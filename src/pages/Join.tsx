@@ -1,26 +1,11 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Users, Heart, Music, ArrowRight } from "lucide-react";
-import { useState } from "react";
-
-type JoinType = "member" | "supporter" | null;
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function Join() {
-  const [joinType, setJoinType] = useState<JoinType>(null);
-  const [step, setStep] = useState(1);
-
+  useDocumentTitle("Join the Choir");
+  
   return (
     <div className="min-h-screen bg-background">
       <Header />

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Target, Eye, Heart, Users, Calendar, Award, Music } from "lucide-react";
 import choirImage from "@/assets/choir-group.jpg";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const milestones = [
   { year: "2024", title: "Founded", description: "Serenades of Praise was born at Kacyiru SDA Church" },
@@ -19,6 +20,8 @@ const values = [
 ];
 
 export default function About() {
+  useDocumentTitle("About Us");
+  
   return (
     <div className="min-h-screen bg-background">
       <Header />

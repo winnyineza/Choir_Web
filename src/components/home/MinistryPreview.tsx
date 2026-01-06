@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Youtube, Music, BookOpen, Heart, ArrowRight, Play, Eye, TrendingUp } from "lucide-react";
+import { Youtube, Music, BookOpen, Heart, ArrowRight, Eye, TrendingUp } from "lucide-react";
+import { getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
 
 export function MinistryPreview() {
   const sectionRef = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [featuredVideo, setFeaturedVideo] = useState<MusicVideo | null>(null);
+
+  useEffect(() => {
+    // Load featured video from admin-managed data
+    const latest = getLatestMusicVideo();
+    setFeaturedVideo(latest || null);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -97,20 +105,21 @@ export function MinistryPreview() {
             </div>
           </div>
 
-          {/* Featured Song Card */}
-          <div
-            className={`transition-all duration-700 delay-300 ${
-              isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold">
-                    <TrendingUp className="w-3 h-3" />
-                    Most Loved Song
-                  </span>
+          {/* Featured Song Card - Only show if video exists */}
+          {featuredVideo && (
+            <div
+              className={`transition-all duration-700 delay-300 ${
+                isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold">
+                  <TrendingUp className="w-3 h-3" />
+                  Featured Song
+                </span>
                 <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                    <Eye className="w-4 h-4" />
-                    <span className="font-medium">10K+ views</span>
+                  <Eye className="w-4 h-4" />
+                  <span className="font-medium">Watch Now</span>
                 </div>
               </div>
               
@@ -119,8 +128,8 @@ export function MinistryPreview() {
                 <iframe
                   width="100%"
                   height="220"
-                  src="https://www.youtube.com/embed/MIxvjxty1Nw"
-                  title="Warakoze Mukiza"
+                  src={`https://www.youtube.com/embed/${featuredVideo.youtubeId}`}
+                  title={featuredVideo.title}
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -129,27 +138,28 @@ export function MinistryPreview() {
               </div>
 
               <h3 className="font-display text-2xl font-semibold text-foreground mb-2">
-                Warakoze Mukiza
+                {featuredVideo.title}
               </h3>
               <p className="text-muted-foreground text-sm mb-5">
-                A heartfelt song of gratitude to our Savior, featuring beautiful harmonies that touch the soul.
+                Experience the power of worship through our featured release.
               </p>
 
               <div className="flex gap-3">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <a href="https://www.youtube.com/watch?v=MIxvjxty1Nw" target="_blank" rel="noopener noreferrer">
+                  <a href={`https://www.youtube.com/watch?v=${featuredVideo.youtubeId}`} target="_blank" rel="noopener noreferrer">
                     <Youtube className="w-4 h-4 mr-2" />
                     YouTube
                   </a>
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <a href="https://open.spotify.com/user/31vkr3pk5yd5y2mpocfhibr4xbfm?si=R0-7_dXCRL2tlA84TP04TA" target="_blank" rel="noopener noreferrer">
+                  <a href="https://open.spotify.com/user/31vkr3pk5yd5y2mpocfhibr4xbfm" target="_blank" rel="noopener noreferrer">
                     <Music className="w-4 h-4 mr-2" />
                     Spotify
                   </a>
                 </Button>
               </div>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </section>

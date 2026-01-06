@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Info, Users, Calendar, Music, Image } from "lucide-react";
+import { Menu, X, Info, Users, Calendar, Music, Image, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/LogoTSC.jpg"; // <-- your logo import
 
@@ -11,6 +11,7 @@ const navLinks = [
   { name: "Events", href: "/events", icon: Calendar },
   { name: "Releases", href: "/releases", icon: Music },
   { name: "Gallery", href: "/gallery", icon: Image },
+  { name: "Contact", href: "/contact", icon: Mail },
 ];
 
 export function Header() {

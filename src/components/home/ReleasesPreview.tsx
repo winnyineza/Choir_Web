@@ -1,32 +1,21 @@
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Music, ArrowRight } from "lucide-react";
+import { Play, Music, ArrowRight, Video } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const youtubeVideos = [
-  {
-    id: 1,
-    title: "Latest Release",
-    videoId: "Pzgvo9oSPn0",
-    isLatest: true,
-  },
-  {
-    id: 2,
-    title: "Ntabaza Yesu | I Must Tell Jesus",
-    videoId: "Jwql9oVctsU",
-    isLatest: false,
-  },
-  {
-    id: 3,
-    title: "Warakoze Mukiza",
-    videoId: "MIxvjxty1Nw",
-    isLatest: false,
-  },
-];
+import { getAllMusicVideos, getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
 
 export const ReleasesPreview = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [musicVideos, setMusicVideos] = useState<MusicVideo[]>([]);
+  const [latestVideo, setLatestVideo] = useState<MusicVideo | null>(null);
+
+  useEffect(() => {
+    // Load videos from admin-managed data
+    const videos = getAllMusicVideos();
+    setMusicVideos(videos);
+    setLatestVideo(getLatestMusicVideo() || null);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -45,8 +34,12 @@ export const ReleasesPreview = () => {
     return () => observer.disconnect();
   }, []);
 
-  const latestVideo = youtubeVideos.find((v) => v.isLatest);
-  const otherVideos = youtubeVideos.filter((v) => !v.isLatest);
+  const otherVideos = musicVideos.filter((v) => !v.isLatest).slice(0, 3);
+
+  // Don't render section if no videos exist
+  if (musicVideos.length === 0) {
+    return null;
+  }
 
   return (
     <section
@@ -93,7 +86,7 @@ export const ReleasesPreview = () => {
                 <iframe
                   width="100%"
                   height="315"
-                  src={`https://www.youtube.com/embed/${latestVideo.videoId}`}
+                  src={`https://www.youtube.com/embed/${latestVideo.youtubeId}`}
                   title={latestVideo.title}
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -112,13 +105,15 @@ export const ReleasesPreview = () => {
                 : "opacity-0 translate-y-10"
             }`}
           >
-            <h3 className="font-semibold text-lg text-foreground mb-4">
-              More from our collection
-            </h3>
+            {otherVideos.length > 0 && (
+              <h3 className="font-semibold text-lg text-foreground mb-4">
+                More from our collection
+              </h3>
+            )}
             {otherVideos.map((video, index) => (
               <a
                 key={video.id}
-                href={`https://www.youtube.com/watch?v=${video.videoId}`}
+                href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex gap-4 p-3 rounded-xl card-glass hover:bg-secondary/50 transition-all duration-300"
@@ -126,7 +121,7 @@ export const ReleasesPreview = () => {
               >
                 <div className="relative w-40 flex-shrink-0 rounded-lg overflow-hidden">
                   <img
-                    src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`}
+                    src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
                     alt={video.title}
                     className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-500"
                   />

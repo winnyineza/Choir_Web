@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
-import { Instagram, Facebook, Youtube, Twitter, Mail, Phone, MapPin } from "lucide-react";
-import logo from "@/assets/LogoTSC.jpg"; // <-- import your logo
+import { Instagram, Facebook, Youtube, Twitter, Mail, Phone, MapPin, Eye } from "lucide-react";
+import { NewsletterForm } from "@/components/NewsletterForm";
+import { useVisitorCount } from "@/hooks/useVisitorCount";
+import logo from "@/assets/LogoTSC.jpg";
 
 // Custom Spotify icon component
 const SpotifyIcon = () => (
@@ -15,9 +17,28 @@ const SpotifyIcon = () => (
 );
 
 export function Footer() {
+  const visitorCount = useVisitorCount();
+  
   return (
     <footer className="bg-charcoal border-t border-primary/10">
-      <div className="container mx-auto px-4 py-16">
+      {/* Newsletter Section */}
+      <div className="border-b border-primary/10">
+        <div className="container mx-auto px-4 py-10">
+          <div className="max-w-2xl mx-auto text-center">
+            <h3 className="font-display text-2xl font-bold text-foreground mb-2">
+              Stay <span className="gold-text">Connected</span>
+            </h3>
+            <p className="text-muted-foreground text-sm mb-6">
+              Subscribe to receive updates on events, new releases, and ministry news.
+            </p>
+            <div className="max-w-md mx-auto">
+              <NewsletterForm variant="inline" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Brand */}
           <div className="space-y-4">
@@ -43,7 +64,7 @@ export function Footer() {
           <div>
             <h3 className="font-display text-lg font-semibold text-foreground mb-4">Quick Links</h3>
             <ul className="space-y-2">
-              {["About", "Ministry", "Events", "Releases", "Gallery"].map((item) => (
+              {["About", "Ministry", "Events", "Releases", "Gallery", "Contact"].map((item) => (
                 <li key={item}>
                   <Link
                     to={`/${item.toLowerCase()}`}
@@ -61,16 +82,26 @@ export function Footer() {
             <h3 className="font-display text-lg font-semibold text-foreground mb-4">Contact</h3>
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                <MapPin className="w-4 h-4 text-primary" />
+                <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
                 Kacyiru SDA Church, Kigali
               </li>
-              <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Mail className="w-4 h-4 text-primary" />
-                theserenadeschoir@gmail.com
+              <li>
+                <a 
+                  href="mailto:theserenadeschoir@gmail.com"
+                  className="flex items-center gap-3 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Mail className="w-4 h-4 text-primary flex-shrink-0" />
+                  theserenadeschoir@gmail.com
+                </a>
               </li>
-              <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Phone className="w-4 h-4 text-primary" />
-                +250 780 623 144
+              <li>
+                <a 
+                  href="tel:+250780623144"
+                  className="flex items-center gap-3 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Phone className="w-4 h-4 text-primary flex-shrink-0" />
+                  +250 780 623 144
+                </a>
               </li>
             </ul>
           </div>
@@ -107,10 +138,18 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Serenades of Praise Choir. All rights reserved.
-          </p>
+        <div className="mt-10 pt-8 border-t border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+            <p className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} Serenades of Praise Choir. All rights reserved.
+            </p>
+            {visitorCount > 0 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Eye className="w-4 h-4 text-primary" />
+                <span>{visitorCount.toLocaleString()} visitors</span>
+              </div>
+            )}
+          </div>
           <div className="flex gap-6 text-sm">
             <Link to="/privacy" className="text-muted-foreground hover:text-primary transition-colors">
               Privacy Policy

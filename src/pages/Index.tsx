@@ -6,6 +6,7 @@ import { EventsPreview } from "@/components/home/EventsPreview";
 import { MinistryPreview } from "@/components/home/MinistryPreview";
 import { ReleasesPreview } from "@/components/home/ReleasesPreview";
 import { SupportCTA } from "@/components/home/SupportCTA";
+import { Testimonials } from "@/components/home/Testimonials";
 
 const Index = () => {
   return (
@@ -17,6 +18,7 @@ const Index = () => {
         <MinistryPreview />
         <ReleasesPreview />
         <EventsPreview />
+        <Testimonials />
         <SupportCTA />
       </main>
       <Footer />

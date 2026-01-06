@@ -80,7 +80,7 @@ export function Hero() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
           >
-            Experience divine connection through <span className="text-primary font-medium">powerful worship</span> and musical excellence that praie God.
+            Experience divine connection through <span className="text-primary font-medium">powerful worship</span> and musical excellence that praises God.
           </p>
 
           {/* Stats */}

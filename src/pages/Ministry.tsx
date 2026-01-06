@@ -1,55 +1,34 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import { BookOpen, MapPin, Calendar, Youtube, Music, Heart, ArrowRight } from "lucide-react";
+import { BookOpen, MapPin, Calendar, Youtube, Music, Heart, ArrowRight, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const trips = [
-  {
-    id: 1,
-    destination: "Musanze District",
-    date: "Jan 20-22, 2025",
-    purpose: "Youth Conference",
-    status: "Trip Approval Status",
-  },
-  {
-    id: 2,
-    destination: "Huye District",
-    date: "Feb 10-12, 2025",
-    purpose: "Church Revival",
-    status: "Trip Approval Status",
-  },
-  {
-    id: 3,
-    destination: "Rubavu District",
-    date: "Mar 5-7, 2025",
-    purpose: "Gospel Concert",
-    status: "Trip Approval Status",
-  },
-];
-
-const devotionals = [
-  {
-    date: "Today",
-    title: "Walking in Faith",
-    verse: "Hebrews 11:1",
-    excerpt: "Now faith is the substance of things hoped for, the evidence of things not seen.",
-  },
-  {
-    date: "Yesterday",
-    title: "The Power of Praise",
-    verse: "Psalm 150:6",
-    excerpt: "Let everything that has breath praise the Lord. Praise the Lord!",
-  },
-  {
-    date: "Dec 5",
-    title: "Joy in the Journey",
-    verse: "Philippians 4:4",
-    excerpt: "Rejoice in the Lord always. I will say it again: Rejoice!",
-  },
-];
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useState, useEffect } from "react";
+import { getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
+import { getAllMembers } from "@/lib/dataService";
 
 export default function Ministry() {
+  useDocumentTitle("Our Ministry");
+  const [featuredVideo, setFeaturedVideo] = useState<MusicVideo | null>(null);
+  const [memberCount, setMemberCount] = useState(0);
+
+  useEffect(() => {
+    // Load data from admin
+    const video = getLatestMusicVideo();
+    setFeaturedVideo(video || null);
+    
+    const members = getAllMembers();
+    setMemberCount(members.filter(m => m.status === "Active").length);
+  }, []);
+
+  const ministryStats = [
+    { label: "Ministry Focus", value: "Music", icon: Music },
+    { label: "Community", value: "Growing", icon: Heart },
+    { label: "Active Members", value: memberCount > 0 ? `${memberCount}` : "—", icon: Users },
+    { label: "Location", value: "Rwanda", icon: MapPin },
+  ];
+  
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -72,113 +51,119 @@ export default function Ministry() {
           </div>
         </section>
 
-        {/* Choir Trips */}
-        <section className="py-20">
+        {/* Ministry Stats */}
+        <section className="py-12 border-b border-primary/10">
           <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-12">
-              <div>
-                <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-2 block">
-                  Ministry Trips
-                </span>
-                <h2 className="font-display text-4xl font-bold">
-                  <span className="gold-text">Book</span> a Trip with Us
-                </h2>
-              </div>
-              <p className="text-muted-foreground max-w-md mt-4 md:mt-0">
-                Travel with the choir to different locations and be part of our ministry outreach.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {trips.map((trip) => (
-                <div key={trip.id} className="card-glass rounded-2xl p-6 hover:border-primary/30 transition-all duration-300">
-                  <div className="flex items-center gap-2 text-sm text-primary mb-4">
-                    <MapPin className="w-4 h-4" />
-                    {trip.destination}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {ministryStats.map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-3 flex items-center justify-center">
+                    <stat.icon className="w-6 h-6 text-primary-foreground" />
                   </div>
-                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">
-                    {trip.purpose}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <Calendar className="w-4 h-4" />
-                    {trip.date}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gold-light">{trip.status}</span>
-                    <Button variant="gold" size="sm">Approved</Button>
-                  </div>
+                  <p className="text-2xl md:text-3xl font-bold gold-text">{stat.value}</p>
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Featured Content */}
-        <section className="py-20 bg-charcoal section-pattern">
+        {/* About Our Ministry */}
+        <section className="py-20">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {/* Most Loved Song */}
-              <div className="card-glass rounded-3xl p-8">
-                <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-4 block">
-                  Most Loved Song
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-12">
+                <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-2 block">
+                  About Us
                 </span>
-                <div className="rounded-2xl overflow-hidden mb-4 gold-glow">
-                <iframe
-                  width="100%"
-                  height="220"
-                  src="https://www.youtube.com/embed/MIxvjxty1Nw"
-                  title="Warakoze Mukiza"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full aspect-video"
-                />
-              </div>
-                <h3 className="font-display text-2xl font-semibold text-foreground mb-2">
-                  Warakoze Mukiza
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Our most popular release featuring soul-stirring harmonies and uplifting messages of what salvation plan means to us.
+                <h2 className="font-display text-4xl font-bold mb-6">
+                  Our <span className="gold-text">Mission</span>
+                </h2>
+                <p className="text-muted-foreground text-lg">
+                  We are dedicated to spreading the gospel through sacred music. Our choir travels across Rwanda 
+                  to share worship, fellowship, and spiritual nourishment with communities everywhere.
                 </p>
-                <div className="flex gap-4">
-                  <Button variant="outline" className="flex-1">
-                    <Youtube className="w-4 h-4 mr-2" />
-                    Watch on YouTube
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    <Music className="w-4 h-4 mr-2" />
-                    Listen on Spotify
-                  </Button>
-                </div>
               </div>
 
-              {/* Daily Devotions */}
-              <div>
-                <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-4 block">
-                  Daily Devotions
-                </span>
-                <h2 className="font-display text-3xl font-bold mb-6">
-                  <span className="gold-text">Spiritual</span> Nourishment
-                </h2>
-                <div className="space-y-4">
-                  {devotionals.map((devotion, index) => (
-                    <div key={index} className="card-glass rounded-xl p-5 hover:border-primary/30 transition-all duration-300 cursor-pointer group">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-primary font-semibold">{devotion.date}</span>
-                        <BookOpen className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                      <h4 className="font-display text-lg font-semibold text-foreground mb-1">
-                        {devotion.title}
-                      </h4>
-                      <p className="text-sm text-gold-light mb-2">{devotion.verse}</p>
-                      <p className="text-sm text-muted-foreground italic">"{devotion.excerpt}"</p>
-                    </div>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="card-glass rounded-2xl p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center">
+                    <Music className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Worship</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Leading hearts to God through powerful worship music and hymns.
+                  </p>
+                </div>
+                <div className="card-glass rounded-2xl p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center">
+                    <Heart className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Fellowship</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Building community through shared faith and musical ministry.
+                  </p>
+                </div>
+                <div className="card-glass rounded-2xl p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Devotion</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Nurturing spiritual growth through daily reflection and prayer.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </section>
+
+        {/* Featured Video - Only show if video exists */}
+        {featuredVideo && (
+          <section className="py-20 bg-charcoal section-pattern">
+            <div className="container mx-auto px-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="card-glass rounded-3xl p-8">
+                  <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-4 block">
+                    Featured Release
+                  </span>
+                  <div className="rounded-2xl overflow-hidden mb-4 gold-glow">
+                    <iframe
+                      width="100%"
+                      height="315"
+                      src={`https://www.youtube.com/embed/${featuredVideo.youtubeId}`}
+                      title={featuredVideo.title}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full aspect-video"
+                    />
+                  </div>
+                  <h3 className="font-display text-2xl font-semibold text-foreground mb-2">
+                    {featuredVideo.title}
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    Experience the power of worship through our featured release.
+                  </p>
+                  <div className="flex gap-4">
+                    <Button variant="outline" className="flex-1" asChild>
+                      <a href={`https://www.youtube.com/watch?v=${featuredVideo.youtubeId}`} target="_blank" rel="noopener noreferrer">
+                        <Youtube className="w-4 h-4 mr-2" />
+                        Watch on YouTube
+                      </a>
+                    </Button>
+                    <Button variant="outline" className="flex-1" asChild>
+                      <a href="https://open.spotify.com/user/31vkr3pk5yd5y2mpocfhibr4xbfm" target="_blank" rel="noopener noreferrer">
+                        <Music className="w-4 h-4 mr-2" />
+                        Listen on Spotify
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Support Section */}
         <section className="py-20">

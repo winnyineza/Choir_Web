@@ -1,41 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Calendar, MapPin, Clock, ArrowRight, Ticket, Mail } from "lucide-react";
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "Salvation Story",
-    date: "Dec 25, 2025",
-    time: "3:00 PM",
-    location: "Kacyiru SDA Church",
-    image: "@/assets/",
-    featured: true,
-  },
-  {
-    id: 2,
-    title: "New Year Praise Night",
-    date: "Dec 31, 2024",
-    time: "9:00 PM",
-    location: "Convention Center Kigali",
-    image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=400&fit=crop",
-    featured: false,
-  },
-  {
-    id: 3,
-    title: "Youth Revival Weekend",
-    date: "Jan 15, 2025",
-    time: "3:00 PM",
-    location: "Kacyiru SDA Church",
-    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&h=400&fit=crop",
-    featured: false,
-  },
-];
+import { Calendar, MapPin, ArrowRight, Ticket } from "lucide-react";
+import { getBookableEvents, type Event } from "@/lib/dataService";
 
 export function EventsPreview() {
   const sectionRef = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [events, setEvents] = useState<Event[]>([]);
+
+  useEffect(() => {
+    // Load events from admin-managed data
+    const bookableEvents = getBookableEvents();
+    setEvents(bookableEvents.slice(0, 3)); // Show first 3 events
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -96,26 +74,79 @@ export function EventsPreview() {
           </Button>
           
         </div>
-        <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto rounded-3xl overflow-hidden gold-glow-lg" style={{ background: "var(--gradient-gold)" }}>
-              <div className="p-10 md:p-14 text-center">
-                <h2 className="font-display text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
-                  Soon to be announced!
-                </h2>
-                <p className="text-primary-foreground/90 text-lg mb-2">
-                  Currently we don't have a concert or an event to publish, but kindly stay tuned...
-                </p>
-                <p className="text-primary-foreground/100 text-lg mb-8 font-style: italic font-medium">
-                  Re-visit our site & our social platforms to get more informed about anything. 
-                </p>
+        {/* Events Grid or Empty State */}
+        {events.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {events.map((event, index) => (
+              <div
+                key={event.id}
+                className={`card-glass rounded-2xl overflow-hidden transition-all duration-700 hover:border-primary/30 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                }`}
+                style={{ transitionDelay: `${300 + index * 100}ms` }}
+              >
+                {event.image && (
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={event.image}
+                      alt={event.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                    {!event.isFree && (
+                      <div className="absolute top-4 right-4">
+                        <span className="px-3 py-1 rounded-full bg-gold-gradient text-primary-foreground text-xs font-semibold">
+                          <Ticket className="w-3 h-3 inline mr-1" />
+                          Tickets Available
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="p-6">
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-3">
+                    {event.title}
+                  </h3>
+                  <div className="space-y-2 text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      {new Date(event.date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      {event.location}
+                    </div>
+                  </div>
+                  <Link to="/events">
+                    <Button variant="gold-outline" size="sm" className="w-full">
+                      View Details
+                    </Button>
+                  </Link>
+                </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto rounded-3xl overflow-hidden gold-glow-lg" style={{ background: "var(--gradient-gold)" }}>
+            <div className="p-10 md:p-14 text-center">
+              <h2 className="font-display text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
+                Soon to be announced!
+              </h2>
+              <p className="text-primary-foreground/90 text-lg mb-2">
+                Currently we don't have a concert or an event to publish, but kindly stay tuned...
+              </p>
+              <p className="text-primary-foreground/100 text-lg mb-8 italic font-medium">
+                Re-visit our site & our social platforms to get more informed about anything. 
+              </p>
             </div>
           </div>
-
-        {/* Events Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-        </div>
+        )}
       </div>
     </section>
   );
