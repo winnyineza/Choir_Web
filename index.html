@@ -6,19 +6,23 @@
     <title>Serenades of Praise Choir | Sacred Music Ministry</title>
     <meta name="description" content="Serenades of Praise - A choir ministry at Kacyiru SDA Church dedicated to glorifying God through sacred music and harmonious praise. Join our community in Kigali, Rwanda." />
     <meta name="author" content="Serenades of Praise Choir" />
-    <meta name="keywords" content="choir, gospel music, Rwanda, Kigali, SDA Church, Kacyiru, sacred music, praise, worship, Christian music, Adventist choir" />
+    <meta name="keywords" content="choir, gospel music, Rwanda, Kigali, SDA Church, Kacyiru, sacred music, praise, worship, Christian music, Adventist choir, Serenades of Praise" />
     <link rel="canonical" href="https://serenadesofpraise.com" />
     
     <!-- Theme Color -->
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="msapplication-TileColor" content="#d4a537" />
+    <meta name="color-scheme" content="dark light" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://serenadesofpraise.com" />
     <meta property="og:title" content="Serenades of Praise Choir | Sacred Music Ministry" />
     <meta property="og:description" content="A choir ministry dedicated to glorifying God through sacred music and harmonious praise at Kacyiru SDA Church, Kigali, Rwanda." />
-    <meta property="og:image" content="/src/assets/LogoTSC.jpg" />
+    <meta property="og:image" content="https://serenadesofpraise.com/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="Serenades of Praise Choir" />
 
@@ -27,14 +31,53 @@
     <meta name="twitter:url" content="https://serenadesofpraise.com" />
     <meta name="twitter:title" content="Serenades of Praise Choir" />
     <meta name="twitter:description" content="Sacred music ministry at Kacyiru SDA Church, Kigali, Rwanda. Voices United in Worship." />
-    <meta name="twitter:image" content="/src/assets/LogoTSC.jpg" />
+    <meta name="twitter:image" content="https://serenadesofpraise.com/og-image.jpg" />
     <meta name="twitter:site" content="@SerenadesTSC" />
     
     <!-- Additional SEO -->
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow" />
     <meta name="language" content="English" />
     <meta name="revisit-after" content="7 days" />
+    <meta name="geo.region" content="RW-01" />
+    <meta name="geo.placename" content="Kigali" />
+    <meta name="geo.position" content="-1.9403;30.0618" />
+    <meta name="ICBM" content="-1.9403, 30.0618" />
+    
+    <!-- Structured Data - Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "MusicGroup",
+      "name": "Serenades of Praise Choir",
+      "alternateName": "TSC",
+      "description": "A choir ministry at Kacyiru SDA Church dedicated to glorifying God through sacred music and harmonious praise.",
+      "url": "https://serenadesofpraise.com",
+      "logo": "https://serenadesofpraise.com/logo.png",
+      "image": "https://serenadesofpraise.com/og-image.jpg",
+      "genre": ["Gospel", "Sacred Music", "Christian Music", "Choral"],
+      "foundingDate": "2010",
+      "foundingLocation": {
+        "@type": "Place",
+        "name": "Kigali, Rwanda"
+      },
+      "location": {
+        "@type": "Place",
+        "name": "Kacyiru SDA Church",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Kigali",
+          "addressCountry": "RW"
+        }
+      },
+      "sameAs": [
+        "https://www.youtube.com/@theserenadesofpraisegroup",
+        "https://open.spotify.com/user/31vkr3pk5yd5y2mpocfhibr4xbfm",
+        "https://www.instagram.com/theserenadespraise",
+        "https://www.facebook.com/theserenadesofpraise"
+      ]
+    }
+    </script>
     
     <!-- Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,11 +86,25 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    
+    <!-- Preload critical assets -->
+    <link rel="preload" href="/src/index.css" as="style" />
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Prevent FOUC for dark mode -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -3,6 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Info, Users, Calendar, Music, Image, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import logo from "@/assets/LogoTSC.jpg"; // <-- your logo import
 
 const navLinks = [
@@ -77,7 +79,9 @@ export function Header() {
         </nav>
 
         {/* CTA Buttons */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-2">
+          <LanguageSelector />
+          <ThemeToggle />
           <Button variant="gold-outline" size="sm" asChild>
             <Link to="/join">Join Choir</Link>
           </Button>
@@ -123,13 +127,19 @@ export function Header() {
               </Link>
             );
           })}
-          <div className="flex gap-3 mt-4 pt-4 border-t border-primary/10">
-            <Button variant="gold-outline" size="sm" className="flex-1" asChild>
-              <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join Choir</Link>
-            </Button>
-            <Button variant="gold" size="sm" className="flex-1" asChild>
-              <Link to="/support" onClick={() => setIsMobileMenuOpen(false)}>Support Us</Link>
-            </Button>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary/10">
+            <div className="flex items-center gap-2">
+              <LanguageSelector />
+              <ThemeToggle />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="gold-outline" size="sm" asChild>
+                <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join</Link>
+              </Button>
+              <Button variant="gold" size="sm" asChild>
+                <Link to="/support" onClick={() => setIsMobileMenuOpen(false)}>Support</Link>
+              </Button>
+            </div>
           </div>
         </nav>
       </div>

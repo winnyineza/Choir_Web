@@ -79,8 +79,10 @@ import { UploadGalleryModal } from "@/components/admin/UploadGalleryModal";
 import { TicketDetailModal } from "@/components/admin/TicketDetailModal";
 import { AddAlbumModal } from "@/components/admin/AddAlbumModal";
 import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
+import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
+import { BarChart3 } from "lucide-react";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "releases" | "promos" | "gallery" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "releases" | "promos" | "gallery" | "analytics" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -90,6 +92,7 @@ const sidebarItems = [
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
+  { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
   { id: "settings" as Tab, label: "Settings", icon: Settings },
 ];
 
@@ -1359,6 +1362,19 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Analytics */}
+          {activeTab === "analytics" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="font-display text-xl font-semibold">Analytics</h2>
+                <p className="text-sm text-muted-foreground">
+                  Track your website performance
+                </p>
+              </div>
+              <AnalyticsDashboard />
             </div>
           )}
 

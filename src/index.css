@@ -69,6 +69,52 @@
     --background: 0 0% 3%;
     --foreground: 45 50% 95%;
   }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 45 80% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 45 70% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85%;
+    --input: 0 0% 92%;
+    --ring: 45 80% 45%;
+
+    --charcoal: 0 0% 95%;
+    --charcoal-light: 0 0% 92%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-primary: 45 80% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 85%;
+    --sidebar-ring: 45 80% 45%;
+  }
+
+  .light body {
+    background: linear-gradient(180deg, hsl(0 0% 98%), hsl(0 0% 95%));
+  }
 }
 
 @layer base {
@@ -211,4 +257,111 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(45 80% 50% / 0.5);
+}
+
+/* Light mode scrollbar */
+.light ::-webkit-scrollbar-track {
+  background: hsl(0 0% 95%);
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: hsl(45 80% 50% / 0.4);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: hsl(45 80% 50% / 0.6);
+}
+
+/* Print Styles */
+@media print {
+  /* Reset page */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide non-essential elements */
+  header,
+  footer,
+  nav,
+  .no-print,
+  button:not(.print-show),
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Ticket print styles */
+  .ticket-print {
+    width: 100% !important;
+    max-width: 400px !important;
+    margin: 0 auto !important;
+    padding: 20px !important;
+    border: 2px solid #d4a537 !important;
+    border-radius: 16px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .ticket-print .ticket-header {
+    background: linear-gradient(135deg, #d4a537, #b8922e) !important;
+    color: white !important;
+    padding: 16px !important;
+    border-radius: 12px 12px 0 0 !important;
+    text-align: center !important;
+  }
+
+  .ticket-print .ticket-body {
+    padding: 20px !important;
+    background: #f9f9f9 !important;
+  }
+
+  .ticket-print .ticket-qr {
+    display: flex !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    background: white !important;
+  }
+
+  .ticket-print .ticket-qr img,
+  .ticket-print .ticket-qr canvas {
+    width: 150px !important;
+    height: 150px !important;
+  }
+
+  .ticket-print .ticket-footer {
+    text-align: center !important;
+    padding: 12px !important;
+    font-size: 10px !important;
+    color: #666 !important;
+    border-top: 1px dashed #ccc !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  /* Links */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  /* Images */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* QR Codes */
+  .qr-code {
+    display: block !important;
+    page-break-inside: avoid !important;
+  }
 }
