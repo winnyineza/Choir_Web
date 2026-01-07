@@ -23,6 +23,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import Scanner from "./pages/Scanner";
+import MemberPortal from "./pages/MemberPortal";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const App = () => (
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/scanner" element={<Scanner />} />
+                <Route path="/member-portal" element={<MemberPortal />} />
                 <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

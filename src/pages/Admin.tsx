@@ -32,6 +32,9 @@ import {
   Play,
   Star,
   ExternalLink,
+  CalendarOff,
+  FileText,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -72,7 +75,16 @@ import {
   type Album,
   type MusicVideo,
 } from "@/lib/releaseService";
+import {
+  getAllLeaveRequests,
+  getPendingLeaveRequests,
+  approveLeaveRequest,
+  denyLeaveRequest,
+  getLeaveRequestStats,
+  type LeaveRequest,
+} from "@/lib/leaveService";
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
 import { AddMemberModal } from "@/components/admin/AddMemberModal";
 import { AddEventModal } from "@/components/admin/AddEventModal";
 import { UploadGalleryModal } from "@/components/admin/UploadGalleryModal";
@@ -82,13 +94,14 @@ import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { BarChart3 } from "lucide-react";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "releases" | "promos" | "gallery" | "analytics" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
   { id: "members" as Tab, label: "Members", icon: Users },
   { id: "events" as Tab, label: "Events", icon: Calendar },
   { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket },
+  { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
@@ -111,6 +124,8 @@ export default function Admin() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [musicVideos, setMusicVideos] = useState<MusicVideo[]>([]);
   const [streamingPlatforms, setStreamingPlatforms] = useState<StreamingPlatform[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leaveFilter, setLeaveFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [dashboardStats, setDashboardStats] = useState({
     totalMembers: 0,
     newMembersThisMonth: 0,
@@ -150,6 +165,7 @@ export default function Admin() {
     setAlbums(getAllAlbums());
     setMusicVideos(getAllMusicVideos());
     setStreamingPlatforms(getAllPlatforms());
+    setLeaveRequests(getAllLeaveRequests());
     setDashboardStats(getDashboardStats());
   };
 
@@ -832,6 +848,198 @@ export default function Admin() {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Leave Requests */}
+          {activeTab === "leave" && (
+            <div className="space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-foreground">{leaveRequests.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Requests</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {leaveRequests.filter(r => r.status === "pending").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Pending</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-green-400">
+                    {leaveRequests.filter(r => r.status === "approved").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Approved</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-red-400">
+                    {leaveRequests.filter(r => r.status === "denied").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Denied</p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex gap-2 flex-wrap">
+                  {(["all", "pending", "approved", "denied"] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setLeaveFilter(filter)}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 capitalize",
+                        leaveFilter === filter
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Link to="/member-portal" target="_blank">
+                    <Button variant="outline">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Member Portal
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="icon" onClick={loadData} title="Refresh">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Leave Requests Table */}
+              <div className="card-glass rounded-2xl overflow-hidden">
+                {leaveRequests.filter(r => leaveFilter === "all" || r.status === leaveFilter).length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-secondary/50">
+                        <tr>
+                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Member</th>
+                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Dates</th>
+                          <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Reason</th>
+                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                          <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leaveRequests
+                          .filter(r => leaveFilter === "all" || r.status === leaveFilter)
+                          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                          .map((request) => (
+                          <tr key={request.id} className="border-t border-primary/10">
+                            <td className="p-4">
+                              <p className="font-medium text-foreground">{request.memberName}</p>
+                              <p className="text-xs text-muted-foreground">{request.memberEmail}</p>
+                            </td>
+                            <td className="p-4">
+                              <p className="text-foreground">
+                                {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {Math.ceil((new Date(request.endDate).getTime() - new Date(request.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
+                              </p>
+                            </td>
+                            <td className="p-4 hidden md:table-cell">
+                              <p className="text-muted-foreground text-sm max-w-[200px] truncate">{request.reason}</p>
+                            </td>
+                            <td className="p-4">
+                              <span className={cn(
+                                "px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1",
+                                request.status === "approved" && "bg-green-500/20 text-green-400",
+                                request.status === "pending" && "bg-yellow-500/20 text-yellow-400",
+                                request.status === "denied" && "bg-red-500/20 text-red-400"
+                              )}>
+                                {request.status === "approved" && <CheckCircle className="w-3 h-3" />}
+                                {request.status === "pending" && <Clock className="w-3 h-3" />}
+                                {request.status === "denied" && <XCircle className="w-3 h-3" />}
+                                {request.status}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right">
+                              {request.status === "pending" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-green-400 hover:text-green-300"
+                                    onClick={() => {
+                                      approveLeaveRequest(request.id, "Admin");
+                                      loadData();
+                                      toast({
+                                        title: "Leave Approved",
+                                        description: `${request.memberName}'s leave request has been approved.`,
+                                      });
+                                    }}
+                                    title="Approve"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                    onClick={() => {
+                                      const notes = prompt("Reason for denial (optional):");
+                                      denyLeaveRequest(request.id, "Admin", notes || undefined);
+                                      loadData();
+                                      toast({
+                                        title: "Leave Denied",
+                                        description: `${request.memberName}'s leave request has been denied.`,
+                                      });
+                                    }}
+                                    title="Deny"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {request.status !== "pending" && request.reviewedBy && (
+                                <span className="text-xs text-muted-foreground">
+                                  by {request.reviewedBy}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center">
+                    <CalendarOff className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-foreground mb-2">No Leave Requests</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {leaveFilter !== "all" 
+                        ? `No ${leaveFilter} leave requests found.`
+                        : "Leave requests from members will appear here."}
+                    </p>
+                    <Link to="/member-portal" target="_blank">
+                      <Button variant="gold-outline" className="mt-4">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        View Member Portal
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Info Card */}
+              <div className="card-glass rounded-2xl p-6">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  How Leave Requests Work
+                </h3>
+                <ul className="text-sm text-muted-foreground space-y-2">
+                  <li>• Members access the portal at <code className="text-primary">/member-portal</code> using the choir PIN</li>
+                  <li>• They verify their identity via email before submitting a request</li>
+                  <li>• Approved leave requests will show members as "Excused" in attendance</li>
+                  <li>• Members can view their request status in the portal</li>
+                </ul>
               </div>
             </div>
           )}
