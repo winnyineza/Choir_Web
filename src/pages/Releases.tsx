@@ -15,7 +15,6 @@ import {
   type StreamingPlatform,
 } from "@/lib/releaseService";
 import { getPlatformConfig } from "@/lib/streamingPlatforms";
-import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Releases() {
   useDocumentTitle("Music Releases");
@@ -25,7 +24,6 @@ export default function Releases() {
   const [latestVideo, setLatestVideo] = useState<MusicVideo | null>(null);
   const [platforms, setPlatforms] = useState<StreamingPlatform[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { t } = useLanguage();
 
   // Load releases data from admin-managed content only
   useEffect(() => {
@@ -61,13 +59,13 @@ export default function Releases() {
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
               <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                {t("releases.title")}
+                Music Releases
               </span>
               <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                <span className="gold-text">{t("releases.albums")}</span> & {t("releases.videos")}
+                <span className="gold-text">Albums</span> & Videos
               </h1>
               <p className="text-xl text-muted-foreground">
-                {t("releases.listenEverywhere")}
+                Listen everywhere you stream
               </p>
             </div>
           </div>
@@ -80,10 +78,10 @@ export default function Releases() {
               <div className="text-center mb-8">
                 <div className="inline-flex items-center gap-2 text-primary text-sm font-semibold tracking-wider uppercase mb-2">
                   <Headphones className="w-4 h-4" />
-                  {t("releases.listenEverywhere")}
+                  Listen Everywhere
                 </div>
                 <p className="text-muted-foreground">
-                  {t("home.hero.subtitle")}
+                  Our music is available on all major streaming platforms
                 </p>
               </div>
               

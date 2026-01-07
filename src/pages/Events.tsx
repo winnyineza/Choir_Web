@@ -13,7 +13,6 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { useToast } from "@/hooks/use-toast";
 import { getBookableEvents, type Event as DataEvent, type EventTicket } from "@/lib/dataService";
 import { Link } from "react-router-dom";
-import { useLanguage } from "@/contexts/LanguageContext";
 import choirImage from "@/assets/choir-group.jpg";
 
 // Transform EventTicket to TicketTier format for the modal
@@ -50,7 +49,6 @@ export default function Events() {
   const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { t } = useLanguage();
 
   // Fetch events from dataService
   useEffect(() => {
@@ -175,13 +173,13 @@ export default function Events() {
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
               <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                {t("events.upcoming")}
+                Upcoming
               </span>
               <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                <span className="gold-text">{t("events.title")}</span>
+                <span className="gold-text">Events</span> & Concerts
               </h1>
               <p className="text-xl text-muted-foreground">
-                {t("home.hero.subtitle")}
+                Join us for worship, celebration, and musical excellence
               </p>
             </div>
           </div>

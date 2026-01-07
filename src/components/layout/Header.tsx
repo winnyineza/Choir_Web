@@ -4,24 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, Info, Users, Calendar, Music, Image, Mail, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { LanguageSelector } from "@/components/LanguageSelector";
-import { useLanguage } from "@/contexts/LanguageContext";
 import logo from "@/assets/LogoTSC.jpg";
 
 const navLinks = [
-  { key: "nav.about", href: "/about", icon: Info },
-  { key: "nav.ministry", href: "/ministry", icon: Users },
-  { key: "nav.events", href: "/events", icon: Calendar },
-  { key: "nav.releases", href: "/releases", icon: Music },
-  { key: "nav.gallery", href: "/gallery", icon: Image },
-  { key: "nav.contact", href: "/contact", icon: Mail },
+  { name: "About", href: "/about", icon: Info },
+  { name: "Ministry", href: "/ministry", icon: Users },
+  { name: "Events", href: "/events", icon: Calendar },
+  { name: "Releases", href: "/releases", icon: Music },
+  { name: "Gallery", href: "/gallery", icon: Image },
+  { name: "Contact", href: "/contact", icon: Mail },
 ];
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { t } = useLanguage();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,7 +51,7 @@ export function Header() {
             <h1 className="font-body text-base font-bold text-foreground">
               Serenades of Praise
             </h1>
-            <p className="text-xs text-muted-foreground">{t("home.hero.subtitle").slice(0, 25)}...</p>
+            <p className="text-xs text-muted-foreground">Voices United in Worship</p>
           </div>
         </Link>
 
@@ -64,7 +61,7 @@ export function Header() {
             const IconComponent = link.icon;
             return (
               <Link
-                key={link.key}
+                key={link.name}
                 to={link.href}
                 className={cn(
                   "px-4 py-2 text-sm font-medium transition-all duration-300 rounded-lg flex items-center gap-2",
@@ -74,7 +71,7 @@ export function Header() {
                 )}
               >
                 <IconComponent className="w-4 h-4" />
-                {t(link.key)}
+                {link.name}
               </Link>
             );
           })}
@@ -82,15 +79,14 @@ export function Header() {
 
         {/* CTA Buttons */}
         <div className="hidden md:flex items-center gap-2">
-          <LanguageSelector />
           <ThemeToggle />
           <Button variant="gold-outline" size="sm" asChild>
-            <Link to="/join">{t("nav.join")}</Link>
+            <Link to="/join">Join Choir</Link>
           </Button>
           <Button variant="gold" size="sm" asChild>
             <Link to="/donate">
               <Heart className="w-4 h-4 mr-1" />
-              {t("common.donate")}
+              Donate
             </Link>
           </Button>
         </div>
@@ -116,7 +112,7 @@ export function Header() {
             const IconComponent = link.icon;
             return (
               <Link
-                key={link.key}
+                key={link.name}
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
@@ -128,21 +124,18 @@ export function Header() {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <IconComponent className="w-5 h-5" />
-                {t(link.key)}
+                {link.name}
               </Link>
             );
           })}
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary/10">
-            <div className="flex items-center gap-2">
-              <LanguageSelector />
-              <ThemeToggle />
-            </div>
+            <ThemeToggle />
             <div className="flex gap-2">
               <Button variant="gold-outline" size="sm" asChild>
-                <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>{t("nav.join")}</Link>
+                <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join</Link>
               </Button>
               <Button variant="gold" size="sm" asChild>
-                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>{t("common.donate")}</Link>
+                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
               </Button>
             </div>
           </div>

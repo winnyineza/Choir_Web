@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { Instagram, Facebook, Youtube, Twitter, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { useVisitorCount } from "@/hooks/useVisitorCount";
-import { useLanguage } from "@/contexts/LanguageContext";
 import logo from "@/assets/LogoTSC.jpg";
 
 // Custom Spotify icon component
@@ -18,17 +17,16 @@ const SpotifyIcon = () => (
 );
 
 const quickLinks = [
-  { key: "nav.about", href: "/about" },
-  { key: "nav.ministry", href: "/ministry" },
-  { key: "nav.events", href: "/events" },
-  { key: "nav.releases", href: "/releases" },
-  { key: "nav.gallery", href: "/gallery" },
-  { key: "nav.contact", href: "/contact" },
+  { name: "About", href: "/about" },
+  { name: "Ministry", href: "/ministry" },
+  { name: "Events", href: "/events" },
+  { name: "Releases", href: "/releases" },
+  { name: "Gallery", href: "/gallery" },
+  { name: "Contact", href: "/contact" },
 ];
 
 export function Footer() {
   const visitorCount = useVisitorCount();
-  const { t } = useLanguage();
   
   return (
     <footer className="bg-charcoal border-t border-primary/10">
@@ -37,10 +35,10 @@ export function Footer() {
         <div className="container mx-auto px-4 py-10">
           <div className="max-w-2xl mx-auto text-center">
             <h3 className="font-display text-2xl font-bold text-foreground mb-2">
-              {t("footer.newsletter")}
+              Stay <span className="gold-text">Connected</span>
             </h3>
             <p className="text-muted-foreground text-sm mb-6">
-              {t("footer.newsletter.placeholder")}
+              Subscribe to receive updates on events, new releases, and ministry news.
             </p>
             <div className="max-w-md mx-auto">
               <NewsletterForm variant="inline" />
@@ -67,23 +65,23 @@ export function Footer() {
               </div>
             </Link>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              {t("home.hero.subtitle")}
+              Lifting hearts through harmonious praise. A ministry dedicated to glorifying God through sacred music.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
             <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              {t("footer.quickLinks")}
+              Quick Links
             </h3>
             <ul className="space-y-2">
               {quickLinks.map((link) => (
-                <li key={link.key}>
+                <li key={link.name}>
                   <Link
                     to={link.href}
                     className="text-muted-foreground hover:text-primary transition-colors text-sm"
                   >
-                    {t(link.key)}
+                    {link.name}
                   </Link>
                 </li>
               ))}
@@ -93,7 +91,7 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              {t("nav.contact")}
+              Contact
             </h3>
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -124,7 +122,7 @@ export function Footer() {
           {/* Socials */}
           <div>
             <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              {t("footer.followUs")}
+              Follow Us
             </h3>
             <div className="flex gap-3">
               {[
@@ -158,7 +156,7 @@ export function Footer() {
         <div className="mt-10 pt-8 border-t border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Serenades of Praise Choir. {t("footer.rights")}.
+              © {new Date().getFullYear()} Serenades of Praise Choir. All rights reserved.
             </p>
             {visitorCount > 0 && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

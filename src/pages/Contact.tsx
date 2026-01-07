@@ -15,8 +15,6 @@ import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Loader2 } from "lucide-r
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { sendContactEmail } from "@/lib/emailService";
 
 export default function Contact() {
   useDocumentTitle("Contact Us");
@@ -31,7 +29,6 @@ export default function Contact() {
     message: "",
   });
   const { toast } = useToast();
-  const { t } = useLanguage();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -41,38 +38,46 @@ export default function Contact() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const result = await sendContactEmail({
-      name: `${formData.firstName} ${formData.lastName}`,
-      email: formData.email,
-      subject: formData.subject || "Contact Form Message",
-      message: formData.message,
-    });
+    // Submit to Netlify Forms
+    const form = e.currentTarget;
+    const formDataObj = new FormData(form);
 
-    setIsSubmitting(false);
-
-    if (result.success) {
-      setIsSubmitted(true);
-      toast({
-        title: "Message Sent! ✉️",
-        description: result.message,
+    try {
+      const response = await fetch("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(formDataObj as any).toString(),
       });
 
-      // Reset form after delay
-      setTimeout(() => {
-        setIsSubmitted(false);
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone: "",
-          subject: "",
-          message: "",
+      setIsSubmitting(false);
+
+      if (response.ok) {
+        setIsSubmitted(true);
+        toast({
+          title: "Message Sent! ✉️",
+          description: "We'll get back to you within 24-48 hours.",
         });
-      }, 3000);
-    } else {
+
+        // Reset form after delay
+        setTimeout(() => {
+          setIsSubmitted(false);
+          setFormData({
+            firstName: "",
+            lastName: "",
+            email: "",
+            phone: "",
+            subject: "",
+            message: "",
+          });
+        }, 3000);
+      } else {
+        throw new Error("Form submission failed");
+      }
+    } catch (error) {
+      setIsSubmitting(false);
       toast({
         title: "Error",
-        description: result.message,
+        description: "Something went wrong. Please try again or email us directly.",
         variant: "destructive",
       });
     }
@@ -88,13 +93,13 @@ export default function Contact() {
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
               <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                {t("nav.contact")}
+                Contact
               </span>
               <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                {t("contact.title")}
+                Get in <span className="gold-text">Touch</span>
               </h1>
               <p className="text-xl text-muted-foreground">
-                {t("home.hero.subtitle")}
+                We'd love to hear from you. Reach out with any questions or inquiries.
               </p>
             </div>
           </div>
@@ -107,7 +112,7 @@ export default function Contact() {
               {/* Contact Form */}
               <div className="card-glass rounded-3xl p-8">
                 <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                  {t("contact.form.send")}
+                  Send a Message
                 </h2>
 
                 {isSubmitted ? (
@@ -123,12 +128,26 @@ export default function Contact() {
                     </p>
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-5">
+                  <form
+                    name="contact"
+                    method="POST"
+                    data-netlify="true"
+                    netlify-honeypot="bot-field"
+                    onSubmit={handleSubmit}
+                    className="space-y-5"
+                  >
+                    {/* Netlify Forms hidden fields */}
+                    <input type="hidden" name="form-name" value="contact" />
+                    <div hidden>
+                      <input name="bot-field" />
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="firstName">{t("contact.form.name")}</Label>
+                        <Label htmlFor="firstName">First Name</Label>
                         <Input
                           id="firstName"
+                          name="firstName"
                           placeholder="John"
                           value={formData.firstName}
                           onChange={handleChange}
@@ -141,6 +160,7 @@ export default function Contact() {
                         <Label htmlFor="lastName">Last Name</Label>
                         <Input
                           id="lastName"
+                          name="lastName"
                           placeholder="Doe"
                           value={formData.lastName}
                           onChange={handleChange}
@@ -152,9 +172,10 @@ export default function Contact() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="email">{t("contact.form.email")}</Label>
+                      <Label htmlFor="email">Email</Label>
                       <Input
                         id="email"
+                        name="email"
                         type="email"
                         placeholder="john@example.com"
                         value={formData.email}
@@ -169,6 +190,7 @@ export default function Contact() {
                       <Label htmlFor="phone">Phone Number (Optional)</Label>
                       <Input
                         id="phone"
+                        name="phone"
                         type="tel"
                         placeholder="+250 7XX XXX XXX"
                         value={formData.phone}
@@ -182,6 +204,7 @@ export default function Contact() {
                       <Label htmlFor="subject">Subject</Label>
                       <Select 
                         disabled={isSubmitting}
+                        name="subject"
                         onValueChange={(value) => setFormData({ ...formData, subject: value })}
                       >
                         <SelectTrigger className="bg-secondary border-primary/20">
@@ -196,12 +219,15 @@ export default function Contact() {
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
+                      {/* Hidden input for Netlify to capture select value */}
+                      <input type="hidden" name="subject" value={formData.subject} />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="message">{t("contact.form.message")}</Label>
+                      <Label htmlFor="message">Message</Label>
                       <Textarea
                         id="message"
+                        name="message"
                         placeholder="Write your message here..."
                         rows={5}
                         value={formData.message}
@@ -226,7 +252,7 @@ export default function Contact() {
                       ) : (
                         <>
                           <Send className="w-4 h-4 mr-2" />
-                          {t("contact.form.send")}
+                          Send Message
                         </>
                       )}
                     </Button>
