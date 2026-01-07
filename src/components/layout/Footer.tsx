@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Instagram, Facebook, Youtube, Twitter, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { useVisitorCount } from "@/hooks/useVisitorCount";
+import { useLanguage } from "@/contexts/LanguageContext";
 import logo from "@/assets/LogoTSC.jpg";
 
 // Custom Spotify icon component
@@ -16,8 +17,18 @@ const SpotifyIcon = () => (
   </svg>
 );
 
+const quickLinks = [
+  { key: "nav.about", href: "/about" },
+  { key: "nav.ministry", href: "/ministry" },
+  { key: "nav.events", href: "/events" },
+  { key: "nav.releases", href: "/releases" },
+  { key: "nav.gallery", href: "/gallery" },
+  { key: "nav.contact", href: "/contact" },
+];
+
 export function Footer() {
   const visitorCount = useVisitorCount();
+  const { t } = useLanguage();
   
   return (
     <footer className="bg-charcoal border-t border-primary/10">
@@ -26,10 +37,10 @@ export function Footer() {
         <div className="container mx-auto px-4 py-10">
           <div className="max-w-2xl mx-auto text-center">
             <h3 className="font-display text-2xl font-bold text-foreground mb-2">
-              Stay <span className="gold-text">Connected</span>
+              {t("footer.newsletter")}
             </h3>
             <p className="text-muted-foreground text-sm mb-6">
-              Subscribe to receive updates on events, new releases, and ministry news.
+              {t("footer.newsletter.placeholder")}
             </p>
             <div className="max-w-md mx-auto">
               <NewsletterForm variant="inline" />
@@ -56,21 +67,23 @@ export function Footer() {
               </div>
             </Link>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Lifting hearts through harmonious praise. A ministry dedicated to glorifying God through sacred music.
+              {t("home.hero.subtitle")}
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">Quick Links</h3>
+            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
+              {t("footer.quickLinks")}
+            </h3>
             <ul className="space-y-2">
-              {["About", "Ministry", "Events", "Releases", "Gallery", "Contact"].map((item) => (
-                <li key={item}>
+              {quickLinks.map((link) => (
+                <li key={link.key}>
                   <Link
-                    to={`/${item.toLowerCase()}`}
+                    to={link.href}
                     className="text-muted-foreground hover:text-primary transition-colors text-sm"
                   >
-                    {item}
+                    {t(link.key)}
                   </Link>
                 </li>
               ))}
@@ -79,7 +92,9 @@ export function Footer() {
 
           {/* Contact */}
           <div>
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">Contact</h3>
+            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
+              {t("nav.contact")}
+            </h3>
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
@@ -108,7 +123,9 @@ export function Footer() {
 
           {/* Socials */}
           <div>
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">Follow Us</h3>
+            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
+              {t("footer.followUs")}
+            </h3>
             <div className="flex gap-3">
               {[
                 { icon: Instagram, href: "https://www.instagram.com/theserenadesofpraise_group/", label: "Instagram" },
@@ -141,7 +158,7 @@ export function Footer() {
         <div className="mt-10 pt-8 border-t border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Serenades of Praise Choir. All rights reserved.
+              © {new Date().getFullYear()} Serenades of Praise Choir. {t("footer.rights")}.
             </p>
             {visitorCount > 0 && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

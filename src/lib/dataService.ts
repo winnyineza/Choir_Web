@@ -26,6 +26,8 @@ export interface Event {
   tickets: EventTicket[];
   createdAt: string;
   status?: "draft" | "published" | "cancelled";
+  livestreamUrl?: string; // YouTube live stream URL
+  isLive?: boolean; // Whether the event is currently streaming
 }
 
 export interface EventTicket {

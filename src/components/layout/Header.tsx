@@ -1,25 +1,27 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Info, Users, Calendar, Music, Image, Mail } from "lucide-react";
+import { Menu, X, Info, Users, Calendar, Music, Image, Mail, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageSelector } from "@/components/LanguageSelector";
-import logo from "@/assets/LogoTSC.jpg"; // <-- your logo import
+import { useLanguage } from "@/contexts/LanguageContext";
+import logo from "@/assets/LogoTSC.jpg";
 
 const navLinks = [
-  { name: "About", href: "/about", icon: Info },
-  { name: "Ministry", href: "/ministry", icon: Users },
-  { name: "Events", href: "/events", icon: Calendar },
-  { name: "Releases", href: "/releases", icon: Music },
-  { name: "Gallery", href: "/gallery", icon: Image },
-  { name: "Contact", href: "/contact", icon: Mail },
+  { key: "nav.about", href: "/about", icon: Info },
+  { key: "nav.ministry", href: "/ministry", icon: Users },
+  { key: "nav.events", href: "/events", icon: Calendar },
+  { key: "nav.releases", href: "/releases", icon: Music },
+  { key: "nav.gallery", href: "/gallery", icon: Image },
+  { key: "nav.contact", href: "/contact", icon: Mail },
 ];
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -52,7 +54,7 @@ export function Header() {
             <h1 className="font-body text-base font-bold text-foreground">
               Serenades of Praise
             </h1>
-            <p className="text-xs text-muted-foreground">Voices United in Worship</p>
+            <p className="text-xs text-muted-foreground">{t("home.hero.subtitle").slice(0, 25)}...</p>
           </div>
         </Link>
 
@@ -62,7 +64,7 @@ export function Header() {
             const IconComponent = link.icon;
             return (
               <Link
-                key={link.name}
+                key={link.key}
                 to={link.href}
                 className={cn(
                   "px-4 py-2 text-sm font-medium transition-all duration-300 rounded-lg flex items-center gap-2",
@@ -72,7 +74,7 @@ export function Header() {
                 )}
               >
                 <IconComponent className="w-4 h-4" />
-                {link.name}
+                {t(link.key)}
               </Link>
             );
           })}
@@ -83,10 +85,13 @@ export function Header() {
           <LanguageSelector />
           <ThemeToggle />
           <Button variant="gold-outline" size="sm" asChild>
-            <Link to="/join">Join Choir</Link>
+            <Link to="/join">{t("nav.join")}</Link>
           </Button>
           <Button variant="gold" size="sm" asChild>
-            <Link to="/support">Support Us</Link>
+            <Link to="/donate">
+              <Heart className="w-4 h-4 mr-1" />
+              {t("common.donate")}
+            </Link>
           </Button>
         </div>
 
@@ -103,7 +108,7 @@ export function Header() {
       <div
         className={cn(
           "lg:hidden absolute top-full left-0 right-0 bg-background/95 backdrop-blur-xl border-b border-primary/10 overflow-hidden transition-all duration-300",
-          isMobileMenuOpen ? "max-h-96 py-4" : "max-h-0"
+          isMobileMenuOpen ? "max-h-[500px] py-4" : "max-h-0"
         )}
       >
         <nav className="container mx-auto px-4 flex flex-col gap-2">
@@ -111,7 +116,7 @@ export function Header() {
             const IconComponent = link.icon;
             return (
               <Link
-                key={link.name}
+                key={link.key}
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
@@ -123,7 +128,7 @@ export function Header() {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <IconComponent className="w-5 h-5" />
-                {link.name}
+                {t(link.key)}
               </Link>
             );
           })}
@@ -134,10 +139,10 @@ export function Header() {
             </div>
             <div className="flex gap-2">
               <Button variant="gold-outline" size="sm" asChild>
-                <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join</Link>
+                <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>{t("nav.join")}</Link>
               </Button>
               <Button variant="gold" size="sm" asChild>
-                <Link to="/support" onClick={() => setIsMobileMenuOpen(false)}>Support</Link>
+                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>{t("common.donate")}</Link>
               </Button>
             </div>
           </div>

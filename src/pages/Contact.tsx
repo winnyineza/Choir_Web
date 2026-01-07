@@ -15,33 +15,67 @@ import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Loader2 } from "lucide-r
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { sendContactEmail } from "@/lib/emailService";
 
 export default function Contact() {
   useDocumentTitle("Contact Us");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+  });
   const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-
-    toast({
-      title: "Message Sent!",
-      description: "Thank you for reaching out. We'll get back to you soon.",
+    const result = await sendContactEmail({
+      name: `${formData.firstName} ${formData.lastName}`,
+      email: formData.email,
+      subject: formData.subject || "Contact Form Message",
+      message: formData.message,
     });
 
-    // Reset form after delay
-    setTimeout(() => {
-      setIsSubmitted(false);
-      (e.target as HTMLFormElement).reset();
-    }, 3000);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setIsSubmitted(true);
+      toast({
+        title: "Message Sent! ✉️",
+        description: result.message,
+      });
+
+      // Reset form after delay
+      setTimeout(() => {
+        setIsSubmitted(false);
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          phone: "",
+          subject: "",
+          message: "",
+        });
+      }, 3000);
+    } else {
+      toast({
+        title: "Error",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -54,13 +88,13 @@ export default function Contact() {
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
               <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                Get in Touch
+                {t("nav.contact")}
               </span>
               <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                Contact <span className="gold-text">Us</span>
+                {t("contact.title")}
               </h1>
               <p className="text-xl text-muted-foreground">
-                Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+                {t("home.hero.subtitle")}
               </p>
             </div>
           </div>
@@ -73,7 +107,7 @@ export default function Contact() {
               {/* Contact Form */}
               <div className="card-glass rounded-3xl p-8">
                 <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                  Send a Message
+                  {t("contact.form.send")}
                 </h2>
 
                 {isSubmitted ? (
@@ -92,10 +126,12 @@ export default function Contact() {
                   <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
+                        <Label htmlFor="firstName">{t("contact.form.name")}</Label>
                         <Input
                           id="firstName"
                           placeholder="John"
+                          value={formData.firstName}
+                          onChange={handleChange}
                           required
                           className="bg-secondary border-primary/20"
                           disabled={isSubmitting}
@@ -106,6 +142,8 @@ export default function Contact() {
                         <Input
                           id="lastName"
                           placeholder="Doe"
+                          value={formData.lastName}
+                          onChange={handleChange}
                           required
                           className="bg-secondary border-primary/20"
                           disabled={isSubmitting}
@@ -114,11 +152,13 @@ export default function Contact() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="email">{t("contact.form.email")}</Label>
                       <Input
                         id="email"
                         type="email"
                         placeholder="john@example.com"
+                        value={formData.email}
+                        onChange={handleChange}
                         required
                         className="bg-secondary border-primary/20"
                         disabled={isSubmitting}
@@ -131,6 +171,8 @@ export default function Contact() {
                         id="phone"
                         type="tel"
                         placeholder="+250 7XX XXX XXX"
+                        value={formData.phone}
+                        onChange={handleChange}
                         className="bg-secondary border-primary/20"
                         disabled={isSubmitting}
                       />
@@ -138,7 +180,10 @@ export default function Contact() {
 
                     <div className="space-y-2">
                       <Label htmlFor="subject">Subject</Label>
-                      <Select disabled={isSubmitting}>
+                      <Select 
+                        disabled={isSubmitting}
+                        onValueChange={(value) => setFormData({ ...formData, subject: value })}
+                      >
                         <SelectTrigger className="bg-secondary border-primary/20">
                           <SelectValue placeholder="Select a subject" />
                         </SelectTrigger>
@@ -154,11 +199,13 @@ export default function Contact() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="message">Message</Label>
+                      <Label htmlFor="message">{t("contact.form.message")}</Label>
                       <Textarea
                         id="message"
                         placeholder="Write your message here..."
                         rows={5}
+                        value={formData.message}
+                        onChange={handleChange}
                         required
                         className="bg-secondary border-primary/20 resize-none"
                         disabled={isSubmitting}
@@ -179,7 +226,7 @@ export default function Contact() {
                       ) : (
                         <>
                           <Send className="w-4 h-4 mr-2" />
-                          Send Message
+                          {t("contact.form.send")}
                         </>
                       )}
                     </Button>

@@ -37,6 +37,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
   const [category, setCategory] = useState<Event["category"]>("Concert");
   const [isFree, setIsFree] = useState(false);
   const [tickets, setTickets] = useState<EventTicket[]>([]);
+  const [livestreamUrl, setLivestreamUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -51,6 +52,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
       setCategory(editEvent.category);
       setIsFree(editEvent.isFree);
       setTickets(editEvent.tickets);
+      setLivestreamUrl(editEvent.livestreamUrl || "");
     } else {
       resetForm();
     }
@@ -65,6 +67,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
     setCategory("Concert");
     setIsFree(false);
     setTickets([]);
+    setLivestreamUrl("");
   };
 
   const addTicketTier = () => {
@@ -124,6 +127,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
         category,
         isFree,
         tickets: isFree ? [] : tickets,
+        livestreamUrl: livestreamUrl || undefined,
       };
 
       if (editEvent) {
@@ -242,6 +246,21 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Livestream URL */}
+          <div>
+            <Label htmlFor="livestreamUrl">YouTube Livestream URL (Optional)</Label>
+            <Input
+              id="livestreamUrl"
+              value={livestreamUrl}
+              onChange={(e) => setLivestreamUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="mt-1 bg-secondary border-primary/20"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Add a YouTube live stream URL for virtual attendance
+            </p>
           </div>
 
           {/* Free Event Toggle */}
