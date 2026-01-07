@@ -83,6 +83,19 @@ import {
   getLeaveRequestStats,
   type LeaveRequest,
 } from "@/lib/leaveService";
+import {
+  getAllAttendanceRecords,
+  getAttendanceByDate,
+  getRecentSessions,
+  saveAttendance,
+  deleteAttendanceForDate,
+  hasAttendanceForDate,
+  getMembersToExcuse,
+  getOverallAttendanceStats,
+  type AttendanceRecord,
+  type AttendanceSession,
+  type AttendanceStatus,
+} from "@/lib/attendanceService";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { AddMemberModal } from "@/components/admin/AddMemberModal";
@@ -94,13 +107,14 @@ import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { BarChart3 } from "lucide-react";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
   { id: "members" as Tab, label: "Members", icon: Users },
   { id: "events" as Tab, label: "Events", icon: Calendar },
   { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket },
+  { id: "attendance" as Tab, label: "Attendance", icon: UserCheck },
   { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
@@ -126,6 +140,13 @@ export default function Admin() {
   const [streamingPlatforms, setStreamingPlatforms] = useState<StreamingPlatform[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveFilter, setLeaveFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
+  
+  // Attendance state
+  const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [attendanceRecords, setAttendanceRecords] = useState<{ [memberId: string]: AttendanceStatus }>({});
+  const [sessionTitle, setSessionTitle] = useState("Regular Practice");
+  const [isTakingAttendance, setIsTakingAttendance] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({
     totalMembers: 0,
     newMembersThisMonth: 0,
@@ -166,6 +187,7 @@ export default function Admin() {
     setMusicVideos(getAllMusicVideos());
     setStreamingPlatforms(getAllPlatforms());
     setLeaveRequests(getAllLeaveRequests());
+    setAttendanceSessions(getRecentSessions(20));
     setDashboardStats(getDashboardStats());
   };
 
@@ -845,6 +867,330 @@ export default function Admin() {
                       {orderSearch
                         ? "No orders match your search criteria."
                         : "Ticket orders will appear here when customers make purchases."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Attendance */}
+          {activeTab === "attendance" && (
+            <div className="space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-foreground">{attendanceSessions.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Sessions</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-primary">{getOverallAttendanceStats().avgAttendance}%</p>
+                  <p className="text-xs text-muted-foreground">Avg. Attendance</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-foreground">{members.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Members</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {leaveRequests.filter(r => r.status === 'pending').length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Pending Leave</p>
+                </div>
+              </div>
+
+              {/* Take Attendance Section */}
+              <div className="card-glass rounded-2xl p-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h2 className="font-display text-lg font-semibold">Take Attendance</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Mark attendance for choir members
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <Input
+                      type="date"
+                      value={attendanceDate}
+                      onChange={(e) => {
+                        setAttendanceDate(e.target.value);
+                        setIsTakingAttendance(false);
+                        setAttendanceRecords({});
+                      }}
+                      className="w-40 bg-secondary border-primary/20"
+                    />
+                    <Input
+                      type="text"
+                      placeholder="Session title"
+                      value={sessionTitle}
+                      onChange={(e) => setSessionTitle(e.target.value)}
+                      className="w-48 bg-secondary border-primary/20"
+                    />
+                    {!isTakingAttendance ? (
+                      <Button
+                        variant="gold"
+                        onClick={() => {
+                          if (members.length === 0) {
+                            toast({
+                              title: "No Members",
+                              description: "Add members first before taking attendance.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          
+                          // Pre-fill with existing attendance if any
+                          const existing = getAttendanceByDate(attendanceDate);
+                          const existingMap: { [key: string]: AttendanceStatus } = {};
+                          existing.forEach(r => {
+                            existingMap[r.memberId] = r.status;
+                          });
+                          
+                          // Also check for members on leave
+                          const onLeave = getMembersToExcuse(attendanceDate);
+                          onLeave.forEach(l => {
+                            if (!existingMap[l.memberId]) {
+                              existingMap[l.memberId] = 'excused';
+                            }
+                          });
+                          
+                          setAttendanceRecords(existingMap);
+                          setIsTakingAttendance(true);
+                        }}
+                      >
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        {hasAttendanceForDate(attendanceDate) ? 'Edit Attendance' : 'Start Attendance'}
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="gold"
+                          onClick={() => {
+                            const records = members.map(m => ({
+                              memberId: m.id,
+                              memberName: m.name,
+                              memberEmail: m.email,
+                              memberVoice: m.voice,
+                              status: attendanceRecords[m.id] || 'absent' as AttendanceStatus,
+                            }));
+                            
+                            saveAttendance(attendanceDate, records, sessionTitle, 'Admin');
+                            loadData();
+                            setIsTakingAttendance(false);
+                            toast({
+                              title: "Attendance Saved! ✅",
+                              description: `Attendance for ${new Date(attendanceDate).toLocaleDateString()} has been recorded.`,
+                            });
+                          }}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Save Attendance
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsTakingAttendance(false);
+                            setAttendanceRecords({});
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Attendance Form */}
+                {isTakingAttendance && (
+                  <div className="space-y-4">
+                    {/* Quick Actions */}
+                    <div className="flex flex-wrap gap-2 pb-4 border-b border-primary/10">
+                      <span className="text-sm text-muted-foreground mr-2">Mark all as:</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const all: { [key: string]: AttendanceStatus } = {};
+                          members.forEach(m => { all[m.id] = 'present'; });
+                          setAttendanceRecords(all);
+                        }}
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1 text-green-500" />
+                        Present
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const all: { [key: string]: AttendanceStatus } = {};
+                          members.forEach(m => { all[m.id] = 'absent'; });
+                          setAttendanceRecords(all);
+                        }}
+                      >
+                        <XCircle className="w-3 h-3 mr-1 text-red-500" />
+                        Absent
+                      </Button>
+                    </div>
+
+                    {/* Members List */}
+                    <div className="grid gap-2">
+                      {members.map((member) => {
+                        const onLeave = getMembersToExcuse(attendanceDate).find(l => l.memberId === member.id);
+                        
+                        return (
+                          <div
+                            key={member.id}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-lg border transition-all",
+                              attendanceRecords[member.id] === 'present' && "bg-green-500/10 border-green-500/30",
+                              attendanceRecords[member.id] === 'absent' && "bg-red-500/10 border-red-500/30",
+                              attendanceRecords[member.id] === 'excused' && "bg-yellow-500/10 border-yellow-500/30",
+                              attendanceRecords[member.id] === 'late' && "bg-orange-500/10 border-orange-500/30",
+                              !attendanceRecords[member.id] && "bg-secondary/30 border-transparent"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
+                                {member.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">{member.name}</p>
+                                <p className="text-xs text-muted-foreground">{member.voice}</p>
+                                {onLeave && (
+                                  <p className="text-xs text-yellow-400">⚠️ Has approved leave</p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-1">
+                              {(['present', 'late', 'excused', 'absent'] as AttendanceStatus[]).map((status) => (
+                                <button
+                                  key={status}
+                                  onClick={() => setAttendanceRecords(prev => ({
+                                    ...prev,
+                                    [member.id]: status,
+                                  }))}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize",
+                                    attendanceRecords[member.id] === status
+                                      ? status === 'present' ? "bg-green-500 text-white"
+                                        : status === 'absent' ? "bg-red-500 text-white"
+                                        : status === 'excused' ? "bg-yellow-500 text-white"
+                                        : "bg-orange-500 text-white"
+                                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  {status}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {members.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No members found. Add members first.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isTakingAttendance && hasAttendanceForDate(attendanceDate) && (
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <p className="text-sm text-foreground">
+                      ✅ Attendance already recorded for {new Date(attendanceDate).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Click "Edit Attendance" to modify the records.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Sessions */}
+              <div className="card-glass rounded-2xl overflow-hidden">
+                <div className="p-4 border-b border-primary/10">
+                  <h2 className="font-display text-lg font-semibold">Attendance History</h2>
+                </div>
+                
+                {attendanceSessions.length > 0 ? (
+                  <table className="w-full">
+                    <thead className="bg-secondary/50">
+                      <tr>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Session</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Present</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Absent</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Excused</th>
+                        <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendanceSessions
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((session) => (
+                        <tr key={session.id} className="border-t border-primary/10">
+                          <td className="p-4 font-medium text-foreground">
+                            {new Date(session.date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </td>
+                          <td className="p-4 text-muted-foreground">{session.title}</td>
+                          <td className="p-4">
+                            <span className="text-green-400">{session.totalPresent + session.totalLate}</span>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-red-400">{session.totalAbsent}</span>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-yellow-400">{session.totalExcused}</span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setAttendanceDate(session.date);
+                                setSessionTitle(session.title);
+                                const existing = getAttendanceByDate(session.date);
+                                const existingMap: { [key: string]: AttendanceStatus } = {};
+                                existing.forEach(r => { existingMap[r.memberId] = r.status; });
+                                setAttendanceRecords(existingMap);
+                                setIsTakingAttendance(true);
+                              }}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm(`Delete attendance for ${new Date(session.date).toLocaleDateString()}?`)) {
+                                  deleteAttendanceForDate(session.date);
+                                  loadData();
+                                  toast({ title: "Attendance Deleted" });
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-12 text-center">
+                    <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-foreground mb-2">No Attendance Records</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Start taking attendance to see history here.
                     </p>
                   </div>
                 )}

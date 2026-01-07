@@ -19,6 +19,12 @@ import {
   Shield,
   FileText,
   XCircle,
+  UserCheck,
+  CalendarOff,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  BarChart3,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
@@ -33,25 +39,34 @@ import {
   sendVerificationCode,
   verifyEmailCode,
 } from "@/lib/emailVerificationService";
+import {
+  getAttendanceByMemberEmail,
+  getMemberAttendanceStatsByEmail,
+  type AttendanceRecord,
+} from "@/lib/attendanceService";
+import { cn } from "@/lib/utils";
 
-type Step = "pin" | "form" | "verify" | "submit" | "success";
+type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests";
 
 export default function MemberPortal() {
   useDocumentTitle("Member Portal");
   const { toast } = useToast();
 
   // State
-  const [step, setStep] = useState<Step>("pin");
+  const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState(["", "", "", ""]);
   const [isPinError, setIsPinError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Form data
+  // Member data
   const [email, setEmail] = useState("");
+  const [memberInfo, setMemberInfo] = useState<Member | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Leave request form data
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
-  const [memberInfo, setMemberInfo] = useState<Member | null>(null);
 
   // Verification
   const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""]);
@@ -59,9 +74,10 @@ export default function MemberPortal() {
   const [canResend, setCanResend] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
 
-  // My requests
+  // Data
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
-  const [showMyRequests, setShowMyRequests] = useState(false);
+  const [myAttendance, setMyAttendance] = useState<AttendanceRecord[]>([]);
+  const [attendanceStats, setAttendanceStats] = useState<ReturnType<typeof getMemberAttendanceStatsByEmail> | null>(null);
 
   // PIN input handling
   const handlePinChange = (index: number, value: string) => {
@@ -73,13 +89,11 @@ export default function MemberPortal() {
     setPin(newPin);
     setIsPinError(false);
 
-    // Auto-focus next input
     if (value && index < 3) {
       const nextInput = document.getElementById(`pin-${index + 1}`);
       nextInput?.focus();
     }
 
-    // Auto-submit when all digits entered
     if (value && index === 3 && newPin.every((p) => p)) {
       handlePinSubmit(newPin.join(""));
     }
@@ -95,7 +109,8 @@ export default function MemberPortal() {
   const handlePinSubmit = (pinValue?: string) => {
     const pinToCheck = pinValue || pin.join("");
     if (verifyPortalPin(pinToCheck)) {
-      setStep("form");
+      setView("dashboard");
+      setIsLoggedIn(true);
       toast({
         title: "Welcome! 🎵",
         description: "You now have access to the member portal.",
@@ -111,8 +126,8 @@ export default function MemberPortal() {
     }
   };
 
-  // Email validation
-  const handleEmailCheck = () => {
+  // Login with email to see personal data
+  const handleEmailLogin = () => {
     const members = getAllMembers();
     const member = members.find(
       (m) => m.email?.toLowerCase() === email.toLowerCase()
@@ -124,16 +139,32 @@ export default function MemberPortal() {
         description: "This email is not registered. Please use your choir email.",
         variant: "destructive",
       });
-      return false;
+      return;
     }
 
     setMemberInfo(member);
-    return true;
+    setMyAttendance(getAttendanceByMemberEmail(email));
+    setAttendanceStats(getMemberAttendanceStatsByEmail(email));
+    setMyRequests(getLeaveRequestsByEmail(email));
+    
+    toast({
+      title: `Welcome, ${member.name}! 👋`,
+      description: "Your personal data has been loaded.",
+    });
   };
 
-  // Form submission
+  // Refresh data when email changes
+  useEffect(() => {
+    if (memberInfo && email) {
+      setMyAttendance(getAttendanceByMemberEmail(email));
+      setAttendanceStats(getMemberAttendanceStatsByEmail(email));
+      setMyRequests(getLeaveRequestsByEmail(email));
+    }
+  }, [memberInfo, email]);
+
+  // Form submission for leave request
   const handleFormContinue = () => {
-    if (!email || !startDate || !endDate || !reason) {
+    if (!startDate || !endDate || !reason) {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields.",
@@ -151,9 +182,7 @@ export default function MemberPortal() {
       return;
     }
 
-    if (!handleEmailCheck()) return;
-
-    setStep("verify");
+    setView("verify");
   };
 
   // Send verification code
@@ -174,7 +203,7 @@ export default function MemberPortal() {
         title: "Code sent! 📧",
         description: result.message,
       });
-      setStep("submit");
+      setView("submit");
     } else {
       toast({
         title: "Error",
@@ -186,13 +215,13 @@ export default function MemberPortal() {
 
   // Resend timer
   useEffect(() => {
-    if (step === "submit" && resendTimer > 0) {
+    if (view === "submit" && resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
       return () => clearTimeout(timer);
     } else if (resendTimer === 0) {
       setCanResend(true);
     }
-  }, [step, resendTimer]);
+  }, [view, resendTimer]);
 
   // Verification code input handling
   const handleCodeChange = (index: number, value: string) => {
@@ -203,7 +232,6 @@ export default function MemberPortal() {
     newCode[index] = value;
     setVerificationCode(newCode);
 
-    // Auto-focus next input
     if (value && index < 5) {
       const nextInput = document.getElementById(`code-${index + 1}`);
       nextInput?.focus();
@@ -232,7 +260,6 @@ export default function MemberPortal() {
     const result = verifyEmailCode(email, code);
 
     if (result.success) {
-      // Create the leave request
       createLeaveRequest({
         memberId: memberInfo?.id || "",
         memberName: memberInfo?.name || "",
@@ -242,7 +269,7 @@ export default function MemberPortal() {
         reason,
       });
 
-      setStep("success");
+      setView("success");
       toast({
         title: "Request submitted! ✅",
         description: "Your leave request has been sent to the admins.",
@@ -257,24 +284,18 @@ export default function MemberPortal() {
     }
   };
 
-  // Load my requests
-  useEffect(() => {
-    if (email && showMyRequests) {
-      setMyRequests(getLeaveRequestsByEmail(email));
-    }
-  }, [email, showMyRequests]);
-
-  // Reset form
-  const resetForm = () => {
-    setEmail("");
+  // Reset leave form
+  const resetLeaveForm = () => {
     setStartDate("");
     setEndDate("");
     setReason("");
-    setMemberInfo(null);
     setVerificationCode(["", "", "", "", "", ""]);
     setDevCode(null);
-    setStep("form");
-    setShowMyRequests(false);
+    setView("dashboard");
+    // Refresh requests
+    if (email) {
+      setMyRequests(getLeaveRequestsByEmail(email));
+    }
   };
 
   const getStatusBadge = (status: LeaveRequest["status"]) => {
@@ -300,15 +321,44 @@ export default function MemberPortal() {
     }
   };
 
+  const getAttendanceStatusBadge = (status: AttendanceRecord["status"]) => {
+    switch (status) {
+      case "present":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
+            <CheckCircle className="w-3 h-3" /> Present
+          </span>
+        );
+      case "absent":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/20 text-red-400 text-xs">
+            <XCircle className="w-3 h-3" /> Absent
+          </span>
+        );
+      case "excused":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs">
+            <CalendarOff className="w-3 h-3" /> Excused
+          </span>
+        );
+      case "late":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs">
+            <Clock className="w-3 h-3" /> Late
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-2xl mx-auto">
             {/* PIN Entry */}
-            {step === "pin" && (
-              <div className="card-glass rounded-3xl p-8 text-center">
+            {view === "pin" && (
+              <div className="card-glass rounded-3xl p-8 text-center max-w-md mx-auto">
                 <div className="w-16 h-16 rounded-full bg-primary/20 mx-auto mb-6 flex items-center justify-center">
                   <Lock className="w-8 h-8 text-primary" />
                 </div>
@@ -365,161 +415,414 @@ export default function MemberPortal() {
               </div>
             )}
 
-            {/* Leave Request Form */}
-            {step === "form" && (
-              <div className="card-glass rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h1 className="font-display text-2xl font-bold">
-                    Request <span className="gold-text">Leave</span>
-                  </h1>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (email) {
-                        setShowMyRequests(!showMyRequests);
-                        if (!showMyRequests) {
-                          setMyRequests(getLeaveRequestsByEmail(email));
-                        }
-                      } else {
-                        toast({
-                          title: "Enter your email first",
-                          description: "We need your email to find your requests.",
-                        });
-                      }
-                    }}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    My Requests
-                  </Button>
-                </div>
-
-                {showMyRequests ? (
-                  <div className="space-y-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowMyRequests(false)}
-                      className="mb-4"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Form
-                    </Button>
-
-                    {myRequests.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No leave requests found for this email.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {myRequests.map((request) => (
-                          <div
-                            key={request.id}
-                            className="p-4 rounded-xl bg-secondary/50 border border-primary/10"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-medium text-foreground">
-                                  {new Date(request.startDate).toLocaleDateString()} -{" "}
-                                  {new Date(request.endDate).toLocaleDateString()}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.reason}
-                                </p>
-                              </div>
-                              {getStatusBadge(request.status)}
-                            </div>
-                            {request.adminNotes && (
-                              <p className="text-xs text-muted-foreground mt-2 p-2 rounded bg-secondary">
-                                Admin note: {request.adminNotes}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <form className="space-y-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Your Email *</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {/* Dashboard */}
+            {view === "dashboard" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="card-glass rounded-2xl p-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h1 className="font-display text-2xl font-bold">
+                        Member <span className="gold-text">Portal</span>
+                      </h1>
+                      {memberInfo ? (
+                        <p className="text-muted-foreground">
+                          Welcome back, <span className="text-primary">{memberInfo.name}</span>!
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">
+                          Enter your email to view your personal data
+                        </p>
+                      )}
+                    </div>
+                    
+                    {!memberInfo && (
+                      <div className="flex gap-2">
                         <Input
-                          id="email"
                           type="email"
                           placeholder="your.email@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10 bg-secondary border-primary/20"
+                          className="bg-secondary border-primary/20 w-64"
                         />
+                        <Button variant="gold" onClick={handleEmailLogin}>
+                          <UserCheck className="w-4 h-4 mr-2" />
+                          Load My Data
+                        </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Use the same email registered with the choir
-                      </p>
-                    </div>
+                    )}
+                  </div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="startDate">Start Date *</Label>
-                        <div className="relative">
-                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="startDate"
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="pl-10 bg-secondary border-primary/20"
-                            min={new Date().toISOString().split("T")[0]}
-                          />
-                        </div>
+                {/* Quick Actions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    onClick={() => {
+                      if (!memberInfo) {
+                        toast({
+                          title: "Enter your email first",
+                          description: "We need your email to submit a leave request.",
+                        });
+                        return;
+                      }
+                      setView("leave-form");
+                    }}
+                    className="card-glass rounded-2xl p-6 text-left hover:border-primary/30 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                        <CalendarOff className="w-6 h-6 text-primary" />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="endDate">End Date *</Label>
-                        <div className="relative">
-                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="endDate"
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="pl-10 bg-secondary border-primary/20"
-                            min={startDate || new Date().toISOString().split("T")[0]}
-                          />
-                        </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">Request Leave</h3>
+                        <p className="text-sm text-muted-foreground">Submit a leave request</p>
                       </div>
                     </div>
+                  </button>
 
+                  <button
+                    onClick={() => {
+                      if (!memberInfo) {
+                        toast({
+                          title: "Enter your email first",
+                          description: "We need your email to view your attendance.",
+                        });
+                        return;
+                      }
+                      setView("attendance");
+                    }}
+                    className="card-glass rounded-2xl p-6 text-left hover:border-primary/30 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
+                        <BarChart3 className="w-6 h-6 text-green-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">My Attendance</h3>
+                        <p className="text-sm text-muted-foreground">View your attendance history</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Attendance Stats (if logged in) */}
+                {memberInfo && attendanceStats && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-primary" />
+                      Attendance Overview
+                    </h2>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="text-center p-4 rounded-xl bg-secondary/50">
+                        <p className="text-3xl font-bold text-primary">{attendanceStats.percentage}%</p>
+                        <p className="text-xs text-muted-foreground">Overall Rate</p>
+                      </div>
+                      <div className="text-center p-4 rounded-xl bg-secondary/50">
+                        <p className="text-3xl font-bold text-green-400">{attendanceStats.present}</p>
+                        <p className="text-xs text-muted-foreground">Present</p>
+                      </div>
+                      <div className="text-center p-4 rounded-xl bg-secondary/50">
+                        <p className="text-3xl font-bold text-yellow-400">{attendanceStats.excused}</p>
+                        <p className="text-xs text-muted-foreground">Excused</p>
+                      </div>
+                      <div className="text-center p-4 rounded-xl bg-secondary/50">
+                        <p className="text-3xl font-bold text-red-400">{attendanceStats.absent}</p>
+                        <p className="text-xs text-muted-foreground">Absent</p>
+                      </div>
+                    </div>
+
+                    {attendanceStats.thisMonth.total > 0 && (
+                      <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-muted-foreground">This Month</p>
+                            <p className="text-lg font-semibold text-foreground">
+                              {attendanceStats.thisMonth.attended}/{attendanceStats.thisMonth.total} sessions
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-primary">
+                              {attendanceStats.thisMonth.percentage}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent Attendance */}
+                    {myAttendance.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-sm text-muted-foreground mb-2">Recent:</p>
+                        <div className="space-y-2">
+                          {myAttendance.slice(0, 3).map((record) => (
+                            <div key={record.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
+                              <span className="text-sm text-foreground">
+                                {new Date(record.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                              </span>
+                              {getAttendanceStatusBadge(record.status)}
+                            </div>
+                          ))}
+                        </div>
+                        {myAttendance.length > 3 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={() => setView("attendance")}
+                          >
+                            View All ({myAttendance.length} records) →
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Leave Requests (if logged in) */}
+                {memberInfo && myRequests.length > 0 && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-primary" />
+                        My Leave Requests
+                      </h2>
+                      <Button variant="ghost" size="sm" onClick={() => setView("requests")}>
+                        View All →
+                      </Button>
+                    </div>
+                    
                     <div className="space-y-2">
-                      <Label htmlFor="reason">Reason for Leave *</Label>
-                      <Textarea
-                        id="reason"
-                        placeholder="Please explain why you need leave..."
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        className="bg-secondary border-primary/20 resize-none"
-                        rows={4}
-                      />
+                      {myRequests.slice(0, 2).map((request) => (
+                        <div key={request.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{request.reason}</p>
+                          </div>
+                          {getStatusBadge(request.status)}
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                )}
 
-                    <Button
-                      type="button"
-                      variant="gold"
-                      className="w-full"
-                      onClick={handleFormContinue}
-                    >
-                      Continue
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </form>
+                {/* Empty state if not logged in */}
+                {!memberInfo && (
+                  <div className="card-glass rounded-2xl p-8 text-center">
+                    <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-foreground mb-2">Enter Your Email</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Enter your registered choir email above to view your attendance history and leave requests.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
 
+            {/* Full Attendance View */}
+            {view === "attendance" && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" onClick={() => setView("dashboard")}>
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                  <h1 className="font-display text-2xl font-bold">
+                    My <span className="gold-text">Attendance</span>
+                  </h1>
+                </div>
+
+                {attendanceStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-primary">{attendanceStats.percentage}%</p>
+                      <p className="text-xs text-muted-foreground">Overall</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-green-400">{attendanceStats.present}</p>
+                      <p className="text-xs text-muted-foreground">Present</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-orange-400">{attendanceStats.late}</p>
+                      <p className="text-xs text-muted-foreground">Late</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-yellow-400">{attendanceStats.excused}</p>
+                      <p className="text-xs text-muted-foreground">Excused</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-red-400">{attendanceStats.absent}</p>
+                      <p className="text-xs text-muted-foreground">Absent</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="card-glass rounded-2xl overflow-hidden">
+                  {myAttendance.length > 0 ? (
+                    <div className="divide-y divide-primary/10">
+                      {myAttendance.map((record) => (
+                        <div key={record.id} className="flex items-center justify-between p-4">
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {new Date(record.date).toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              })}
+                            </p>
+                            {record.notes && (
+                              <p className="text-xs text-muted-foreground">{record.notes}</p>
+                            )}
+                          </div>
+                          {getAttendanceStatusBadge(record.status)}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center">
+                      <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="font-semibold text-foreground mb-2">No Attendance Records</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Your attendance history will appear here once recorded by admins.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Full Leave Requests View */}
+            {view === "requests" && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" onClick={() => setView("dashboard")}>
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                  <h1 className="font-display text-2xl font-bold">
+                    My Leave <span className="gold-text">Requests</span>
+                  </h1>
+                </div>
+
+                <div className="card-glass rounded-2xl overflow-hidden">
+                  {myRequests.length > 0 ? (
+                    <div className="divide-y divide-primary/10">
+                      {myRequests.map((request) => (
+                        <div key={request.id} className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{request.reason}</p>
+                            </div>
+                            {getStatusBadge(request.status)}
+                          </div>
+                          {request.adminNotes && (
+                            <p className="text-xs text-muted-foreground mt-2 p-2 rounded bg-secondary">
+                              Admin note: {request.adminNotes}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Submitted: {new Date(request.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center">
+                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="font-semibold text-foreground mb-2">No Leave Requests</h3>
+                      <p className="text-sm text-muted-foreground">
+                        You haven't submitted any leave requests yet.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Leave Request Form */}
+            {view === "leave-form" && (
+              <div className="card-glass rounded-3xl p-8 max-w-lg mx-auto">
+                <div className="flex items-center gap-4 mb-6">
+                  <Button variant="ghost" size="sm" onClick={() => setView("dashboard")}>
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                  <h1 className="font-display text-2xl font-bold">
+                    Request <span className="gold-text">Leave</span>
+                  </h1>
+                </div>
+
+                <form className="space-y-5">
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                    <p className="text-sm text-muted-foreground">Requesting as:</p>
+                    <p className="font-medium text-foreground">{memberInfo?.name}</p>
+                    <p className="text-xs text-muted-foreground">{email}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startDate">Start Date *</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="startDate"
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="pl-10 bg-secondary border-primary/20"
+                          min={new Date().toISOString().split("T")[0]}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endDate">End Date *</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="endDate"
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="pl-10 bg-secondary border-primary/20"
+                          min={startDate || new Date().toISOString().split("T")[0]}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reason">Reason for Leave *</Label>
+                    <Textarea
+                      id="reason"
+                      placeholder="Please explain why you need leave..."
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      className="bg-secondary border-primary/20 resize-none"
+                      rows={4}
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="gold"
+                    className="w-full"
+                    onClick={handleFormContinue}
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </form>
+              </div>
+            )}
+
             {/* Email Verification Step */}
-            {step === "verify" && (
-              <div className="card-glass rounded-3xl p-8 text-center">
+            {view === "verify" && (
+              <div className="card-glass rounded-3xl p-8 text-center max-w-lg mx-auto">
                 <div className="w-16 h-16 rounded-full bg-primary/20 mx-auto mb-6 flex items-center justify-center">
                   <Mail className="w-8 h-8 text-primary" />
                 </div>
@@ -527,19 +830,14 @@ export default function MemberPortal() {
                   Verify Your <span className="gold-text">Identity</span>
                 </h1>
                 <p className="text-muted-foreground mb-6">
-                  We need to confirm this is really you.
+                  We'll send a verification code to confirm this is you.
                 </p>
 
                 <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 mb-6">
                   <p className="text-sm text-muted-foreground mb-1">
-                    A verification code will be sent to:
+                    Code will be sent to:
                   </p>
                   <p className="font-medium text-foreground">{email}</p>
-                  {memberInfo && (
-                    <p className="text-xs text-primary mt-1">
-                      Verified as: {memberInfo.name}
-                    </p>
-                  )}
                 </div>
 
                 <Button
@@ -564,17 +862,17 @@ export default function MemberPortal() {
                 <Button
                   variant="ghost"
                   className="w-full"
-                  onClick={() => setStep("form")}
+                  onClick={() => setView("leave-form")}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Form
+                  Back
                 </Button>
               </div>
             )}
 
             {/* Enter Code & Submit */}
-            {step === "submit" && (
-              <div className="card-glass rounded-3xl p-8">
+            {view === "submit" && (
+              <div className="card-glass rounded-3xl p-8 max-w-lg mx-auto">
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 rounded-full bg-green-500/20 mx-auto mb-4 flex items-center justify-center">
                     <CheckCircle className="w-8 h-8 text-green-500" />
@@ -583,19 +881,14 @@ export default function MemberPortal() {
                     Code <span className="gold-text">Sent!</span>
                   </h1>
                   <p className="text-muted-foreground">
-                    Enter the 6-digit code sent to {email}
+                    Enter the 6-digit code sent to your email
                   </p>
                 </div>
 
-                {/* Development mode: Show code */}
                 {devCode && (
                   <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 mb-6 text-center">
-                    <p className="text-xs text-yellow-400 mb-1">
-                      🔧 Development Mode - Code:
-                    </p>
-                    <p className="font-mono text-lg font-bold text-yellow-400">
-                      {devCode}
-                    </p>
+                    <p className="text-xs text-yellow-400 mb-1">🔧 Dev Mode - Code:</p>
+                    <p className="font-mono text-lg font-bold text-yellow-400">{devCode}</p>
                   </div>
                 )}
 
@@ -622,33 +915,17 @@ export default function MemberPortal() {
                       Resend Code
                     </Button>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Resend code in {resendTimer}s
-                    </p>
+                    <p className="text-sm text-muted-foreground">Resend in {resendTimer}s</p>
                   )}
                 </div>
 
-                {/* Request Summary */}
                 <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 mb-6">
-                  <h3 className="font-semibold text-foreground mb-3">
-                    Leave Request Summary
-                  </h3>
+                  <h3 className="font-semibold text-foreground mb-3">Summary</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Member:</span>
-                      <span className="text-foreground">{memberInfo?.name}</span>
-                    </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Dates:</span>
                       <span className="text-foreground">
-                        {new Date(startDate).toLocaleDateString()} -{" "}
-                        {new Date(endDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Reason:</span>
-                      <span className="text-foreground text-right max-w-[200px] truncate">
-                        {reason}
+                        {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -661,14 +938,10 @@ export default function MemberPortal() {
                   disabled={!verificationCode.every((d) => d)}
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Verify & Submit Request
+                  Verify & Submit
                 </Button>
 
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setStep("verify")}
-                >
+                <Button variant="ghost" className="w-full" onClick={() => setView("verify")}>
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
@@ -676,8 +949,8 @@ export default function MemberPortal() {
             )}
 
             {/* Success */}
-            {step === "success" && (
-              <div className="card-glass rounded-3xl p-8 text-center">
+            {view === "success" && (
+              <div className="card-glass rounded-3xl p-8 text-center max-w-lg mx-auto">
                 <div className="w-20 h-20 rounded-full bg-green-500/20 mx-auto mb-6 flex items-center justify-center">
                   <CheckCircle className="w-10 h-10 text-green-500" />
                 </div>
@@ -685,23 +958,15 @@ export default function MemberPortal() {
                   Request <span className="gold-text">Submitted!</span>
                 </h1>
                 <p className="text-muted-foreground mb-8">
-                  Your leave request has been sent to the choir admins for review.
+                  Your leave request has been sent for review.
                 </p>
 
                 <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 mb-6 text-left">
-                  <h3 className="font-semibold text-foreground mb-3">
-                    Request Details
-                  </h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Member:</span>
-                      <span className="text-foreground">{memberInfo?.name}</span>
-                    </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Dates:</span>
                       <span className="text-foreground">
-                        {new Date(startDate).toLocaleDateString()} -{" "}
-                        {new Date(endDate).toLocaleDateString()}
+                        {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -713,17 +978,9 @@ export default function MemberPortal() {
                   </div>
                 </div>
 
-                <p className="text-sm text-muted-foreground mb-6">
-                  You'll be notified when your request is approved or if more
-                  information is needed.
-                </p>
-
                 <div className="flex gap-3">
-                  <Button variant="gold-outline" className="flex-1" onClick={resetForm}>
-                    Submit Another
-                  </Button>
-                  <Button variant="gold" className="flex-1" asChild>
-                    <a href="/">Back to Home</a>
+                  <Button variant="gold-outline" className="flex-1" onClick={resetLeaveForm}>
+                    Back to Dashboard
                   </Button>
                 </div>
               </div>
@@ -735,4 +992,3 @@ export default function MemberPortal() {
     </div>
   );
 }
-
