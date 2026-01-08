@@ -367,7 +367,24 @@ export default function Admin() {
             ))}
           </nav>
 
-          <div className="p-4 border-t border-primary/10">
+          <div className="p-4 border-t border-primary/10 space-y-2">
+            {/* Current User Info */}
+            <div className="p-3 rounded-lg bg-secondary/50 mb-3">
+              <p className="text-sm font-medium text-foreground truncate">
+                {currentUser?.name || "Admin"}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {currentUser?.email}
+              </p>
+              <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${
+                currentUser?.role === "super_admin" 
+                  ? "bg-primary/20 text-primary" 
+                  : "bg-secondary text-muted-foreground"
+              }`}>
+                {currentUser?.role === "super_admin" ? "Super Admin" : "Admin"}
+              </span>
+            </div>
+            
             <Link to="/">
               <Button variant="outline" className="w-full justify-start">
                 <Eye className="w-4 h-4 mr-2" />
@@ -375,8 +392,8 @@ export default function Admin() {
               </Button>
             </Link>
             <Button
-              variant="ghost"
-              className="w-full justify-start mt-2 text-muted-foreground hover:text-destructive"
+              variant="outline"
+              className="w-full justify-start text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
               onClick={logout}
             >
               <LogOut className="w-4 h-4 mr-2" />
@@ -411,8 +428,35 @@ export default function Admin() {
                 {currentUser?.role === "super_admin" ? "Super Admin" : "Admin"}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center text-primary-foreground font-semibold">
-              {currentUser?.name?.charAt(0).toUpperCase() || "A"}
+            <div className="relative group">
+              <button className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center text-primary-foreground font-semibold hover:opacity-90 transition-opacity">
+                {currentUser?.name?.charAt(0).toUpperCase() || "A"}
+              </button>
+              {/* Dropdown */}
+              <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-charcoal border border-primary/20 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="px-4 py-2 border-b border-primary/10">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {currentUser?.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {currentUser?.email}
+                  </p>
+                </div>
+                <Link 
+                  to="/"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  View Website
+                </Link>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </header>
