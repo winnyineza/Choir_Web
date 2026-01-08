@@ -105,9 +105,11 @@ import { TicketDetailModal } from "@/components/admin/TicketDetailModal";
 import { AddAlbumModal } from "@/components/admin/AddAlbumModal";
 import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
-import { BarChart3 } from "lucide-react";
+import { AdminTeamManagement } from "@/components/admin/AdminTeamManagement";
+import { BarChart3, Shield } from "lucide-react";
+import { addAuditLog } from "@/lib/adminService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "team" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -120,14 +122,20 @@ const sidebarItems = [
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
+  { id: "team" as Tab, label: "Admin Team", icon: Shield, superAdminOnly: true },
   { id: "settings" as Tab, label: "Settings", icon: Settings },
 ];
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { isAuthenticated, isLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading, logout, isSuperAdmin, currentUser } = useAuth();
   const { toast } = useToast();
+
+  // Filter sidebar items based on role
+  const visibleSidebarItems = sidebarItems.filter(
+    item => !item.superAdminOnly || isSuperAdmin
+  );
 
   // Data states
   const [members, setMembers] = useState<Member[]>([]);
@@ -337,7 +345,7 @@ export default function Admin() {
           </div>
 
           <nav className="flex-1 p-4 space-y-1">
-            {sidebarItems.map((item) => (
+            {visibleSidebarItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
@@ -350,6 +358,9 @@ export default function Admin() {
               >
                 <item.icon className="w-5 h-5" />
                 {item.label}
+                {item.superAdminOnly && (
+                  <Shield className="w-3 h-3 ml-auto text-primary" />
+                )}
               </button>
             ))}
           </nav>
@@ -390,9 +401,16 @@ export default function Admin() {
           </button>
           <h1 className="font-display text-xl font-semibold capitalize">{activeTab}</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">Welcome, Admin</span>
+            <div className="text-right hidden sm:block">
+              <span className="text-sm text-foreground font-medium block">
+                {currentUser?.name || "Admin"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {currentUser?.role === "super_admin" ? "Super Admin" : "Admin"}
+              </span>
+            </div>
             <div className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center text-primary-foreground font-semibold">
-              A
+              {currentUser?.name?.charAt(0).toUpperCase() || "A"}
             </div>
           </div>
         </header>
@@ -1930,6 +1948,11 @@ export default function Admin() {
               </div>
               <AnalyticsDashboard />
             </div>
+          )}
+
+          {/* Admin Team (Super Admin Only) */}
+          {activeTab === "team" && isSuperAdmin && (
+            <AdminTeamManagement />
           )}
 
           {/* Settings */}

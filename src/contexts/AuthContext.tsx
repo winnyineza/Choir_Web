@@ -1,66 +1,100 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { 
+  authenticateAdmin, 
+  getAdminById, 
+  addAuditLog,
+  type AdminUser, 
+  type AdminRole 
+} from "@/lib/adminService";
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  currentUser: AdminUser | null;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Simple credentials - In production, this should be in a secure backend
-const ADMIN_CREDENTIALS = {
-  username: "admin",
-  password: "serenades2024",
-};
+const AUTH_TOKEN_KEY = "sop_admin_auth";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     // Check if user is already logged in
-    const authToken = localStorage.getItem("sop_admin_auth");
+    const authToken = localStorage.getItem(AUTH_TOKEN_KEY);
     if (authToken) {
-      const tokenData = JSON.parse(authToken);
-      const isExpired = Date.now() > tokenData.expiry;
-      if (!isExpired) {
-        setIsAuthenticated(true);
-      } else {
-        localStorage.removeItem("sop_admin_auth");
+      try {
+        const tokenData = JSON.parse(authToken);
+        const isExpired = Date.now() > tokenData.expiry;
+        
+        if (!isExpired && tokenData.userId) {
+          // Get the user data
+          const user = getAdminById(tokenData.userId);
+          if (user && user.isActive) {
+            setCurrentUser(user);
+            setIsAuthenticated(true);
+          } else {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+          }
+        } else {
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+      } catch {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
       }
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     // Simulate API call delay
     await new Promise((resolve) => setTimeout(resolve, 800));
 
-    if (
-      username === ADMIN_CREDENTIALS.username &&
-      password === ADMIN_CREDENTIALS.password
-    ) {
+    const user = authenticateAdmin(email, password);
+    
+    if (user) {
       // Set token with 24-hour expiry
       const tokenData = {
-        authenticated: true,
+        userId: user.id,
         expiry: Date.now() + 24 * 60 * 60 * 1000,
       };
-      localStorage.setItem("sop_admin_auth", JSON.stringify(tokenData));
+      localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(tokenData));
+      setCurrentUser(user);
       setIsAuthenticated(true);
       return true;
     }
+    
     return false;
   };
 
   const logout = () => {
-    localStorage.removeItem("sop_admin_auth");
+    if (currentUser) {
+      addAuditLog(currentUser, "LOGOUT", "Admin logged out");
+    }
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    setCurrentUser(null);
     setIsAuthenticated(false);
   };
 
+  const isSuperAdmin = currentUser?.role === "super_admin";
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, login, logout }}>
+    <AuthContext.Provider 
+      value={{ 
+        isAuthenticated, 
+        isLoading, 
+        currentUser, 
+        login, 
+        logout,
+        isSuperAdmin,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
