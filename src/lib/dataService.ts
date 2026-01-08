@@ -468,7 +468,9 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export function getSettings(): Settings {
-  return getFromStorage<Settings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
+  const stored = getFromStorage<Partial<Settings>>(KEYS.SETTINGS, {});
+  // Merge with defaults to ensure new fields get default values
+  return { ...DEFAULT_SETTINGS, ...stored };
 }
 
 export function updateSettings(updates: Partial<Settings>): Settings {
