@@ -109,13 +109,37 @@ import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { AdminTeamManagement } from "@/components/admin/AdminTeamManagement";
 import { AuditLogPage } from "@/components/admin/AuditLogPage";
-import { ReportsDashboard } from "@/components/admin/ReportsDashboard";
+// Charts - used inline in dashboard, members, tickets, attendance sections
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
+import {
+  exportFullBackup,
+  exportMembersToCSV,
+  exportAttendanceToCSV,
+  exportFinancialReportToCSV,
+  getBackupStats,
+} from "@/lib/exportUtils";
 import { AnnouncementManagement } from "@/components/admin/AnnouncementManagement";
 import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
 import { BarChart3, Shield, History } from "lucide-react";
 import { addAuditLog } from "@/lib/adminService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "announcements" | "releases" | "promos" | "gallery" | "analytics" | "reports" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "announcements" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -129,7 +153,6 @@ const sidebarItems = [
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
-  { id: "reports" as Tab, label: "Reports", icon: FileText },
   { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard, superAdminOnly: true },
   { id: "team" as Tab, label: "Admin Team", icon: Shield, superAdminOnly: true },
   { id: "audit" as Tab, label: "Audit Log", icon: History, superAdminOnly: true },
@@ -234,6 +257,51 @@ export default function Admin() {
       member.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
       member.email.toLowerCase().includes(memberSearch.toLowerCase())
   );
+
+  // Chart colors
+  const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+  // Chart data calculations
+  const confirmedOrders = orders.filter(o => o.status === "confirmed" || o.status === "used");
+  
+  const getRevenueByDay = () => {
+    const byDay: Record<string, number> = {};
+    confirmedOrders.forEach(order => {
+      const day = new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      byDay[day] = (byDay[day] || 0) + order.total;
+    });
+    return Object.entries(byDay).map(([date, revenue]) => ({ date, revenue })).slice(-10);
+  };
+
+  const getTicketsByTier = () => {
+    const byTier: Record<string, number> = {};
+    confirmedOrders.forEach(order => {
+      order.tickets.forEach(ticket => {
+        byTier[ticket.tierName] = (byTier[ticket.tierName] || 0) + ticket.quantity;
+      });
+    });
+    return Object.entries(byTier).map(([name, value]) => ({ name, value }));
+  };
+
+  const getMembersByVoice = () => {
+    const byVoice: Record<string, number> = {};
+    members.forEach(m => {
+      const voice = m.voice || "Unknown";
+      byVoice[voice] = (byVoice[voice] || 0) + 1;
+    });
+    return Object.entries(byVoice).map(([name, value]) => ({ name, value }));
+  };
+
+  const getAttendanceRate = () => {
+    return attendanceSessions.slice(-10).map(session => {
+      const total = session.totalPresent + session.totalAbsent + session.totalExcused + session.totalLate;
+      const rate = total > 0 ? (session.totalPresent / total) * 100 : 0;
+      return {
+        date: new Date(session.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        rate: Math.round(rate),
+      };
+    });
+  };
 
   // Order actions
   const handleConfirmOrder = (orderId: string) => {
@@ -502,6 +570,31 @@ export default function Admin() {
                 </div>
               </div>
 
+              {/* Revenue Chart */}
+              {confirmedOrders.length > 0 && (
+                <div className="card-glass rounded-2xl p-6">
+                  <h2 className="font-display text-lg font-semibold mb-4">Recent Revenue</h2>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={getRevenueByDay()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: "hsl(var(--card))", 
+                            border: "1px solid hsl(var(--primary) / 0.2)",
+                            borderRadius: "8px",
+                          }}
+                          formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                        />
+                        <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
               {/* Quick Actions */}
               <div>
                 <h2 className="font-display text-lg font-semibold mb-4">Quick Actions</h2>
@@ -599,6 +692,49 @@ export default function Admin() {
                   </Button>
                 </div>
               </div>
+
+              {/* Voice Part Distribution */}
+              {members.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="card-glass rounded-xl p-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Voice Distribution</h3>
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={getMembersByVoice()}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={30}
+                            outerRadius={60}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {getMembersByVoice().map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Quick Stats</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {getMembersByVoice().map((voice, i) => (
+                        <div key={voice.name} className="p-3 rounded-lg bg-secondary/50">
+                          <p className="text-lg font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                            {voice.value}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{voice.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="card-glass rounded-2xl overflow-hidden">
                 {filteredMembers.length > 0 ? (
@@ -783,6 +919,57 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">Revenue</p>
                 </div>
               </div>
+
+              {/* Revenue Charts */}
+              {confirmedOrders.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="card-glass rounded-xl p-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Revenue Trend</h3>
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={getRevenueByDay()}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                          <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: "hsl(var(--card))", 
+                              border: "1px solid hsl(var(--primary) / 0.2)",
+                              borderRadius: "8px",
+                            }}
+                            formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                          />
+                          <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Tickets by Tier</h3>
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={getTicketsByTier()}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={30}
+                            outerRadius={60}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, value }) => `${name}: ${value}`}
+                          >
+                            {getTicketsByTier().map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Filters */}
               <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -970,6 +1157,31 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">Pending Leave</p>
                 </div>
               </div>
+
+              {/* Attendance Rate Chart */}
+              {attendanceSessions.length > 0 && (
+                <div className="card-glass rounded-xl p-4">
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-3">Attendance Rate Trend</h3>
+                  <div className="h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={getAttendanceRate()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} domain={[0, 100]} />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: "hsl(var(--card))", 
+                            border: "1px solid hsl(var(--primary) / 0.2)",
+                            borderRadius: "8px",
+                          }}
+                          formatter={(value: number) => [`${value}%`, "Attendance"]}
+                        />
+                        <Line type="monotone" dataKey="rate" stroke="#D4AF37" strokeWidth={2} dot={{ fill: "#D4AF37" }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
 
               {/* Take Attendance Section */}
               <div className="card-glass rounded-2xl p-6">
@@ -2018,11 +2230,6 @@ export default function Admin() {
             </div>
           )}
 
-          {/* Reports */}
-          {activeTab === "reports" && (
-            <ReportsDashboard />
-          )}
-
           {/* Event Staff (Super Admin Only) */}
           {activeTab === "event-staff" && isSuperAdmin && (
             <EventStaffManagement />
@@ -2156,6 +2363,44 @@ export default function Admin() {
                     💡 Admins can access the scanner without a PIN when logged in
                   </p>
                   <Button variant="gold" onClick={handleSaveSettings}>Save Scanner Settings</Button>
+                </div>
+              </div>
+
+              {/* Data Export Section */}
+              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Download className="w-5 h-5 text-primary" />
+                  Export Data
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Download your data as CSV files or create a full backup.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="outline" size="sm" onClick={() => { exportFullBackup(); toast({ title: "Backup Created" }); }}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Full Backup (JSON)
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { exportFinancialReportToCSV(); toast({ title: "Financial Report Exported" }); }}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Financial Report
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { exportMembersToCSV(); toast({ title: "Members Exported" }); }}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Members List
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { exportAttendanceToCSV(); toast({ title: "Attendance Exported" }); }}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Attendance
+                  </Button>
+                </div>
+                <div className="mt-4 p-3 rounded-lg bg-secondary/50 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground mb-1">Current data:</p>
+                  <div className="flex flex-wrap gap-3">
+                    <span>{getBackupStats().members} members</span>
+                    <span>{getBackupStats().events} events</span>
+                    <span>{getBackupStats().orders} orders</span>
+                    <span>{getBackupStats().attendance} attendance sessions</span>
+                  </div>
                 </div>
               </div>
 
