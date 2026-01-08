@@ -106,10 +106,11 @@ import { AddAlbumModal } from "@/components/admin/AddAlbumModal";
 import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { AdminTeamManagement } from "@/components/admin/AdminTeamManagement";
-import { BarChart3, Shield } from "lucide-react";
+import { AuditLogPage } from "@/components/admin/AuditLogPage";
+import { BarChart3, Shield, History } from "lucide-react";
 import { addAuditLog } from "@/lib/adminService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "team" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -123,6 +124,7 @@ const sidebarItems = [
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
   { id: "team" as Tab, label: "Admin Team", icon: Shield, superAdminOnly: true },
+  { id: "audit" as Tab, label: "Audit Log", icon: History, superAdminOnly: true },
   { id: "settings" as Tab, label: "Settings", icon: Settings },
 ];
 
@@ -1953,6 +1955,11 @@ export default function Admin() {
           {/* Admin Team (Super Admin Only) */}
           {activeTab === "team" && isSuperAdmin && (
             <AdminTeamManagement />
+          )}
+
+          {/* Audit Log (Super Admin Only) */}
+          {activeTab === "audit" && isSuperAdmin && (
+            <AuditLogPage />
           )}
 
           {/* Settings */}

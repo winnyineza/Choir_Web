@@ -27,7 +27,6 @@ import {
   Trash2,
   UserX,
   UserCheck,
-  History,
   AlertCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +34,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getAllAdminUsers,
   getAllInvites,
-  getAuditLog,
   createInvite,
   deleteInvite,
   deactivateAdminUser,
@@ -44,16 +42,13 @@ import {
   getRoleLabel,
   type AdminUser,
   type AdminInvite,
-  type AuditLogEntry,
   type AdminRole,
 } from "@/lib/adminService";
 
 export function AdminTeamManagement() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [invites, setInvites] = useState<AdminInvite[]>([]);
-  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [showAuditLog, setShowAuditLog] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState<string | null>(null);
   
   // Invite form
@@ -67,7 +62,6 @@ export function AdminTeamManagement() {
   const loadData = () => {
     setAdmins(getAllAdminUsers());
     setInvites(getAllInvites().filter(i => !i.used));
-    setAuditLog(getAuditLog(50));
   };
 
   useEffect(() => {
@@ -187,22 +181,13 @@ export function AdminTeamManagement() {
         <div>
           <h2 className="font-display text-2xl font-bold gold-text">Admin Team</h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Manage admin access and view activity
+            Manage admin access and permissions
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowAuditLog(!showAuditLog)}
-          >
-            <History className="w-4 h-4 mr-2" />
-            {showAuditLog ? "Hide Log" : "Activity Log"}
-          </Button>
-          <Button variant="gold" onClick={() => setIsInviteModalOpen(true)}>
-            <UserPlus className="w-4 h-4 mr-2" />
-            Invite Admin
-          </Button>
-        </div>
+        <Button variant="gold" onClick={() => setIsInviteModalOpen(true)}>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Invite Admin
+        </Button>
       </div>
 
       {/* Stats */}
@@ -247,41 +232,6 @@ export function AdminTeamManagement() {
           </div>
         </div>
       </div>
-
-      {/* Audit Log (conditional) */}
-      {showAuditLog && (
-        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-          <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <History className="w-4 h-4 text-primary" />
-            Recent Activity
-          </h3>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {auditLog.length > 0 ? (
-              auditLog.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-background/50 text-sm"
-                >
-                  <div>
-                    <span className="font-medium text-foreground">{entry.userName}</span>
-                    <span className="text-muted-foreground"> - {entry.action}</span>
-                    {entry.details && (
-                      <span className="text-muted-foreground"> ({entry.details})</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(entry.timestamp)}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No activity recorded yet
-              </p>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Admin Users List */}
       <div className="space-y-4">
