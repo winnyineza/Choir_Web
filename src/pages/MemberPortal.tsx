@@ -25,6 +25,10 @@ import {
   TrendingDown,
   Minus,
   BarChart3,
+  Megaphone,
+  Info,
+  Bell,
+  Pin,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +48,10 @@ import {
   getMemberAttendanceStatsByEmail,
   type AttendanceRecord,
 } from "@/lib/attendanceService";
+import {
+  getActiveAnnouncements,
+  type Announcement,
+} from "@/lib/announcementService";
 import { cn } from "@/lib/utils";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests";
@@ -78,6 +86,14 @@ export default function MemberPortal() {
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [myAttendance, setMyAttendance] = useState<AttendanceRecord[]>([]);
   const [attendanceStats, setAttendanceStats] = useState<ReturnType<typeof getMemberAttendanceStatsByEmail> | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  // Load announcements when PIN is verified
+  useEffect(() => {
+    if (view !== "pin") {
+      setAnnouncements(getActiveAnnouncements("members"));
+    }
+  }, [view]);
 
   // PIN input handling
   const handlePinChange = (index: number, value: string) => {
@@ -453,6 +469,64 @@ export default function MemberPortal() {
                     )}
                   </div>
                 </div>
+
+                {/* Announcements */}
+                {announcements.length > 0 && (
+                  <div className="space-y-3">
+                    <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+                      <Megaphone className="w-5 h-5 text-primary" />
+                      Announcements
+                    </h2>
+                    {announcements.map((announcement) => (
+                      <div
+                        key={announcement.id}
+                        className={cn(
+                          "card-glass rounded-xl p-4 border-l-4",
+                          announcement.priority === "urgent" && "border-l-red-500 bg-red-500/5",
+                          announcement.priority === "high" && "border-l-yellow-500 bg-yellow-500/5",
+                          announcement.priority === "normal" && "border-l-primary",
+                          announcement.type === "event" && "border-l-blue-500",
+                          announcement.type === "warning" && "border-l-yellow-500",
+                          announcement.type === "success" && "border-l-green-500"
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={cn(
+                            "p-2 rounded-lg mt-0.5",
+                            announcement.priority === "urgent" ? "bg-red-500/20" : 
+                            announcement.type === "warning" ? "bg-yellow-500/20" :
+                            announcement.type === "success" ? "bg-green-500/20" :
+                            announcement.type === "event" ? "bg-blue-500/20" : "bg-primary/20"
+                          )}>
+                            {announcement.priority === "urgent" ? (
+                              <Bell className="w-4 h-4 text-red-500" />
+                            ) : (
+                              <Info className={cn(
+                                "w-4 h-4",
+                                announcement.type === "warning" ? "text-yellow-500" :
+                                announcement.type === "success" ? "text-green-500" :
+                                announcement.type === "event" ? "text-blue-500" : "text-primary"
+                              )} />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-foreground">{announcement.title}</h3>
+                              {announcement.isPinned && <Pin className="w-3 h-3 text-primary" />}
+                              {announcement.priority === "urgent" && (
+                                <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">Urgent</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {new Date(announcement.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

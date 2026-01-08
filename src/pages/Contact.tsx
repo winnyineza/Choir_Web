@@ -15,6 +15,7 @@ import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Loader2 } from "lucide-r
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { createContactSubmission } from "@/lib/contactService";
 
 export default function Contact() {
   useDocumentTitle("Contact Us");
@@ -52,6 +53,14 @@ export default function Contact() {
       setIsSubmitting(false);
 
       if (response.ok) {
+        // Also save to localStorage for admin panel viewing
+        createContactSubmission({
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          subject: formData.subject || "General Inquiry",
+          message: formData.message,
+        });
+
         setIsSubmitted(true);
         toast({
           title: "Message Sent! ✉️",

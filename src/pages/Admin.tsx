@@ -41,7 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllOrders, updateOrderStatus, confirmOrder, getOrderStats, type TicketOrder } from "@/lib/ticketService";
+import { getAllOrders, updateOrderStatus, confirmOrder, getOrderStats, getPendingOrderStats, cleanupOldPendingOrders, deletePendingOrders, type TicketOrder } from "@/lib/ticketService";
 import {
   getAllMembers,
   getAllEvents,
@@ -136,10 +136,13 @@ import {
 } from "@/lib/exportUtils";
 import { AnnouncementManagement } from "@/components/admin/AnnouncementManagement";
 import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
-import { BarChart3, Shield, History } from "lucide-react";
+import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
+import { BarChart3, Shield, History, Mail } from "lucide-react";
 import { addAuditLog } from "@/lib/adminService";
+import { ContactSubmissions } from "@/components/admin/ContactSubmissions";
+import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "announcements" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -149,6 +152,7 @@ const sidebarItems = [
   { id: "attendance" as Tab, label: "Attendance", icon: UserCheck },
   { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
   { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
+  { id: "messages" as Tab, label: "Messages", icon: Mail },
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
@@ -181,6 +185,7 @@ export default function Admin() {
   const [streamingPlatforms, setStreamingPlatforms] = useState<StreamingPlatform[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveFilter, setLeaveFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
+  const [unreadMessages, setUnreadMessages] = useState(0);
   
   // Attendance state
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
@@ -205,6 +210,8 @@ export default function Admin() {
   const [showAddMusicVideo, setShowAddMusicVideo] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [showEventSummary, setShowEventSummary] = useState(false);
+  const [summaryEvent, setSummaryEvent] = useState<Event | null>(null);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [editingMusicVideo, setEditingMusicVideo] = useState<MusicVideo | null>(null);
   const [viewingOrder, setViewingOrder] = useState<TicketOrder | null>(null);
@@ -230,6 +237,7 @@ export default function Admin() {
     setLeaveRequests(getAllLeaveRequests());
     setAttendanceSessions(getRecentSessions(20));
     setDashboardStats(getDashboardStats());
+    setUnreadMessages(getUnreadContactCount());
   };
 
   // Load data on mount
@@ -527,6 +535,12 @@ export default function Admin() {
               >
                 <item.icon className="w-5 h-5" />
                 {item.label}
+                {/* Unread messages badge */}
+                {item.id === "messages" && unreadMessages > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-medium">
+                    {unreadMessages}
+                  </span>
+                )}
                 {item.superAdminOnly && (
                   <Shield className="w-3 h-3 ml-auto text-primary" />
                 )}
@@ -924,11 +938,20 @@ export default function Admin() {
                                 {event.isFree ? "Free" : `${event.tickets.length} tiers`}
                               </span>
                             </td>
-                            <td className="p-4 text-right">
+                            <td className="p-4 text-right space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setSummaryEvent(event); setShowEventSummary(true); }}
+                                title="View Summary"
+                              >
+                                <BarChart3 className="w-4 h-4 text-primary" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => { setEditingEvent(event); setShowAddEvent(true); }}
+                                title="Edit"
                               >
                                 <Pencil className="w-4 h-4" />
                               </Button>
@@ -936,6 +959,7 @@ export default function Admin() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteEvent(event.id, event.title)}
+                                title="Delete"
                               >
                                 <Trash2 className="w-4 h-4 text-destructive" />
                               </Button>
@@ -985,6 +1009,72 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">Revenue</p>
                 </div>
               </div>
+
+              {/* Pending Order Cleanup */}
+              {orderStats.pending > 0 && (
+                <div className="card-glass rounded-xl p-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-foreground flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-yellow-500" />
+                        Pending Orders Cleanup
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {orderStats.pending} pending order(s) found. These are orders where payment was not completed.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const count = cleanupOldPendingOrders(24);
+                          if (count > 0) {
+                            toast({
+                              title: "Cleanup Complete",
+                              description: `${count} pending order(s) older than 24 hours marked as cancelled.`,
+                            });
+                            loadData();
+                          } else {
+                            toast({
+                              title: "No orders to clean",
+                              description: "All pending orders are less than 24 hours old.",
+                            });
+                          }
+                        }}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Cancel Old (24h+)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-400 hover:text-red-300"
+                        onClick={() => {
+                          if (confirm("This will permanently delete all pending orders older than 24 hours. This cannot be undone. Continue?")) {
+                            const count = deletePendingOrders(24);
+                            if (count > 0) {
+                              toast({
+                                title: "Deleted",
+                                description: `${count} pending order(s) permanently deleted.`,
+                              });
+                              loadData();
+                            } else {
+                              toast({
+                                title: "No orders to delete",
+                                description: "All pending orders are less than 24 hours old.",
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Old (24h+)
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Revenue Charts */}
               {confirmedOrders.length > 0 && (
@@ -2448,6 +2538,14 @@ export default function Admin() {
             <AdminTeamManagement />
           )}
 
+          {/* Messages */}
+          {activeTab === "messages" && (
+            <div className="space-y-6">
+              <h2 className="font-display text-2xl font-bold">Contact Messages</h2>
+              <ContactSubmissions onUnreadCountChange={setUnreadMessages} />
+            </div>
+          )}
+
           {/* Audit Log (Super Admin Only) */}
           {activeTab === "audit" && isSuperAdmin && (
             <AuditLogPage />
@@ -2664,6 +2762,13 @@ export default function Admin() {
         onClose={() => { setShowAddEvent(false); setEditingEvent(null); }}
         onSuccess={loadData}
         editEvent={editingEvent}
+      />
+
+      <EventSummaryModal
+        isOpen={showEventSummary}
+        onClose={() => { setShowEventSummary(false); setSummaryEvent(null); }}
+        event={summaryEvent}
+        orders={orders}
       />
 
       <UploadGalleryModal

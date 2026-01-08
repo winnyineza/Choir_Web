@@ -213,3 +213,72 @@ export function clearAllOrders(): void {
   localStorage.removeItem(ORDERS_KEY);
 }
 
+// Get pending order stats
+export function getPendingOrderStats() {
+  const orders = getAllOrders();
+  const pendingOrders = orders.filter((o) => o.status === "pending");
+  
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const oneDay = 24 * oneHour;
+  const oneWeek = 7 * oneDay;
+  
+  return {
+    total: pendingOrders.length,
+    olderThan1Hour: pendingOrders.filter((o) => now - new Date(o.createdAt).getTime() > oneHour).length,
+    olderThan24Hours: pendingOrders.filter((o) => now - new Date(o.createdAt).getTime() > oneDay).length,
+    olderThan7Days: pendingOrders.filter((o) => now - new Date(o.createdAt).getTime() > oneWeek).length,
+    potentialRevenue: pendingOrders.reduce((sum, o) => sum + o.total, 0),
+  };
+}
+
+// Clean up old pending orders
+// Returns the number of orders cancelled
+export function cleanupOldPendingOrders(maxAgeHours: number = 24): number {
+  const orders = getAllOrders();
+  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+  const now = Date.now();
+  
+  let cleanedCount = 0;
+  
+  const updatedOrders = orders.map((order) => {
+    if (order.status === "pending") {
+      const orderAge = now - new Date(order.createdAt).getTime();
+      if (orderAge > maxAgeMs) {
+        cleanedCount++;
+        return { ...order, status: "cancelled" as const };
+      }
+    }
+    return order;
+  });
+  
+  if (cleanedCount > 0) {
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(updatedOrders));
+  }
+  
+  return cleanedCount;
+}
+
+// Delete pending orders completely (not just cancel)
+export function deletePendingOrders(maxAgeHours: number = 24): number {
+  const orders = getAllOrders();
+  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+  const now = Date.now();
+  
+  const filteredOrders = orders.filter((order) => {
+    if (order.status === "pending") {
+      const orderAge = now - new Date(order.createdAt).getTime();
+      return orderAge <= maxAgeMs; // Keep only recent pending orders
+    }
+    return true; // Keep all non-pending orders
+  });
+  
+  const deletedCount = orders.length - filteredOrders.length;
+  
+  if (deletedCount > 0) {
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(filteredOrders));
+  }
+  
+  return deletedCount;
+}
+
