@@ -1376,39 +1376,48 @@ export default function Admin() {
                             <td className="p-4 text-right">
                               {request.status === "pending" && (
                                 <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-green-400 hover:text-green-300"
-                                    onClick={() => {
-                                      approveLeaveRequest(request.id, "Admin");
-                                      loadData();
-                                      toast({
-                                        title: "Leave Approved",
-                                        description: `${request.memberName}'s leave request has been approved.`,
-                                      });
-                                    }}
-                                    title="Approve"
-                                  >
-                                    <CheckCircle className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive"
-                                    onClick={() => {
-                                      const notes = prompt("Reason for denial (optional):");
-                                      denyLeaveRequest(request.id, "Admin", notes || undefined);
-                                      loadData();
-                                      toast({
-                                        title: "Leave Denied",
-                                        description: `${request.memberName}'s leave request has been denied.`,
-                                      });
-                                    }}
-                                    title="Deny"
-                                  >
-                                    <XCircle className="w-4 h-4" />
-                                  </Button>
+                                  {/* Prevent admins from approving their own leave requests */}
+                                  {currentUser?.memberId === request.memberId ? (
+                                    <span className="text-xs text-muted-foreground italic">
+                                      Cannot review own request
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-green-400 hover:text-green-300"
+                                        onClick={() => {
+                                          approveLeaveRequest(request.id, currentUser?.name || "Admin");
+                                          loadData();
+                                          toast({
+                                            title: "Leave Approved",
+                                            description: `${request.memberName}'s leave request has been approved.`,
+                                          });
+                                        }}
+                                        title="Approve"
+                                      >
+                                        <CheckCircle className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive"
+                                        onClick={() => {
+                                          const notes = prompt("Reason for denial (optional):");
+                                          denyLeaveRequest(request.id, currentUser?.name || "Admin", notes || undefined);
+                                          loadData();
+                                          toast({
+                                            title: "Leave Denied",
+                                            description: `${request.memberName}'s leave request has been denied.`,
+                                          });
+                                        }}
+                                        title="Deny"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </>
                               )}
                               {request.status !== "pending" && request.reviewedBy && (
