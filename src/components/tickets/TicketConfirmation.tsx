@@ -1,93 +1,32 @@
-import { CheckCircle, Calendar, MapPin, Ticket, Mail, QrCode, Clock, AlertCircle, Image, Printer } from "lucide-react";
+import { CheckCircle, Calendar, MapPin, Ticket, QrCode, Clock, AlertCircle, Image, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/flutterwave";
-import { printTicket } from "@/lib/exportUtils";
 import type { TicketOrder } from "@/lib/ticketService";
 import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 
 interface TicketConfirmationProps {
   order: TicketOrder;
   onClose: () => void;
 }
 
-// Simple QR Code generator using canvas
-function generateQRCode(data: string, size: number = 150): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  
-  if (!ctx) return "";
-
-  // Background
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, size, size);
-
-  // Create a pattern based on the data hash
-  ctx.fillStyle = "#000000";
-  const cellSize = size / 25;
-  
-  // Generate pseudo-random pattern from data
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash) + data.charCodeAt(i);
-    hash = hash & hash;
+// Generate real scannable QR code
+async function generateQRCodeAsync(data: string, size: number = 150): Promise<string> {
+  try {
+    const qrDataUrl = await QRCode.toDataURL(data, {
+      width: size,
+      margin: 1,
+      color: {
+        dark: "#000000",
+        light: "#ffffff"
+      },
+      errorCorrectionLevel: "M"
+    });
+    return qrDataUrl;
+  } catch (error) {
+    console.error("Error generating QR code:", error);
+    return "";
   }
-
-  // Position detection patterns (corners)
-  const drawFinderPattern = (x: number, y: number) => {
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x, y, cellSize * 7, cellSize * 7);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x + cellSize, y + cellSize, cellSize * 5, cellSize * 5);
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x + cellSize * 2, y + cellSize * 2, cellSize * 3, cellSize * 3);
-  };
-
-  drawFinderPattern(0, 0);
-  drawFinderPattern(size - cellSize * 7, 0);
-  drawFinderPattern(0, size - cellSize * 7);
-
-  // Data modules (simplified)
-  const seedRandom = (seed: number) => {
-    return () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-  };
-
-  const random = seedRandom(Math.abs(hash));
-
-  ctx.fillStyle = "#000000";
-  for (let row = 8; row < 17; row++) {
-    for (let col = 8; col < 17; col++) {
-      if (random() > 0.5) {
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-      }
-    }
-  }
-
-  for (let row = 0; row < 25; row++) {
-    for (let col = 8; col < 17; col++) {
-      if (row < 8 || row > 16) {
-        if (random() > 0.5) {
-          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-  }
-
-  for (let col = 0; col < 25; col++) {
-    for (let row = 8; row < 17; row++) {
-      if (col < 8 || col > 16) {
-        if (random() > 0.5) {
-          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-  }
-
-  return canvas.toDataURL("image/png");
 }
 
 // Color themes based on ticket tier
@@ -114,6 +53,28 @@ const tierColors: Record<string, { primary: string; secondary: string; accent: s
     bg2: "#4a1a1a",
   },
 };
+
+// Helper function to draw rounded rectangles (for browser compatibility)
+function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
 
 // Generate professional concert ticket image as PNG
 function generateTicketImage(order: TicketOrder, qrCodeData: string): Promise<string> {
@@ -170,8 +131,7 @@ function generateTicketImage(order: TicketOrder, qrCodeData: string): Promise<st
 
     // Tier badge (top right of main section)
     ctx.fillStyle = colors.primary;
-    ctx.beginPath();
-    ctx.roundRect(mainWidth - 120, 20, 90, 28, 14);
+    drawRoundRect(ctx, mainWidth - 120, 20, 90, 28, 14);
     ctx.fill();
     ctx.fillStyle = primaryTier === "vip" ? "#000000" : "#ffffff";
     ctx.font = "bold 12px Arial, sans-serif";
@@ -306,8 +266,7 @@ function generateTicketImage(order: TicketOrder, qrCodeData: string): Promise<st
 
     // White background for QR
     ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.roundRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10, 6);
+    drawRoundRect(ctx, qrX - 5, qrY - 5, qrSize + 10, qrSize + 10, 6);
     ctx.fill();
 
     // Draw QR code if provided
@@ -354,8 +313,7 @@ function generateTicketImage(order: TicketOrder, qrCodeData: string): Promise<st
 
       // Tier badge on stub
       ctx.fillStyle = colors.primary;
-      ctx.beginPath();
-      ctx.roundRect(stubCenter - 40, qrY + qrSize + 85, 80, 24, 12);
+      drawRoundRect(ctx, stubCenter - 40, qrY + qrSize + 85, 80, 24, 12);
       ctx.fill();
       ctx.fillStyle = primaryTier === "vip" ? "#000000" : "#ffffff";
       ctx.font = "bold 11px Arial, sans-serif";
@@ -379,18 +337,26 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
   const isPending = order.status === "pending";
 
   useEffect(() => {
-    // Generate QR code for display
-    const qrData = JSON.stringify({
-      orderId: order.id,
-      txRef: order.txRef,
-      event: order.eventTitle,
-      tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
-    });
-    const qrUrl = generateQRCode(qrData, 200);
-    setQrCodeUrl(qrUrl);
+    const generateTicket = async () => {
+      // Generate QR code for display
+      const qrData = JSON.stringify({
+        orderId: order.id,
+        txRef: order.txRef,
+        event: order.eventTitle,
+        tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+      });
+      
+      const qrUrl = await generateQRCodeAsync(qrData, 200);
+      setQrCodeUrl(qrUrl);
+      
+      // Generate full ticket image with QR code
+      if (qrUrl) {
+        const ticketImg = await generateTicketImage(order, qrUrl);
+        setTicketImageUrl(ticketImg);
+      }
+    };
     
-    // Generate full ticket image with QR code
-    generateTicketImage(order, qrUrl).then(setTicketImageUrl);
+    generateTicket();
   }, [order]);
 
   const totalTickets = order.tickets.reduce((sum, t) => sum + t.quantity, 0);
@@ -398,19 +364,122 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
   const handleDownloadTicket = async () => {
     setIsGenerating(true);
     
-    let imgUrl = ticketImageUrl;
-    if (!imgUrl) {
-      imgUrl = await generateTicketImage(order, qrCodeUrl);
+    try {
+      // Generate QR code if not already available
+      let qrUrl = qrCodeUrl;
+      if (!qrUrl) {
+        const qrData = JSON.stringify({
+          orderId: order.id,
+          txRef: order.txRef,
+          event: order.eventTitle,
+          tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+        });
+        qrUrl = await generateQRCodeAsync(qrData, 200);
+        setQrCodeUrl(qrUrl);
+      }
+      
+      // Generate ticket image
+      const imgUrl = await generateTicketImage(order, qrUrl);
+      
+      if (!imgUrl) {
+        console.error("Failed to generate ticket image");
+        setIsGenerating(false);
+        return;
+      }
+      
       setTicketImageUrl(imgUrl);
+      
+      // Create download link
+      const a = document.createElement("a");
+      a.href = imgUrl;
+      a.download = `ticket-${order.txRef}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Error downloading ticket:", error);
+    } finally {
+      setIsGenerating(false);
     }
+  };
+
+  const handlePrintTicket = async () => {
+    setIsGenerating(true);
     
-    // Download
-    const a = document.createElement("a");
-    a.href = imgUrl;
-    a.download = `ticket-${order.txRef}.png`;
-    a.click();
-    
-    setIsGenerating(false);
+    try {
+      // Generate QR code if not already available
+      let qrUrl = qrCodeUrl;
+      if (!qrUrl) {
+        const qrData = JSON.stringify({
+          orderId: order.id,
+          txRef: order.txRef,
+          event: order.eventTitle,
+          tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+        });
+        qrUrl = await generateQRCodeAsync(qrData, 200);
+        setQrCodeUrl(qrUrl);
+      }
+      
+      let imgUrl = ticketImageUrl;
+      if (!imgUrl) {
+        imgUrl = await generateTicketImage(order, qrUrl);
+        setTicketImageUrl(imgUrl);
+      }
+      
+      if (!imgUrl) {
+        console.error("Failed to generate ticket image for printing");
+        setIsGenerating(false);
+        return;
+      }
+      
+      // Open print window
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Print Ticket - ${order.txRef}</title>
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  min-height: 100vh;
+                  background: #f5f5f5;
+                  padding: 20px;
+                }
+                img {
+                  max-width: 100%;
+                  height: auto;
+                  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                }
+                @media print {
+                  body { background: white; padding: 0; }
+                  img { box-shadow: none; max-width: 100%; }
+                }
+              </style>
+            </head>
+            <body>
+              <img src="${imgUrl}" alt="Ticket" />
+              <script>
+                document.querySelector('img').onload = function() {
+                  setTimeout(function() {
+                    window.print();
+                  }, 500);
+                };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } catch (error) {
+      console.error("Error printing ticket:", error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -565,11 +634,11 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
             <Button 
               variant="outline" 
               className="flex-1" 
-              onClick={() => ticketImageUrl && printTicket(ticketImageUrl)}
-              disabled={!ticketImageUrl}
+              onClick={handlePrintTicket}
+              disabled={isGenerating}
             >
               <Printer className="w-4 h-4 mr-2" />
-              Print
+              {isGenerating ? "Preparing..." : "Print"}
             </Button>
           </div>
         )}

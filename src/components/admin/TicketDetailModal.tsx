@@ -30,6 +30,7 @@ import {
   Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import QRCodeLib from "qrcode";
 
 interface TicketDetailModalProps {
   order: TicketOrder | null;
@@ -40,79 +41,23 @@ interface TicketDetailModalProps {
   onMarkUsed: (orderId: string) => void;
 }
 
-// Simple QR Code generator
-function generateQRCode(data: string, size: number = 120): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  
-  if (!ctx) return "";
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, size, size);
-
-  ctx.fillStyle = "#000000";
-  const cellSize = size / 25;
-  
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash) + data.charCodeAt(i);
-    hash = hash & hash;
+// Generate real scannable QR code
+async function generateQRCode(data: string, size: number = 120): Promise<string> {
+  try {
+    const qrDataUrl = await QRCodeLib.toDataURL(data, {
+      width: size,
+      margin: 1,
+      color: {
+        dark: "#000000",
+        light: "#ffffff"
+      },
+      errorCorrectionLevel: "M"
+    });
+    return qrDataUrl;
+  } catch (error) {
+    console.error("Error generating QR code:", error);
+    return "";
   }
-
-  const drawFinderPattern = (x: number, y: number) => {
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x, y, cellSize * 7, cellSize * 7);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x + cellSize, y + cellSize, cellSize * 5, cellSize * 5);
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x + cellSize * 2, y + cellSize * 2, cellSize * 3, cellSize * 3);
-  };
-
-  drawFinderPattern(0, 0);
-  drawFinderPattern(size - cellSize * 7, 0);
-  drawFinderPattern(0, size - cellSize * 7);
-
-  const seedRandom = (seed: number) => {
-    return () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-  };
-
-  const random = seedRandom(Math.abs(hash));
-
-  ctx.fillStyle = "#000000";
-  for (let row = 8; row < 17; row++) {
-    for (let col = 8; col < 17; col++) {
-      if (random() > 0.5) {
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-      }
-    }
-  }
-
-  for (let row = 0; row < 25; row++) {
-    for (let col = 8; col < 17; col++) {
-      if (row < 8 || row > 16) {
-        if (random() > 0.5) {
-          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-  }
-
-  for (let col = 0; col < 25; col++) {
-    for (let row = 8; row < 17; row++) {
-      if (col < 8 || col > 16) {
-        if (random() > 0.5) {
-          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-  }
-
-  return canvas.toDataURL("image/png");
 }
 
 export function TicketDetailModal({
@@ -127,15 +72,19 @@ export function TicketDetailModal({
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
-    if (order && isOpen) {
-      const qrData = JSON.stringify({
-        orderId: order.id,
-        txRef: order.txRef,
-        event: order.eventTitle,
-        tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
-      });
-      setQrCode(generateQRCode(qrData, 150));
-    }
+    const generateQR = async () => {
+      if (order && isOpen) {
+        const qrData = JSON.stringify({
+          orderId: order.id,
+          txRef: order.txRef,
+          event: order.eventTitle,
+          tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+        });
+        const qrUrl = await generateQRCode(qrData, 150);
+        setQrCode(qrUrl);
+      }
+    };
+    generateQR();
   }, [order, isOpen]);
 
   if (!order) return null;
