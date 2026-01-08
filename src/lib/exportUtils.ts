@@ -5,8 +5,8 @@ import { formatCurrency } from "./flutterwave";
 import { getAllMembers, getAllEvents, getAllGalleryItems, getSettings } from "./dataService";
 import { getAllOrders } from "./ticketService";
 import { getAllLeaveRequests } from "./leaveService";
-import { getAllAttendanceSessions } from "./attendanceService";
-import { getAllAlbums, getAllMusicVideos, getAllStreamingPlatforms } from "./releaseService";
+import { getAllSessions } from "./attendanceService";
+import { getAllAlbums, getAllMusicVideos, getAllPlatforms } from "./releaseService";
 import { getAllPromoCodes } from "./promoService";
 import { getAllAdminUsers, getAuditLog } from "./adminService";
 
@@ -224,10 +224,10 @@ export function exportFullBackup(): void {
       gallery: getAllGalleryItems(),
       orders: getAllOrders(),
       leaveRequests: getAllLeaveRequests(),
-      attendance: getAllAttendanceSessions(),
+      attendance: getAllSessions(),
       albums: getAllAlbums(),
       musicVideos: getAllMusicVideos(),
-      streamingPlatforms: getAllStreamingPlatforms(),
+      streamingPlatforms: getAllPlatforms(),
       promoCodes: getAllPromoCodes(),
       settings: getSettings(),
       adminUsers: getAllAdminUsers().map(u => ({ ...u, password: "[HIDDEN]" })), // Don't export passwords
@@ -398,7 +398,7 @@ export function getBackupStats() {
     gallery: getAllGalleryItems().length,
     orders: getAllOrders().length,
     leaveRequests: getAllLeaveRequests().length,
-    attendance: getAllAttendanceSessions().length,
+    attendance: getAllSessions().length,
     albums: getAllAlbums().length,
     musicVideos: getAllMusicVideos().length,
     promoCodes: getAllPromoCodes().length,
