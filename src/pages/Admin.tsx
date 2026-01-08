@@ -36,6 +36,7 @@ import {
   FileText,
   UserCheck,
   IdCard,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -108,11 +109,13 @@ import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { AdminTeamManagement } from "@/components/admin/AdminTeamManagement";
 import { AuditLogPage } from "@/components/admin/AuditLogPage";
+import { ReportsDashboard } from "@/components/admin/ReportsDashboard";
+import { AnnouncementManagement } from "@/components/admin/AnnouncementManagement";
 import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
 import { BarChart3, Shield, History } from "lucide-react";
 import { addAuditLog } from "@/lib/adminService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "announcements" | "releases" | "promos" | "gallery" | "analytics" | "reports" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -121,10 +124,12 @@ const sidebarItems = [
   { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket },
   { id: "attendance" as Tab, label: "Attendance", icon: UserCheck },
   { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
+  { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
+  { id: "reports" as Tab, label: "Reports", icon: FileText },
   { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard, superAdminOnly: true },
   { id: "team" as Tab, label: "Admin Team", icon: Shield, superAdminOnly: true },
   { id: "audit" as Tab, label: "Audit Log", icon: History, superAdminOnly: true },
@@ -1466,6 +1471,11 @@ export default function Admin() {
             </div>
           )}
 
+          {/* Announcements */}
+          {activeTab === "announcements" && (
+            <AnnouncementManagement />
+          )}
+
           {/* Gallery */}
           {activeTab === "gallery" && (
             <div className="space-y-6">
@@ -2006,6 +2016,11 @@ export default function Admin() {
               </div>
               <AnalyticsDashboard />
             </div>
+          )}
+
+          {/* Reports */}
+          {activeTab === "reports" && (
+            <ReportsDashboard />
           )}
 
           {/* Event Staff (Super Admin Only) */}

@@ -44,6 +44,17 @@ export interface AuditLogEntry {
   ipAddress?: string;
 }
 
+export interface PasswordResetToken {
+  id: string;
+  userId: string;
+  email: string;
+  token: string;
+  expiresAt: string;
+  used: boolean;
+}
+
+const PASSWORD_RESET_KEY = "choir_password_resets";
+
 // Default Super Admin - Change this to your email!
 const DEFAULT_SUPER_ADMIN: AdminUser = {
   id: "super-admin-001",
@@ -361,6 +372,132 @@ export function getAdminByMemberId(memberId: string): AdminUser | null {
 // Check if a member is already an admin
 export function isMemberAdmin(memberId: string): boolean {
   return getAdminByMemberId(memberId) !== null;
+}
+
+// ============ PASSWORD RESET ============
+
+function getAllPasswordResets(): PasswordResetToken[] {
+  const data = localStorage.getItem(PASSWORD_RESET_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+function generateResetToken(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+// Request password reset - generates token
+export function requestPasswordReset(email: string): PasswordResetToken | null {
+  const user = getAdminByEmail(email);
+  if (!user) return null;
+  
+  const resets = getAllPasswordResets();
+  
+  // Invalidate any existing tokens for this email
+  const filtered = resets.filter(r => r.email.toLowerCase() !== email.toLowerCase());
+  
+  const resetToken: PasswordResetToken = {
+    id: `reset-${Date.now()}`,
+    userId: user.id,
+    email: user.email,
+    token: generateResetToken(),
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+    used: false,
+  };
+  
+  filtered.push(resetToken);
+  localStorage.setItem(PASSWORD_RESET_KEY, JSON.stringify(filtered));
+  
+  return resetToken;
+}
+
+// Validate reset token
+export function validateResetToken(token: string): PasswordResetToken | null {
+  const resets = getAllPasswordResets();
+  const resetToken = resets.find(r => r.token === token && !r.used);
+  
+  if (!resetToken) return null;
+  if (new Date(resetToken.expiresAt) < new Date()) return null;
+  
+  return resetToken;
+}
+
+// Reset password using token
+export function resetPassword(token: string, newPassword: string): boolean {
+  const resetToken = validateResetToken(token);
+  if (!resetToken) return false;
+  
+  // Update password
+  const updated = updateAdminUser(resetToken.userId, { password: newPassword });
+  if (!updated) return false;
+  
+  // Mark token as used
+  const resets = getAllPasswordResets();
+  const index = resets.findIndex(r => r.id === resetToken.id);
+  if (index !== -1) {
+    resets[index].used = true;
+    localStorage.setItem(PASSWORD_RESET_KEY, JSON.stringify(resets));
+  }
+  
+  // Log the action
+  addAuditLog(updated, "PASSWORD_RESET", "Password was reset via reset link");
+  
+  return true;
+}
+
+// Change password (when logged in)
+export function changePassword(userId: string, currentPassword: string, newPassword: string): boolean {
+  const user = getAdminById(userId);
+  if (!user) return false;
+  if (user.password !== currentPassword) return false;
+  
+  const updated = updateAdminUser(userId, { password: newPassword });
+  if (!updated) return false;
+  
+  addAuditLog(updated, "PASSWORD_CHANGE", "Password was changed");
+  return true;
+}
+
+// Password strength checker
+export function checkPasswordStrength(password: string): {
+  score: number;
+  label: string;
+  color: string;
+  suggestions: string[];
+} {
+  let score = 0;
+  const suggestions: string[] = [];
+  
+  if (password.length >= 8) score++;
+  else suggestions.push("Use at least 8 characters");
+  
+  if (password.length >= 12) score++;
+  
+  if (/[a-z]/.test(password)) score++;
+  else suggestions.push("Add lowercase letters");
+  
+  if (/[A-Z]/.test(password)) score++;
+  else suggestions.push("Add uppercase letters");
+  
+  if (/[0-9]/.test(password)) score++;
+  else suggestions.push("Add numbers");
+  
+  if (/[^a-zA-Z0-9]/.test(password)) score++;
+  else suggestions.push("Add special characters (!@#$%...)");
+  
+  const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong", "Very Strong"];
+  const colors = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e", "#10b981"];
+  
+  return {
+    score,
+    label: labels[Math.min(score, 5)],
+    color: colors[Math.min(score, 5)],
+    suggestions,
+  };
 }
 
 // Initialize on load

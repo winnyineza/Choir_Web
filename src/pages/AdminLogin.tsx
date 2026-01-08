@@ -3,21 +3,33 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { validateInvite, useInvite } from "@/lib/adminService";
-import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle } from "lucide-react";
+import { validateInvite, useInvite, requestPasswordReset, validateResetToken, resetPassword } from "@/lib/adminService";
+import { PasswordStrength } from "@/components/ui/password-strength";
+import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
+
+type View = "login" | "signup" | "forgot" | "reset";
 
 export default function AdminLogin() {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("invite");
+  const resetToken = searchParams.get("reset");
+  
+  const [view, setView] = useState<View>(() => {
+    if (inviteCode) return "signup";
+    if (resetToken) return "reset";
+    return "login";
+  });
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignup, setIsSignup] = useState(!!inviteCode);
   const [signupSuccess, setSignupSuccess] = useState(false);
   
   const { login } = useAuth();
@@ -25,6 +37,7 @@ export default function AdminLogin() {
 
   // Validate invite code if present
   const invite = inviteCode ? validateInvite(inviteCode) : null;
+  const validReset = resetToken ? validateResetToken(resetToken) : null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +45,7 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
+      const success = await login(email, password, rememberMe);
       if (success) {
         navigate("/admin");
       } else {
@@ -70,9 +83,8 @@ export default function AdminLogin() {
       const user = useInvite(inviteCode!, password);
       if (user) {
         setSignupSuccess(true);
-        // Auto-login after 2 seconds
         setTimeout(async () => {
-          const success = await login(user.email, password);
+          const success = await login(user.email, password, true);
           if (success) {
             navigate("/admin");
           }
@@ -82,6 +94,68 @@ export default function AdminLogin() {
       }
     } catch (err: any) {
       setError(err.message || "An error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
+
+    try {
+      const result = requestPasswordReset(email);
+      if (result) {
+        // In production, this would send an email
+        // For now, show the reset link (dev mode)
+        const resetLink = `${window.location.origin}/admin/login?reset=${result.token}`;
+        setSuccess(`DEV MODE: Reset link generated. In production, this would be emailed.\n\nReset Link: ${resetLink}`);
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(resetLink);
+      } else {
+        setError("No account found with this email address");
+      }
+    } catch {
+      setError("An error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const success = resetPassword(resetToken!, password);
+      if (success) {
+        setSuccess("Password reset successfully! Redirecting to login...");
+        setTimeout(() => {
+          navigate("/admin/login");
+          setView("login");
+          setPassword("");
+          setConfirmPassword("");
+        }, 2000);
+      } else {
+        setError("Failed to reset password. The link may have expired.");
+      }
+    } catch {
+      setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +184,7 @@ export default function AdminLogin() {
   }
 
   // Show invalid invite message
-  if (inviteCode && !invite) {
+  if (inviteCode && !invite && view === "signup") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="relative w-full max-w-md text-center">
@@ -123,8 +197,30 @@ export default function AdminLogin() {
           <p className="text-muted-foreground mb-6">
             This invite link is invalid or has expired.
           </p>
-          <Button variant="outline" asChild>
-            <Link to="/admin/login">Go to Login</Link>
+          <Button variant="outline" onClick={() => { setView("login"); navigate("/admin/login"); }}>
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show invalid reset token message
+  if (resetToken && !validReset && view === "reset") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="relative w-full max-w-md text-center">
+          <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-10 h-10 text-destructive" />
+          </div>
+          <h1 className="font-display text-2xl font-bold mb-2 text-foreground">
+            Invalid Reset Link
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            This password reset link is invalid or has expired.
+          </p>
+          <Button variant="outline" onClick={() => { setView("forgot"); navigate("/admin/login"); }}>
+            Request New Link
           </Button>
         </div>
       </div>
@@ -155,10 +251,10 @@ export default function AdminLogin() {
           </p>
         </div>
 
-        {/* Login/Signup Card */}
+        {/* Card */}
         <div className="card-glass rounded-3xl p-8">
-          {isSignup && invite ? (
-            // Signup Form
+          {/* SIGNUP VIEW */}
+          {view === "signup" && invite && (
             <>
               <div className="text-center mb-6">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
@@ -216,6 +312,7 @@ export default function AdminLogin() {
                       disabled={isLoading}
                     />
                   </div>
+                  <PasswordStrength password={password} />
                 </div>
 
                 <div className="space-y-2">
@@ -235,12 +332,7 @@ export default function AdminLogin() {
                   </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  variant="gold"
-                  className="w-full"
-                  disabled={isLoading}
-                >
+                <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -252,8 +344,10 @@ export default function AdminLogin() {
                 </Button>
               </form>
             </>
-          ) : (
-            // Login Form
+          )}
+
+          {/* LOGIN VIEW */}
+          {view === "login" && (
             <>
               <h2 className="font-display text-xl font-semibold text-foreground text-center mb-6">
                 Sign In
@@ -301,12 +395,30 @@ export default function AdminLogin() {
                   </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  variant="gold"
-                  className="w-full"
-                  disabled={isLoading}
-                >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="rememberMe" 
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="rememberMe"
+                      className="text-sm text-muted-foreground cursor-pointer"
+                    >
+                      Remember me
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setView("forgot"); setError(""); setSuccess(""); }}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -314,6 +426,156 @@ export default function AdminLogin() {
                     </>
                   ) : (
                     "Sign In"
+                  )}
+                </Button>
+              </form>
+            </>
+          )}
+
+          {/* FORGOT PASSWORD VIEW */}
+          {view === "forgot" && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                  <KeyRound className="w-6 h-6 text-primary" />
+                </div>
+                <h2 className="font-display text-xl font-semibold text-foreground">
+                  Reset Password
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Enter your email to receive a reset link
+                </p>
+              </div>
+
+              <form onSubmit={handleForgotPassword} className="space-y-5">
+                {error && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {error}
+                  </div>
+                )}
+                
+                {success && (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-500 text-sm whitespace-pre-wrap break-all">
+                    <CheckCircle className="w-4 h-4 inline mr-2" />
+                    {success}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="resetEmail">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="resetEmail"
+                      type="email"
+                      placeholder="Enter your admin email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 bg-secondary border-primary/20"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Reset Link"
+                  )}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => { setView("login"); setError(""); setSuccess(""); }}
+                  className="w-full text-sm text-muted-foreground hover:text-primary flex items-center justify-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Login
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* RESET PASSWORD VIEW */}
+          {view === "reset" && validReset && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                  <KeyRound className="w-6 h-6 text-primary" />
+                </div>
+                <h2 className="font-display text-xl font-semibold text-foreground">
+                  Create New Password
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  for {validReset.email}
+                </p>
+              </div>
+
+              <form onSubmit={handleResetPassword} className="space-y-5">
+                {error && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {error}
+                  </div>
+                )}
+                
+                {success && (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-500 text-sm">
+                    <CheckCircle className="w-4 h-4 inline mr-2" />
+                    {success}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      placeholder="At least 8 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 bg-secondary border-primary/20"
+                      required
+                      minLength={8}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <PasswordStrength password={password} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="confirmNewPassword"
+                      type="password"
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10 bg-secondary border-primary/20"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    "Reset Password"
                   )}
                 </Button>
               </form>
