@@ -258,29 +258,97 @@ export default function Admin() {
       member.email.toLowerCase().includes(memberSearch.toLowerCase())
   );
 
-  // Chart colors
-  const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
+  // Chart filters
+  const [chartTimePeriod, setChartTimePeriod] = useState<"7d" | "30d" | "90d" | "year" | "all">("30d");
+  const [chartEventFilter, setChartEventFilter] = useState<string>("all");
+  const [attendanceTimePeriod, setAttendanceTimePeriod] = useState<"10" | "30" | "year" | "all">("10");
 
-  // Chart data calculations
+  // Chart colors
+  const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+
+  // Time period filter helper
+  const getTimeCutoff = (period: string): number => {
+    const now = Date.now();
+    switch (period) {
+      case "7d": return now - 7 * 24 * 60 * 60 * 1000;
+      case "30d": return now - 30 * 24 * 60 * 60 * 1000;
+      case "90d": return now - 90 * 24 * 60 * 60 * 1000;
+      case "year": return now - 365 * 24 * 60 * 60 * 1000;
+      default: return 0; // all time
+    }
+  };
+
+  // Filtered confirmed orders based on time and event
+  const getFilteredOrders = () => {
+    const cutoff = getTimeCutoff(chartTimePeriod);
+    return orders
+      .filter(o => o.status === "confirmed" || o.status === "used")
+      .filter(o => new Date(o.createdAt).getTime() > cutoff)
+      .filter(o => chartEventFilter === "all" || o.eventId === chartEventFilter);
+  };
+
   const confirmedOrders = orders.filter(o => o.status === "confirmed" || o.status === "used");
   
+  // Get unique events from orders for filter dropdown
+  const orderEvents = [...new Map(confirmedOrders.map(o => [o.eventId, { id: o.eventId, title: o.eventTitle }])).values()];
+  
   const getRevenueByDay = () => {
+    const filtered = getFilteredOrders();
     const byDay: Record<string, number> = {};
-    confirmedOrders.forEach(order => {
-      const day = new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      byDay[day] = (byDay[day] || 0) + order.total;
+    
+    // Group by appropriate time unit based on period
+    filtered.forEach(order => {
+      let key: string;
+      const date = new Date(order.createdAt);
+      
+      if (chartTimePeriod === "year" || chartTimePeriod === "all") {
+        // Group by month for longer periods
+        key = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      } else {
+        // Group by day for shorter periods
+        key = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      }
+      byDay[key] = (byDay[key] || 0) + order.total;
     });
-    return Object.entries(byDay).map(([date, revenue]) => ({ date, revenue })).slice(-10);
+    
+    return Object.entries(byDay).map(([date, revenue]) => ({ date, revenue }));
   };
 
   const getTicketsByTier = () => {
+    const filtered = getFilteredOrders();
     const byTier: Record<string, number> = {};
-    confirmedOrders.forEach(order => {
+    filtered.forEach(order => {
       order.tickets.forEach(ticket => {
         byTier[ticket.tierName] = (byTier[ticket.tierName] || 0) + ticket.quantity;
       });
     });
     return Object.entries(byTier).map(([name, value]) => ({ name, value }));
+  };
+
+  const getTicketsByEvent = () => {
+    const cutoff = getTimeCutoff(chartTimePeriod);
+    const filtered = orders
+      .filter(o => o.status === "confirmed" || o.status === "used")
+      .filter(o => new Date(o.createdAt).getTime() > cutoff);
+    
+    const byEvent: Record<string, number> = {};
+    filtered.forEach(order => {
+      byEvent[order.eventTitle] = (byEvent[order.eventTitle] || 0) + order.tickets.reduce((sum, t) => sum + t.quantity, 0);
+    });
+    return Object.entries(byEvent).map(([name, value]) => ({ name, value })).slice(0, 6);
+  };
+
+  const getRevenueByEvent = () => {
+    const cutoff = getTimeCutoff(chartTimePeriod);
+    const filtered = orders
+      .filter(o => o.status === "confirmed" || o.status === "used")
+      .filter(o => new Date(o.createdAt).getTime() > cutoff);
+    
+    const byEvent: Record<string, number> = {};
+    filtered.forEach(order => {
+      byEvent[order.eventTitle] = (byEvent[order.eventTitle] || 0) + order.total;
+    });
+    return Object.entries(byEvent).map(([name, value]) => ({ name, value })).slice(0, 6);
   };
 
   const getMembersByVoice = () => {
@@ -293,14 +361,37 @@ export default function Admin() {
   };
 
   const getAttendanceRate = () => {
-    return attendanceSessions.slice(-10).map(session => {
+    let sessionsToShow = attendanceSessions;
+    
+    if (attendanceTimePeriod === "10") {
+      sessionsToShow = attendanceSessions.slice(-10);
+    } else if (attendanceTimePeriod === "30") {
+      sessionsToShow = attendanceSessions.slice(-30);
+    } else if (attendanceTimePeriod === "year") {
+      const yearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+      sessionsToShow = attendanceSessions.filter(s => new Date(s.date).getTime() > yearAgo);
+    }
+    
+    return sessionsToShow.map(session => {
       const total = session.totalPresent + session.totalAbsent + session.totalExcused + session.totalLate;
       const rate = total > 0 ? (session.totalPresent / total) * 100 : 0;
       return {
         date: new Date(session.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         rate: Math.round(rate),
+        present: session.totalPresent,
+        absent: session.totalAbsent,
       };
     });
+  };
+
+  // Calculate filtered stats for display
+  const filteredOrderStats = () => {
+    const filtered = getFilteredOrders();
+    return {
+      count: filtered.length,
+      revenue: filtered.reduce((sum, o) => sum + o.total, 0),
+      tickets: filtered.reduce((sum, o) => sum + o.tickets.reduce((s, t) => s + t.quantity, 0), 0),
+    };
   };
 
   // Order actions
@@ -573,13 +664,36 @@ export default function Admin() {
               {/* Revenue Chart */}
               {confirmedOrders.length > 0 && (
                 <div className="card-glass rounded-2xl p-6">
-                  <h2 className="font-display text-lg font-semibold mb-4">Recent Revenue</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display text-lg font-semibold">Revenue Trend</h2>
+                    <div className="flex gap-1">
+                      {[
+                        { value: "7d", label: "7D" },
+                        { value: "30d", label: "30D" },
+                        { value: "90d", label: "90D" },
+                        { value: "year", label: "1Y" },
+                      ].map((period) => (
+                        <button
+                          key={period.value}
+                          onClick={() => setChartTimePeriod(period.value as any)}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded-md transition-colors",
+                            chartTimePeriod === period.value
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-secondary text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {period.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="h-48">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={getRevenueByDay()}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
                         <Tooltip 
                           contentStyle={{ 
                             backgroundColor: "hsl(var(--card))", 
@@ -592,6 +706,9 @@ export default function Admin() {
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    {filteredOrderStats().count} orders • {formatCurrency(filteredOrderStats().revenue)} total
+                  </p>
                 </div>
               )}
 
@@ -922,51 +1039,159 @@ export default function Admin() {
 
               {/* Revenue Charts */}
               {confirmedOrders.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="card-glass rounded-xl p-4">
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Revenue Trend</h3>
-                    <div className="h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={getRevenueByDay()}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                          <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: "hsl(var(--card))", 
-                              border: "1px solid hsl(var(--primary) / 0.2)",
-                              borderRadius: "8px",
-                            }}
-                            formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                          />
-                          <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                <div className="space-y-4">
+                  {/* Chart Filters */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-muted-foreground">Period:</span>
+                    <div className="flex gap-1">
+                      {[
+                        { value: "7d", label: "7 Days" },
+                        { value: "30d", label: "30 Days" },
+                        { value: "90d", label: "90 Days" },
+                        { value: "year", label: "This Year" },
+                        { value: "all", label: "All Time" },
+                      ].map((period) => (
+                        <button
+                          key={period.value}
+                          onClick={() => setChartTimePeriod(period.value as any)}
+                          className={cn(
+                            "px-3 py-1 text-xs rounded-lg transition-colors",
+                            chartTimePeriod === period.value
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-secondary text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {period.label}
+                        </button>
+                      ))}
                     </div>
+                    
+                    {orderEvents.length > 1 && (
+                      <>
+                        <span className="text-sm text-muted-foreground ml-4">Event:</span>
+                        <select
+                          value={chartEventFilter}
+                          onChange={(e) => setChartEventFilter(e.target.value)}
+                          className="px-3 py-1 text-xs rounded-lg bg-secondary border border-primary/20 text-foreground"
+                        >
+                          <option value="all">All Events</option>
+                          {orderEvents.map((event) => (
+                            <option key={event.id} value={event.id}>
+                              {event.title}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
                   </div>
-                  <div className="card-glass rounded-xl p-4">
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Tickets by Tier</h3>
-                    <div className="h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={getTicketsByTier()}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={30}
-                            outerRadius={60}
-                            paddingAngle={2}
-                            dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
-                          >
-                            {getTicketsByTier().map((_, index) => (
-                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
+
+                  {/* Filtered Stats Summary */}
+                  <div className="p-3 rounded-lg bg-secondary/50 flex items-center gap-6 text-sm">
+                    <span className="text-muted-foreground">
+                      Showing: <strong className="text-foreground">{filteredOrderStats().count}</strong> orders
+                    </span>
+                    <span className="text-muted-foreground">
+                      Revenue: <strong className="gold-text">{formatCurrency(filteredOrderStats().revenue)}</strong>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Tickets: <strong className="text-foreground">{filteredOrderStats().tickets}</strong>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Revenue Over Time */}
+                    <div className="card-glass rounded-xl p-4">
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-3">Revenue Over Time</h3>
+                      <div className="h-44">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={getRevenueByDay()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                            <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: "hsl(var(--card))", 
+                                border: "1px solid hsl(var(--primary) / 0.2)",
+                                borderRadius: "8px",
+                              }}
+                              formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                            />
+                            <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
+
+                    {/* Tickets by Tier (for selected event or all) */}
+                    <div className="card-glass rounded-xl p-4">
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-3">
+                        Tickets by Tier {chartEventFilter !== "all" && "(Selected Event)"}
+                      </h3>
+                      <div className="h-44">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={getTicketsByTier()}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={35}
+                              outerRadius={65}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, value }) => `${name}: ${value}`}
+                            >
+                              {getTicketsByTier().map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Revenue by Event (only show when "all" events selected) */}
+                    {chartEventFilter === "all" && orderEvents.length > 1 && (
+                      <div className="card-glass rounded-xl p-4">
+                        <h3 className="font-semibold text-sm text-muted-foreground mb-3">Revenue by Event</h3>
+                        <div className="h-44">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getRevenueByEvent()} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                              <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={80} />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: "hsl(var(--card))", 
+                                  border: "1px solid hsl(var(--primary) / 0.2)",
+                                  borderRadius: "8px",
+                                }}
+                                formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                              />
+                              <Bar dataKey="value" fill="#D4AF37" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tickets by Event (only show when "all" events selected) */}
+                    {chartEventFilter === "all" && orderEvents.length > 1 && (
+                      <div className="card-glass rounded-xl p-4">
+                        <h3 className="font-semibold text-sm text-muted-foreground mb-3">Tickets by Event</h3>
+                        <div className="h-44">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getTicketsByEvent()} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                              <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                              <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={80} />
+                              <Tooltip />
+                              <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1161,8 +1386,31 @@ export default function Admin() {
               {/* Attendance Rate Chart */}
               {attendanceSessions.length > 0 && (
                 <div className="card-glass rounded-xl p-4">
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-3">Attendance Rate Trend</h3>
-                  <div className="h-40">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm text-muted-foreground">Attendance Rate Trend</h3>
+                    <div className="flex gap-1">
+                      {[
+                        { value: "10", label: "Last 10" },
+                        { value: "30", label: "Last 30" },
+                        { value: "year", label: "This Year" },
+                        { value: "all", label: "All" },
+                      ].map((period) => (
+                        <button
+                          key={period.value}
+                          onClick={() => setAttendanceTimePeriod(period.value as any)}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded-md transition-colors",
+                            attendanceTimePeriod === period.value
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-secondary text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {period.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="h-44">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={getAttendanceRate()}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
@@ -1174,12 +1422,23 @@ export default function Admin() {
                             border: "1px solid hsl(var(--primary) / 0.2)",
                             borderRadius: "8px",
                           }}
-                          formatter={(value: number) => [`${value}%`, "Attendance"]}
+                          formatter={(value: number, name: string) => {
+                            if (name === "rate") return [`${value}%`, "Attendance Rate"];
+                            return [value, name === "present" ? "Present" : "Absent"];
+                          }}
                         />
-                        <Line type="monotone" dataKey="rate" stroke="#D4AF37" strokeWidth={2} dot={{ fill: "#D4AF37" }} />
+                        <Legend />
+                        <Line type="monotone" dataKey="rate" stroke="#D4AF37" strokeWidth={2} dot={{ fill: "#D4AF37", r: 3 }} name="Rate %" />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    Showing {getAttendanceRate().length} sessions • Avg: {
+                      getAttendanceRate().length > 0 
+                        ? Math.round(getAttendanceRate().reduce((sum, s) => sum + s.rate, 0) / getAttendanceRate().length)
+                        : 0
+                    }%
+                  </p>
                 </div>
               )}
 
