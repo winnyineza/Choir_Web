@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { getOrderByTxRef, updateOrderStatus, type TicketOrder } from "@/lib/ticketService";
 import { formatCurrency } from "@/lib/flutterwave";
+import { getSettings } from "@/lib/dataService";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Camera,
   CheckCircle,
@@ -12,11 +14,12 @@ import {
   Ticket,
   User,
   Calendar,
-  MapPin,
   Search,
   RotateCcw,
   Music2,
   Loader2,
+  Lock,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -27,8 +30,16 @@ type ScanResult = {
   message: string;
 };
 
+const SCANNER_ACCESS_KEY = "serenades_scanner_access";
+
 export default function Scanner() {
   useDocumentTitle("Ticket Scanner | Serenades of Praise");
+  
+  const { isAuthenticated } = useAuth();
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   const [manualCode, setManualCode] = useState("");
   const [isScanning, setIsScanning] = useState(false);
@@ -36,6 +47,38 @@ export default function Scanner() {
   const [isProcessing, setIsProcessing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  
+  // Check authorization on mount
+  useEffect(() => {
+    // If admin is logged in, auto-authorize
+    if (isAuthenticated) {
+      setIsAuthorized(true);
+      setIsCheckingAuth(false);
+      return;
+    }
+    
+    // Check if PIN was previously verified in this session
+    const sessionAccess = sessionStorage.getItem(SCANNER_ACCESS_KEY);
+    if (sessionAccess === "granted") {
+      setIsAuthorized(true);
+    }
+    
+    setIsCheckingAuth(false);
+  }, [isAuthenticated]);
+  
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError("");
+    
+    const settings = getSettings();
+    if (pin === settings.scannerPin) {
+      setIsAuthorized(true);
+      sessionStorage.setItem(SCANNER_ACCESS_KEY, "granted");
+    } else {
+      setPinError("Incorrect PIN. Please try again.");
+      setPin("");
+    }
+  };
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -181,6 +224,63 @@ export default function Scanner() {
     }
   };
 
+  // Show loading while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show PIN entry if not authorized
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="card-glass rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
+          
+          <h1 className="font-display text-2xl font-bold mb-2">Ticket Scanner</h1>
+          <p className="text-muted-foreground mb-6">
+            Enter the event PIN to access the scanner
+          </p>
+          
+          <form onSubmit={handlePinSubmit} className="space-y-4">
+            <Input
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Enter PIN"
+              className="text-center text-2xl tracking-widest bg-secondary border-primary/20"
+              maxLength={10}
+              autoFocus
+            />
+            
+            {pinError && (
+              <p className="text-red-500 text-sm">{pinError}</p>
+            )}
+            
+            <Button type="submit" variant="gold" className="w-full" disabled={!pin}>
+              <Shield className="w-4 h-4 mr-2" />
+              Access Scanner
+            </Button>
+          </form>
+          
+          <div className="mt-6 pt-6 border-t border-primary/10">
+            <p className="text-sm text-muted-foreground mb-3">Are you an admin?</p>
+            <Link to="/admin/login">
+              <Button variant="outline" size="sm">
+                Login to Admin Panel
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -195,11 +295,18 @@ export default function Scanner() {
               <p className="text-xs text-muted-foreground">Serenades of Praise</p>
             </div>
           </Link>
-          <Link to="/admin">
-            <Button variant="outline" size="sm">
-              Admin Panel
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <span className="text-xs text-green-500 flex items-center gap-1">
+                <Shield className="w-3 h-3" /> Admin
+              </span>
+            )}
+            <Link to="/admin">
+              <Button variant="outline" size="sm">
+                Admin Panel
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

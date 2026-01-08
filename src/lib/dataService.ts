@@ -72,6 +72,7 @@ export interface Settings {
   bankAccount: string;
   bankName: string;
   memberPortalPin: string;
+  scannerPin: string; // PIN for event staff to access ticket scanner
 }
 
 // ============ STORAGE KEYS ============
@@ -415,6 +416,7 @@ const DEFAULT_SETTINGS: Settings = {
   bankAccount: "",
   bankName: "",
   memberPortalPin: "2024",
+  scannerPin: "2024", // Default PIN for event staff
 };
 
 export function getSettings(): Settings {
