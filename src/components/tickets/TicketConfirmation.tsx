@@ -333,26 +333,37 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [ticketImageUrl, setTicketImageUrl] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const isConfirmed = order.status === "confirmed" || order.status === "used";
-  const isPending = order.status === "pending";
 
   useEffect(() => {
     const generateTicket = async () => {
-      // Generate QR code for display
-      const qrData = JSON.stringify({
-        orderId: order.id,
-        txRef: order.txRef,
-        event: order.eventTitle,
-        tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
-      });
-      
-      const qrUrl = await generateQRCodeAsync(qrData, 200);
-      setQrCodeUrl(qrUrl);
-      
-      // Generate full ticket image with QR code
-      if (qrUrl) {
-        const ticketImg = await generateTicketImage(order, qrUrl);
-        setTicketImageUrl(ticketImg);
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Generate QR code for display
+        const qrData = JSON.stringify({
+          orderId: order.id,
+          txRef: order.txRef,
+          event: order.eventTitle,
+          tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+        });
+        
+        const qrUrl = await generateQRCodeAsync(qrData, 200);
+        setQrCodeUrl(qrUrl);
+        
+        // Generate full ticket image with QR code
+        if (qrUrl) {
+          const ticketImg = await generateTicketImage(order, qrUrl);
+          setTicketImageUrl(ticketImg);
+        }
+      } catch (err) {
+        console.error("Error generating ticket:", err);
+        setError("Failed to generate ticket. Please try refreshing.");
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -481,6 +492,37 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
       setIsGenerating(false);
     }
   };
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h3 className="font-display text-xl font-bold text-foreground mb-2">
+          Something went wrong
+        </h3>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={onClose}>Close</Button>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
+          <Ticket className="w-8 h-8 text-primary" />
+        </div>
+        <h3 className="font-display text-xl font-bold text-foreground mb-2">
+          Generating Your Ticket...
+        </h3>
+        <p className="text-muted-foreground">Please wait while we prepare your ticket</p>
+      </div>
+    );
+  }
 
   return (
     <div className="text-center">
