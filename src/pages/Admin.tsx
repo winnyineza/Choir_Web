@@ -661,57 +661,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Revenue Chart */}
-              {confirmedOrders.length > 0 && (
-                <div className="card-glass rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-display text-lg font-semibold">Revenue Trend</h2>
-                    <div className="flex gap-1">
-                      {[
-                        { value: "7d", label: "7D" },
-                        { value: "30d", label: "30D" },
-                        { value: "90d", label: "90D" },
-                        { value: "year", label: "1Y" },
-                      ].map((period) => (
-                        <button
-                          key={period.value}
-                          onClick={() => setChartTimePeriod(period.value as any)}
-                          className={cn(
-                            "px-2 py-1 text-xs rounded-md transition-colors",
-                            chartTimePeriod === period.value
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-secondary text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {period.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="h-48">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={getRevenueByDay()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: "hsl(var(--card))", 
-                            border: "1px solid hsl(var(--primary) / 0.2)",
-                            borderRadius: "8px",
-                          }}
-                          formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                        />
-                        <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    {filteredOrderStats().count} orders • {formatCurrency(filteredOrderStats().revenue)} total
-                  </p>
-                </div>
-              )}
-
               {/* Quick Actions */}
               <div>
                 <h2 className="font-display text-lg font-semibold mb-4">Quick Actions</h2>
@@ -1150,8 +1099,8 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    {/* Revenue by Event (only show when "all" events selected) */}
-                    {chartEventFilter === "all" && orderEvents.length > 1 && (
+                    {/* Revenue by Event (show when "all" events selected and has data) */}
+                    {chartEventFilter === "all" && getRevenueByEvent().length > 0 && (
                       <div className="card-glass rounded-xl p-4">
                         <h3 className="font-semibold text-sm text-muted-foreground mb-3">Revenue by Event</h3>
                         <div className="h-44">
@@ -1159,7 +1108,7 @@ export default function Admin() {
                             <BarChart data={getRevenueByEvent()} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
                               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                              <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={80} />
+                              <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={100} />
                               <Tooltip 
                                 contentStyle={{ 
                                   backgroundColor: "hsl(var(--card))", 
@@ -1175,8 +1124,8 @@ export default function Admin() {
                       </div>
                     )}
 
-                    {/* Tickets by Event (only show when "all" events selected) */}
-                    {chartEventFilter === "all" && orderEvents.length > 1 && (
+                    {/* Tickets by Event (show when "all" events selected and has data) */}
+                    {chartEventFilter === "all" && getTicketsByEvent().length > 0 && (
                       <div className="card-glass rounded-xl p-4">
                         <h3 className="font-semibold text-sm text-muted-foreground mb-3">Tickets by Event</h3>
                         <div className="h-44">
@@ -1184,7 +1133,7 @@ export default function Admin() {
                             <BarChart data={getTicketsByEvent()} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
                               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                              <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={80} />
+                              <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={100} />
                               <Tooltip />
                               <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} />
                             </BarChart>
