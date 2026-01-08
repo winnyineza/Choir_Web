@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +21,13 @@ import {
   XCircle,
   Hash,
   Receipt,
+  QrCode,
+  MessageCircle,
+  Copy,
+  Check,
+  Send,
+  Download,
+  Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +40,81 @@ interface TicketDetailModalProps {
   onMarkUsed: (orderId: string) => void;
 }
 
+// Simple QR Code generator
+function generateQRCode(data: string, size: number = 120): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  
+  if (!ctx) return "";
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.fillStyle = "#000000";
+  const cellSize = size / 25;
+  
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    hash = ((hash << 5) - hash) + data.charCodeAt(i);
+    hash = hash & hash;
+  }
+
+  const drawFinderPattern = (x: number, y: number) => {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(x, y, cellSize * 7, cellSize * 7);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x + cellSize, y + cellSize, cellSize * 5, cellSize * 5);
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(x + cellSize * 2, y + cellSize * 2, cellSize * 3, cellSize * 3);
+  };
+
+  drawFinderPattern(0, 0);
+  drawFinderPattern(size - cellSize * 7, 0);
+  drawFinderPattern(0, size - cellSize * 7);
+
+  const seedRandom = (seed: number) => {
+    return () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+  };
+
+  const random = seedRandom(Math.abs(hash));
+
+  ctx.fillStyle = "#000000";
+  for (let row = 8; row < 17; row++) {
+    for (let col = 8; col < 17; col++) {
+      if (random() > 0.5) {
+        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+
+  for (let row = 0; row < 25; row++) {
+    for (let col = 8; col < 17; col++) {
+      if (row < 8 || row > 16) {
+        if (random() > 0.5) {
+          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+  }
+
+  for (let col = 0; col < 25; col++) {
+    for (let row = 8; row < 17; row++) {
+      if (col < 8 || col > 16) {
+        if (random() > 0.5) {
+          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+  }
+
+  return canvas.toDataURL("image/png");
+}
+
 export function TicketDetailModal({
   order,
   isOpen,
@@ -40,7 +123,59 @@ export function TicketDetailModal({
   onCancel,
   onMarkUsed,
 }: TicketDetailModalProps) {
+  const [qrCode, setQrCode] = useState<string>("");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (order && isOpen) {
+      const qrData = JSON.stringify({
+        orderId: order.id,
+        txRef: order.txRef,
+        event: order.eventTitle,
+        tickets: order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+      });
+      setQrCode(generateQRCode(qrData, 150));
+    }
+  }, [order, isOpen]);
+
   if (!order) return null;
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleEmailCustomer = () => {
+    const subject = encodeURIComponent(`Regarding your ticket for ${order.eventTitle}`);
+    const body = encodeURIComponent(
+`Hi ${order.customer.name},
+
+Regarding your ticket order (${order.txRef}) for ${order.eventTitle}:
+
+[Your message here]
+
+Best regards,
+Serenades of Praise Choir`
+    );
+    window.open(`mailto:${order.customer.email}?subject=${subject}&body=${body}`);
+  };
+
+  const handleWhatsApp = () => {
+    const phone = order.customer.phone.replace(/\D/g, '');
+    const message = encodeURIComponent(
+`Hi ${order.customer.name}! 👋
+
+This is regarding your ticket order (${order.txRef}) for *${order.eventTitle}*.
+
+`
+    );
+    window.open(`https://wa.me/${phone}?text=${message}`);
+  };
+
+  const handleCall = () => {
+    window.open(`tel:${order.customer.phone}`);
+  };
 
   const statusColors = {
     pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -102,24 +237,110 @@ export function TicketDetailModal({
             </div>
           </div>
 
-          {/* Customer Info */}
+          {/* Customer Info with Contact Actions */}
           <div className="card-glass rounded-xl p-4 space-y-3">
-            <h4 className="font-semibold text-primary text-sm">Customer Information</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-primary text-sm">Customer Information</h4>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                  onClick={handleWhatsApp}
+                  title="WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+                  onClick={handleEmailCustomer}
+                  title="Email"
+                >
+                  <Mail className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
+                  onClick={handleCall}
+                  title="Call"
+                >
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="w-4 h-4 text-primary" />
-                <span className="text-foreground font-medium">{order.customer.name}</span>
+              <div className="flex items-center justify-between text-sm group">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-primary" />
+                  <span className="text-foreground font-medium">{order.customer.name}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => handleCopy(order.customer.name, 'name')}
+                >
+                  {copiedField === 'name' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                </Button>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="w-4 h-4 text-primary" />
-                <span className="text-muted-foreground">{order.customer.email}</span>
+              <div className="flex items-center justify-between text-sm group">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-primary" />
+                  <span className="text-muted-foreground">{order.customer.email}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => handleCopy(order.customer.email, 'email')}
+                >
+                  {copiedField === 'email' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                </Button>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="w-4 h-4 text-primary" />
-                <span className="text-muted-foreground">{order.customer.phone}</span>
+              <div className="flex items-center justify-between text-sm group">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-primary" />
+                  <span className="text-muted-foreground">{order.customer.phone}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => handleCopy(order.customer.phone, 'phone')}
+                >
+                  {copiedField === 'phone' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                </Button>
               </div>
             </div>
           </div>
+
+          {/* QR Code for Entry */}
+          {(order.status === "confirmed" || order.status === "used") && qrCode && (
+            <div className="card-glass rounded-xl p-4">
+              <h4 className="font-semibold text-primary text-sm mb-3 flex items-center gap-2">
+                <QrCode className="w-4 h-4" />
+                Entry QR Code
+              </h4>
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-2 rounded-lg">
+                  <img src={qrCode} alt="Ticket QR Code" className="w-24 h-24" />
+                </div>
+                <div className="flex-1 text-sm">
+                  <p className="text-muted-foreground mb-2">
+                    Scan this code at the event entrance to verify the ticket.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total tickets: <span className="text-foreground font-medium">
+                      {order.tickets.reduce((sum, t) => sum + t.quantity, 0)}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tickets */}
           <div className="card-glass rounded-xl p-4 space-y-3">
