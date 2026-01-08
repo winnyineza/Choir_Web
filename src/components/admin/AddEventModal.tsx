@@ -38,6 +38,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
   const [isFree, setIsFree] = useState(false);
   const [tickets, setTickets] = useState<EventTicket[]>([]);
   const [livestreamUrl, setLivestreamUrl] = useState("");
+  const [isLive, setIsLive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -53,6 +54,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
       setIsFree(editEvent.isFree);
       setTickets(editEvent.tickets);
       setLivestreamUrl(editEvent.livestreamUrl || "");
+      setIsLive(editEvent.isLive || false);
     } else {
       resetForm();
     }
@@ -68,6 +70,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
     setIsFree(false);
     setTickets([]);
     setLivestreamUrl("");
+    setIsLive(false);
   };
 
   const addTicketTier = () => {
@@ -128,6 +131,7 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
         isFree,
         tickets: isFree ? [] : tickets,
         livestreamUrl: livestreamUrl || undefined,
+        isLive: livestreamUrl ? isLive : false,
       };
 
       if (editEvent) {
@@ -249,18 +253,44 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
           </div>
 
           {/* Livestream URL */}
-          <div>
-            <Label htmlFor="livestreamUrl">YouTube Livestream URL (Optional)</Label>
-            <Input
-              id="livestreamUrl"
-              value={livestreamUrl}
-              onChange={(e) => setLivestreamUrl(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="mt-1 bg-secondary border-primary/20"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Add a YouTube live stream URL for virtual attendance
-            </p>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="livestreamUrl">YouTube Livestream URL (Optional)</Label>
+              <Input
+                id="livestreamUrl"
+                value={livestreamUrl}
+                onChange={(e) => setLivestreamUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="mt-1 bg-secondary border-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Add a YouTube live stream URL for virtual attendance
+              </p>
+            </div>
+            
+            {livestreamUrl && (
+              <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/30">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className={`absolute inline-flex h-full w-full rounded-full ${isLive ? 'bg-red-400 animate-ping' : 'bg-muted'} opacity-75`}></span>
+                    <span className={`relative inline-flex rounded-full h-3 w-3 ${isLive ? 'bg-red-500' : 'bg-muted'}`}></span>
+                  </span>
+                  <div>
+                    <Label htmlFor="isLive" className="font-medium cursor-pointer">
+                      {isLive ? "🔴 Event is LIVE" : "Event is not live"}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Toggle on when the event starts streaming
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="isLive"
+                  checked={isLive}
+                  onCheckedChange={setIsLive}
+                />
+              </div>
+            )}
           </div>
 
           {/* Free Event Toggle */}

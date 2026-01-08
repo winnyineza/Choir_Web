@@ -1,7 +1,7 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Ticket, Search, Users, ShoppingCart, CalendarPlus, Plus, AlertCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, Ticket, Search, Users, ShoppingCart, CalendarPlus, Plus, AlertCircle, Radio, Play } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -14,6 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import { getBookableEvents, type Event as DataEvent, type EventTicket } from "@/lib/dataService";
 import { Link } from "react-router-dom";
 import choirImage from "@/assets/choir-group.jpg";
+import { LivestreamModal } from "@/components/events/LivestreamModal";
+import { EventReminderButton } from "@/components/events/EventReminderButton";
+import { checkAndProcessReminders, cleanupOldReminders } from "@/lib/reminderService";
 
 // Transform EventTicket to TicketTier format for the modal
 interface DisplayEvent {
@@ -21,11 +24,14 @@ interface DisplayEvent {
   title: string;
   description: string;
   date: string;
+  rawDate: string; // Original date for calendar/reminders
   time: string;
   location: string;
   category: string;
   image: string;
   isFree: boolean;
+  livestreamUrl?: string;
+  isLive?: boolean;
   tickets: {
     id: string;
     name: string;
@@ -46,6 +52,8 @@ export default function Events() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<TicketEvent | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [livestreamEvent, setLivestreamEvent] = useState<DataEvent | null>(null);
+  const [isLivestreamOpen, setIsLivestreamOpen] = useState(false);
   const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -61,6 +69,7 @@ export default function Events() {
         id: event.id,
         title: event.title,
         description: event.description,
+        rawDate: event.date,
         date: new Date(event.date).toLocaleDateString("en-US", {
           month: "long",
           day: "numeric",
@@ -71,6 +80,8 @@ export default function Events() {
         category: event.category,
         image: event.image || choirImage,
         isFree: event.isFree,
+        livestreamUrl: event.livestreamUrl,
+        isLive: event.isLive,
         tickets: event.tickets.map((t) => ({
           id: t.id,
           name: t.name,
@@ -96,9 +107,15 @@ export default function Events() {
     // Also listen for custom event when data changes locally
     window.addEventListener("eventsUpdated", handleStorageChange);
     
+    // Check reminders on load and periodically
+    cleanupOldReminders();
+    checkAndProcessReminders();
+    const reminderInterval = setInterval(checkAndProcessReminders, 60000); // Check every minute
+    
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("eventsUpdated", handleStorageChange);
+      clearInterval(reminderInterval);
     };
   }, []);
 
@@ -161,6 +178,16 @@ export default function Events() {
 
   const getTotalRemaining = (event: DisplayEvent) => {
     return event.tickets.reduce((sum, t) => sum + (t.available - t.sold), 0);
+  };
+
+  const handleWatchLive = (event: DisplayEvent) => {
+    // Find the original event data with livestream info
+    const bookableEvents = getBookableEvents();
+    const originalEvent = bookableEvents.find(e => e.id === event.id);
+    if (originalEvent && originalEvent.livestreamUrl) {
+      setLivestreamEvent(originalEvent);
+      setIsLivestreamOpen(true);
+    }
   };
 
   return (
@@ -353,7 +380,31 @@ export default function Events() {
                           )}
                         </Button>
 
-                        {/* Share & Calendar */}
+                        {/* Watch Live Button */}
+                        {event.livestreamUrl && (
+                          <Button
+                            variant={event.isLive ? "default" : "outline"}
+                            className={`w-full mb-3 ${event.isLive ? "bg-red-600 hover:bg-red-700" : ""}`}
+                            onClick={() => handleWatchLive(event)}
+                          >
+                            {event.isLive ? (
+                              <>
+                                <span className="relative flex h-2 w-2 mr-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                                </span>
+                                Watch Live Now
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4 mr-2" />
+                                Watch Online
+                              </>
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Share, Calendar & Reminder */}
                         <div className="flex gap-2 mt-3">
                           <Button
                             variant="outline"
@@ -362,8 +413,15 @@ export default function Events() {
                             onClick={() => handleAddToCalendar(event)}
                           >
                             <CalendarPlus className="w-4 h-4 mr-2" />
-                            Add to Calendar
+                            Calendar
                           </Button>
+                          <EventReminderButton
+                            eventId={event.id}
+                            eventTitle={event.title}
+                            eventDate={event.rawDate}
+                            eventTime={event.time}
+                            eventLocation={event.location}
+                          />
                           <ShareButtons
                             title={event.title}
                             description={`${event.date} at ${event.location}`}
@@ -441,6 +499,18 @@ export default function Events() {
           setSelectedEvent(null);
         }}
       />
+
+      {/* Livestream Modal */}
+      {livestreamEvent && (
+        <LivestreamModal
+          event={livestreamEvent}
+          isOpen={isLivestreamOpen}
+          onClose={() => {
+            setIsLivestreamOpen(false);
+            setLivestreamEvent(null);
+          }}
+        />
+      )}
     </div>
   );
 }

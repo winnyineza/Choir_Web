@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Phone, CreditCard, Building2, Sparkles, Loader2 } from "lucide-react";
-import { formatCurrency, isFlutterwaveConfigured } from "@/lib/flutterwave";
+import { Phone, CreditCard, Building2, Sparkles, Loader2, CheckCircle, Smartphone } from "lucide-react";
+import { formatCurrency, isFlutterwaveConfigured, detectMomoProvider, getPaymentSettings } from "@/lib/flutterwave";
 
 export type PaymentMethod = "momo" | "card" | "bank" | "demo";
 
@@ -202,13 +202,58 @@ export function PaymentStep({
       {selectedMethod === "momo" && (
         <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-foreground">MTN MoMo Payment</h4>
+            <h4 className="font-semibold text-foreground flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-primary" />
+              Mobile Money Payment
+            </h4>
             <span className="text-xs text-muted-foreground font-mono">{txRef}</span>
           </div>
-          <p className="text-sm text-muted-foreground">
-            You will receive payment instructions via SMS/email after clicking the button below.
-            Our team will confirm your payment within 24 hours.
-          </p>
+          
+          {customerInfo.phone && (() => {
+            const provider = detectMomoProvider(customerInfo.phone);
+            const settings = getPaymentSettings();
+            if (provider === "mtn") {
+              return (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-yellow-500 text-black">MTN MoMo</span>
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {flutterwaveReady 
+                      ? "Click Pay Now to receive a USSD push notification on your phone." 
+                      : settings.momoInstructions.mtn}
+                  </p>
+                </div>
+              );
+            } else if (provider === "airtel") {
+              return (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500 text-white">Airtel Money</span>
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {flutterwaveReady 
+                      ? "Click Pay Now to receive a USSD push notification on your phone."
+                      : settings.momoInstructions.airtel}
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <p className="text-sm text-muted-foreground">
+                Enter a valid Rwanda phone number (078/079 for MTN, 072/073 for Airtel)
+              </p>
+            );
+          })()}
+          
+          {!customerInfo.phone && (
+            <p className="text-sm text-muted-foreground">
+              Enter your phone number above to see payment instructions
+            </p>
+          )}
+          
           <div className="flex justify-between text-sm pt-2 border-t border-primary/10">
             <span className="text-muted-foreground">Amount to pay</span>
             <span className="font-semibold gold-text">{formatCurrency(total)}</span>

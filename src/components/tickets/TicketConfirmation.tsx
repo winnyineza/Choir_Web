@@ -1,4 +1,4 @@
-import { CheckCircle, Calendar, MapPin, Ticket, Mail, QrCode, Clock, AlertCircle, Image, Printer } from "lucide-react";
+import { CheckCircle, Calendar, MapPin, Ticket, Mail, QrCode, Clock, AlertCircle, Image, Printer, Send, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/flutterwave";
 import { printTicket } from "@/lib/exportUtils";
@@ -413,6 +413,57 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
     setIsGenerating(false);
   };
 
+  const handleEmailTicket = () => {
+    const ticketDetails = order.tickets.map(t => `${t.quantity}x ${t.tierName}`).join(", ");
+    const subject = encodeURIComponent(`Your Ticket for ${order.eventTitle}`);
+    const body = encodeURIComponent(
+`🎵 SERENADES OF PRAISE - TICKET CONFIRMATION 🎵
+
+Event: ${order.eventTitle}
+Date: ${order.eventDate}
+Location: ${order.eventLocation}
+
+Ticket Details:
+${ticketDetails}
+Total: ${formatCurrency(order.total)}
+
+Reference: ${order.txRef}
+
+─────────────────────────────────
+
+Please present this confirmation or the QR code at the event entrance.
+
+Thank you for your purchase!
+
+Serenades of Praise Choir
+www.serenadesofpraise.com`
+    );
+    
+    window.open(`mailto:${order.customer.email}?subject=${subject}&body=${body}`, '_blank');
+  };
+
+  const handleShareTicket = async () => {
+    const shareData = {
+      title: `Ticket for ${order.eventTitle}`,
+      text: `I'm attending ${order.eventTitle} on ${order.eventDate}! 🎵`,
+      url: window.location.origin,
+    };
+    
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // User cancelled or error
+        console.log('Share cancelled');
+      }
+    } else {
+      // Fallback: copy to clipboard
+      const text = `${shareData.text}\n${shareData.url}`;
+      await navigator.clipboard.writeText(text);
+      alert('Copied to clipboard!');
+    }
+  };
+
   return (
     <div className="text-center">
       {/* Status Animation */}
@@ -571,6 +622,24 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Print
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={handleEmailTicket}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Email Ticket
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={handleShareTicket}
+              >
+                <Share2 className="w-4 h-4 mr-2" />
+                Share
               </Button>
             </div>
           </>
