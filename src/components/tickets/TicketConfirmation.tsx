@@ -1,4 +1,4 @@
-import { CheckCircle, Calendar, MapPin, Ticket, QrCode, Clock, AlertCircle, Image, Printer } from "lucide-react";
+import { CheckCircle, Calendar, MapPin, Ticket, QrCode, Clock, AlertCircle, Image, Printer, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/flutterwave";
 import type { TicketOrder } from "@/lib/ticketService";
@@ -413,6 +413,7 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
   }
   
   const isConfirmed = order.status === "confirmed" || order.status === "used";
+  const isPending = order.status === "pending";
 
   useEffect(() => {
     // QR code and image will load asynchronously - ticket info shows immediately
