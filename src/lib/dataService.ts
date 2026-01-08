@@ -75,6 +75,32 @@ export interface Settings {
   scannerPin: string; // PIN for event staff to access ticket scanner
 }
 
+// Event Staff - for ticket scanning at entrance
+export interface EventStaff {
+  id: string;
+  name: string;
+  nationalId: string; // National ID number
+  phone: string;
+  email?: string;
+  status: "active" | "inactive";
+  assignedEvents: string[]; // Array of event IDs they're assigned to
+  createdAt: string;
+  lastActiveAt?: string;
+}
+
+// Scan record - tracks who scanned each ticket
+export interface ScanRecord {
+  id: string;
+  orderId: string;
+  txRef: string;
+  staffId: string;
+  staffName: string;
+  staffNationalId: string;
+  eventId: string;
+  scannedAt: string;
+  ticketCount: number;
+}
+
 // ============ STORAGE KEYS ============
 
 const KEYS = {
@@ -83,6 +109,8 @@ const KEYS = {
   GALLERY: "serenades_gallery",
   DONATIONS: "serenades_donations",
   SETTINGS: "serenades_settings",
+  EVENT_STAFF: "serenades_event_staff",
+  SCAN_RECORDS: "serenades_scan_records",
 };
 
 // ============ HELPER FUNCTIONS ============
@@ -200,7 +228,8 @@ export function getEventById(id: string): Event | undefined {
   return events.find((e) => e.id === id);
 }
 
-// Get events available for ticket booking (upcoming, published, with available tickets)
+// Get events available for display on public site (upcoming, published)
+// Note: Shows events even if sold out - UI will handle sold out display
 export function getBookableEvents(): Event[] {
   const events = getAllEvents();
   const now = new Date();
@@ -211,10 +240,29 @@ export function getBookableEvents(): Event[] {
       const eventDate = new Date(e.date);
       const isUpcoming = eventDate >= now;
       const isPublished = e.status !== "draft" && e.status !== "cancelled";
-      const hasAvailableTickets = e.tickets.some((t) => t.available > (t.sold || 0));
-      return isUpcoming && isPublished && hasAvailableTickets;
+      return isUpcoming && isPublished;
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+// Check if an event has any tickets available
+export function hasAvailableTickets(event: Event): boolean {
+  return event.tickets.some((t) => (t.available - (t.sold || 0)) > 0);
+}
+
+// Get available count for a specific tier
+export function getAvailableCount(tier: EventTicket): number {
+  return Math.max(0, tier.available - (tier.sold || 0));
+}
+
+// Check if a tier is sold out
+export function isTierSoldOut(tier: EventTicket): boolean {
+  return getAvailableCount(tier) === 0;
+}
+
+// Check if event is completely sold out
+export function isEventSoldOut(event: Event): boolean {
+  return !hasAvailableTickets(event);
 }
 
 // Reduce ticket availability when tickets are purchased
@@ -461,6 +509,123 @@ export function clearAllData(): void {
   localStorage.removeItem(KEYS.EVENTS);
   localStorage.removeItem(KEYS.GALLERY);
   localStorage.removeItem(KEYS.DONATIONS);
+  localStorage.removeItem(KEYS.EVENT_STAFF);
+  localStorage.removeItem(KEYS.SCAN_RECORDS);
   // Note: Settings are preserved
+}
+
+// ============ EVENT STAFF ============
+
+export function getAllEventStaff(): EventStaff[] {
+  return getFromStorage<EventStaff[]>(KEYS.EVENT_STAFF, []);
+}
+
+export function getEventStaffById(id: string): EventStaff | undefined {
+  return getAllEventStaff().find((s) => s.id === id);
+}
+
+export function getEventStaffByNationalId(nationalId: string): EventStaff | undefined {
+  return getAllEventStaff().find((s) => s.nationalId === nationalId);
+}
+
+export function getStaffForEvent(eventId: string): EventStaff[] {
+  return getAllEventStaff().filter(
+    (s) => s.status === "active" && s.assignedEvents.includes(eventId)
+  );
+}
+
+export function addEventStaff(staff: Omit<EventStaff, "id" | "createdAt">): EventStaff {
+  const allStaff = getAllEventStaff();
+  const newStaff: EventStaff = {
+    ...staff,
+    id: `staff-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+  };
+  saveToStorage(KEYS.EVENT_STAFF, [...allStaff, newStaff]);
+  return newStaff;
+}
+
+export function updateEventStaff(id: string, updates: Partial<EventStaff>): EventStaff | null {
+  const allStaff = getAllEventStaff();
+  const index = allStaff.findIndex((s) => s.id === id);
+  if (index === -1) return null;
+  
+  allStaff[index] = { ...allStaff[index], ...updates };
+  saveToStorage(KEYS.EVENT_STAFF, allStaff);
+  return allStaff[index];
+}
+
+export function deleteEventStaff(id: string): boolean {
+  const allStaff = getAllEventStaff();
+  const filtered = allStaff.filter((s) => s.id !== id);
+  if (filtered.length === allStaff.length) return false;
+  saveToStorage(KEYS.EVENT_STAFF, filtered);
+  return true;
+}
+
+export function assignStaffToEvent(staffId: string, eventId: string): boolean {
+  const staff = getEventStaffById(staffId);
+  if (!staff) return false;
+  
+  if (!staff.assignedEvents.includes(eventId)) {
+    staff.assignedEvents.push(eventId);
+    updateEventStaff(staffId, { assignedEvents: staff.assignedEvents });
+  }
+  return true;
+}
+
+export function removeStaffFromEvent(staffId: string, eventId: string): boolean {
+  const staff = getEventStaffById(staffId);
+  if (!staff) return false;
+  
+  staff.assignedEvents = staff.assignedEvents.filter((id) => id !== eventId);
+  updateEventStaff(staffId, { assignedEvents: staff.assignedEvents });
+  return true;
+}
+
+// ============ SCAN RECORDS ============
+
+export function getAllScanRecords(): ScanRecord[] {
+  return getFromStorage<ScanRecord[]>(KEYS.SCAN_RECORDS, []);
+}
+
+export function getScanRecordsForEvent(eventId: string): ScanRecord[] {
+  return getAllScanRecords().filter((r) => r.eventId === eventId);
+}
+
+export function getScanRecordsByStaff(staffId: string): ScanRecord[] {
+  return getAllScanRecords().filter((r) => r.staffId === staffId);
+}
+
+export function addScanRecord(record: Omit<ScanRecord, "id" | "scannedAt">): ScanRecord {
+  const allRecords = getAllScanRecords();
+  const newRecord: ScanRecord = {
+    ...record,
+    id: `scan-${Date.now()}`,
+    scannedAt: new Date().toISOString(),
+  };
+  saveToStorage(KEYS.SCAN_RECORDS, [...allRecords, newRecord]);
+  return newRecord;
+}
+
+export function getScanRecordByOrderId(orderId: string): ScanRecord | undefined {
+  return getAllScanRecords().find((r) => r.orderId === orderId);
+}
+
+// ============ EVENT STATUS HELPERS ============
+
+export function isEventPast(event: Event): boolean {
+  const eventDate = new Date(event.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return eventDate < today;
+}
+
+export function getActiveEvents(): Event[] {
+  return getAllEvents().filter((e) => !isEventPast(e) && e.status !== "cancelled");
+}
+
+export function getPastEvents(): Event[] {
+  return getAllEvents().filter((e) => isEventPast(e));
 }
 

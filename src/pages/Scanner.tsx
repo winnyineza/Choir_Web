@@ -4,7 +4,14 @@ import { Input } from "@/components/ui/input";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { getOrderByTxRef, updateOrderStatus, type TicketOrder } from "@/lib/ticketService";
 import { formatCurrency } from "@/lib/flutterwave";
-import { getSettings } from "@/lib/dataService";
+import { 
+  getSettings, 
+  getEventStaffByNationalId, 
+  getActiveEvents,
+  addScanRecord,
+  type EventStaff,
+  type Event,
+} from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Camera,
@@ -20,6 +27,10 @@ import {
   Loader2,
   Lock,
   Shield,
+  IdCard,
+  Phone,
+  ArrowRight,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -30,55 +41,88 @@ type ScanResult = {
   message: string;
 };
 
-const SCANNER_ACCESS_KEY = "serenades_scanner_access";
+type AuthStep = "pin" | "national-id" | "verification" | "ready";
+
+const SCANNER_SESSION_KEY = "serenades_scanner_session";
+
+interface ScannerSession {
+  staffId: string;
+  staffName: string;
+  staffNationalId: string;
+  eventId: string;
+  eventTitle: string;
+  timestamp: string;
+}
 
 export default function Scanner() {
   useDocumentTitle("Ticket Scanner | Serenades of Praise");
   
   const { isAuthenticated } = useAuth();
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  
+  // Auth state
+  const [authStep, setAuthStep] = useState<AuthStep>("pin");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [nationalId, setNationalId] = useState("");
+  const [nationalIdError, setNationalIdError] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [sentCode, setSentCode] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [isSendingCode, setIsSendingCode] = useState(false);
   
+  // Staff and event data
+  const [currentStaff, setCurrentStaff] = useState<EventStaff | null>(null);
+  const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>("");
+  const [session, setSession] = useState<ScannerSession | null>(null);
+  
+  // Scanner state
   const [manualCode, setManualCode] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [scannedCount, setScannedCount] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   
-  // Check authorization on mount
+  // Check existing session on mount
   useEffect(() => {
-    // If admin is logged in, auto-authorize
+    // If admin is logged in, go directly to ready state with admin session
     if (isAuthenticated) {
-      setIsAuthorized(true);
+      const adminSession: ScannerSession = {
+        staffId: "admin",
+        staffName: "Admin",
+        staffNationalId: "N/A",
+        eventId: "all",
+        eventTitle: "All Events",
+        timestamp: new Date().toISOString(),
+      };
+      setSession(adminSession);
+      setAuthStep("ready");
       setIsCheckingAuth(false);
       return;
     }
     
-    // Check if PIN was previously verified in this session
-    const sessionAccess = sessionStorage.getItem(SCANNER_ACCESS_KEY);
-    if (sessionAccess === "granted") {
-      setIsAuthorized(true);
+    // Check for existing session
+    const savedSession = sessionStorage.getItem(SCANNER_SESSION_KEY);
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession) as ScannerSession;
+        // Check if session is still valid (within 12 hours)
+        const sessionTime = new Date(parsed.timestamp).getTime();
+        const now = Date.now();
+        if (now - sessionTime < 12 * 60 * 60 * 1000) {
+          setSession(parsed);
+          setAuthStep("ready");
+        }
+      } catch {
+        sessionStorage.removeItem(SCANNER_SESSION_KEY);
+      }
     }
     
     setIsCheckingAuth(false);
   }, [isAuthenticated]);
-  
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPinError("");
-    
-    const settings = getSettings();
-    if (pin === settings.scannerPin) {
-      setIsAuthorized(true);
-      sessionStorage.setItem(SCANNER_ACCESS_KEY, "granted");
-    } else {
-      setPinError("Incorrect PIN. Please try again.");
-      setPin("");
-    }
-  };
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -88,6 +132,128 @@ export default function Scanner() {
       }
     };
   }, []);
+
+  // Handle PIN submission
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError("");
+    
+    const settings = getSettings();
+    if (pin === settings.scannerPin) {
+      setAuthStep("national-id");
+      setPin("");
+    } else {
+      setPinError("Incorrect PIN. Please try again.");
+      setPin("");
+    }
+  };
+
+  // Handle National ID submission
+  const handleNationalIdSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setNationalIdError("");
+    
+    if (nationalId.length !== 16) {
+      setNationalIdError("National ID must be 16 digits.");
+      return;
+    }
+    
+    const staff = getEventStaffByNationalId(nationalId);
+    if (!staff) {
+      setNationalIdError("This National ID is not registered. Contact your supervisor.");
+      return;
+    }
+    
+    if (staff.status !== "active") {
+      setNationalIdError("This staff account is inactive. Contact your supervisor.");
+      return;
+    }
+    
+    // Get events this staff is assigned to
+    const events = getActiveEvents().filter((e) => staff.assignedEvents.includes(e.id));
+    if (events.length === 0) {
+      setNationalIdError("You are not assigned to any active events. Contact your supervisor.");
+      return;
+    }
+    
+    setCurrentStaff(staff);
+    setAvailableEvents(events);
+    
+    // If only one event, auto-select it
+    if (events.length === 1) {
+      setSelectedEventId(events[0].id);
+    }
+    
+    setAuthStep("verification");
+  };
+
+  // Send verification code
+  const handleSendCode = () => {
+    if (!currentStaff) return;
+    
+    setIsSendingCode(true);
+    
+    // Generate a 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setSentCode(code);
+    
+    // In production, this would send an SMS
+    // For now, we'll show it on screen (dev mode)
+    setTimeout(() => {
+      setIsSendingCode(false);
+      alert(`DEV MODE: Your verification code is: ${code}\n\nIn production, this would be sent to ${currentStaff.phone}`);
+    }, 1000);
+  };
+
+  // Handle verification code submission
+  const handleVerifyCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCodeError("");
+    
+    if (!selectedEventId) {
+      setCodeError("Please select an event first.");
+      return;
+    }
+    
+    if (verificationCode !== sentCode) {
+      setCodeError("Incorrect code. Please try again.");
+      return;
+    }
+    
+    // Create session
+    const event = availableEvents.find((e) => e.id === selectedEventId);
+    if (!currentStaff || !event) return;
+    
+    const newSession: ScannerSession = {
+      staffId: currentStaff.id,
+      staffName: currentStaff.name,
+      staffNationalId: currentStaff.nationalId,
+      eventId: event.id,
+      eventTitle: event.title,
+      timestamp: new Date().toISOString(),
+    };
+    
+    setSession(newSession);
+    sessionStorage.setItem(SCANNER_SESSION_KEY, JSON.stringify(newSession));
+    setAuthStep("ready");
+  };
+
+  // End session
+  const handleEndSession = () => {
+    if (confirm("Are you sure you want to end this scanning session?")) {
+      sessionStorage.removeItem(SCANNER_SESSION_KEY);
+      setSession(null);
+      setAuthStep("pin");
+      setCurrentStaff(null);
+      setAvailableEvents([]);
+      setSelectedEventId("");
+      setVerificationCode("");
+      setSentCode("");
+      setNationalId("");
+      setScannedCount(0);
+      setScanResult(null);
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -131,6 +297,15 @@ export default function Scanner() {
       return {
         status: "invalid",
         message: "Ticket not found. This may be a fake or invalid ticket.",
+      };
+    }
+
+    // Check if ticket is for the right event (if not admin)
+    if (session && session.eventId !== "all" && order.eventId !== session.eventId) {
+      return {
+        status: "invalid",
+        order,
+        message: `This ticket is for a different event: ${order.eventTitle}`,
       };
     }
 
@@ -182,8 +357,23 @@ export default function Scanner() {
   };
 
   const handleAdmitEntry = () => {
-    if (scanResult?.order && scanResult.status === "valid") {
+    if (scanResult?.order && scanResult.status === "valid" && session) {
+      // Update order status
       updateOrderStatus(scanResult.order.id, "used");
+      
+      // Record the scan
+      addScanRecord({
+        orderId: scanResult.order.id,
+        txRef: scanResult.order.txRef,
+        staffId: session.staffId,
+        staffName: session.staffName,
+        staffNationalId: session.staffNationalId,
+        eventId: scanResult.order.eventId,
+        ticketCount: scanResult.order.tickets.reduce((sum, t) => sum + t.quantity, 0),
+      });
+      
+      setScannedCount((prev) => prev + 1);
+      
       setScanResult({
         ...scanResult,
         status: "used",
@@ -233,8 +423,8 @@ export default function Scanner() {
     );
   }
 
-  // Show PIN entry if not authorized
-  if (!isAuthorized) {
+  // Step 1: PIN Entry
+  if (authStep === "pin") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="card-glass rounded-2xl p-8 max-w-md w-full text-center">
@@ -244,7 +434,7 @@ export default function Scanner() {
           
           <h1 className="font-display text-2xl font-bold mb-2">Ticket Scanner</h1>
           <p className="text-muted-foreground mb-6">
-            Enter the event PIN to access the scanner
+            Enter the event PIN to start
           </p>
           
           <form onSubmit={handlePinSubmit} className="space-y-4">
@@ -263,8 +453,8 @@ export default function Scanner() {
             )}
             
             <Button type="submit" variant="gold" className="w-full" disabled={!pin}>
-              <Shield className="w-4 h-4 mr-2" />
-              Access Scanner
+              <ArrowRight className="w-4 h-4 mr-2" />
+              Continue
             </Button>
           </form>
           
@@ -281,6 +471,184 @@ export default function Scanner() {
     );
   }
 
+  // Step 2: National ID Entry
+  if (authStep === "national-id") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="card-glass rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
+            <IdCard className="w-8 h-8 text-primary" />
+          </div>
+          
+          <h1 className="font-display text-2xl font-bold mb-2">Identify Yourself</h1>
+          <p className="text-muted-foreground mb-6">
+            Enter your National ID to verify your identity
+          </p>
+          
+          <form onSubmit={handleNationalIdSubmit} className="space-y-4">
+            <div>
+              <Input
+                value={nationalId}
+                onChange={(e) => setNationalId(e.target.value.replace(/\D/g, "").slice(0, 16))}
+                placeholder="Enter 16-digit National ID"
+                className="text-center text-lg tracking-wider bg-secondary border-primary/20 font-mono"
+                maxLength={16}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {nationalId.length}/16 digits
+              </p>
+            </div>
+            
+            {nationalIdError && (
+              <p className="text-red-500 text-sm">{nationalIdError}</p>
+            )}
+            
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setAuthStep("pin");
+                  setNationalId("");
+                  setNationalIdError("");
+                }}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <Button type="submit" variant="gold" className="flex-1" disabled={nationalId.length !== 16}>
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Continue
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 3: Verification Code
+  if (authStep === "verification") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="card-glass rounded-2xl p-8 max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+              <Phone className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="font-display text-2xl font-bold mb-2">Verify Phone</h1>
+            <p className="text-muted-foreground">
+              Hi <strong>{currentStaff?.name}</strong>, select your event and verify your phone number
+            </p>
+          </div>
+          
+          {/* Event Selection */}
+          <div className="space-y-3 mb-6">
+            <label className="text-sm font-medium text-foreground">Select Event</label>
+            {availableEvents.map((event) => (
+              <div
+                key={event.id}
+                className={cn(
+                  "p-4 rounded-xl border cursor-pointer transition-all",
+                  selectedEventId === event.id
+                    ? "bg-primary/20 border-primary"
+                    : "bg-secondary/50 border-primary/10 hover:border-primary/30"
+                )}
+                onClick={() => setSelectedEventId(event.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-foreground">{event.title}</h4>
+                    <p className="text-sm text-muted-foreground">{event.date}</p>
+                  </div>
+                  {selectedEventId === event.id ? (
+                    <CheckCircle className="w-5 h-5 text-primary" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Verification Code */}
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Verification Code
+              </label>
+              {!sentCode ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSendCode}
+                  disabled={isSendingCode || !selectedEventId}
+                >
+                  {isSendingCode ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Phone className="w-4 h-4 mr-2" />
+                  )}
+                  Send Code to {currentStaff?.phone}
+                </Button>
+              ) : (
+                <>
+                  <Input
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="Enter 6-digit code"
+                    className="text-center text-2xl tracking-widest bg-secondary border-primary/20 font-mono"
+                    maxLength={6}
+                    autoFocus
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 text-center">
+                    Code sent to {currentStaff?.phone}
+                  </p>
+                </>
+              )}
+            </div>
+            
+            {codeError && (
+              <p className="text-red-500 text-sm text-center">{codeError}</p>
+            )}
+            
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setAuthStep("national-id");
+                  setCurrentStaff(null);
+                  setAvailableEvents([]);
+                  setSelectedEventId("");
+                  setVerificationCode("");
+                  setSentCode("");
+                }}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <Button
+                type="submit"
+                variant="gold"
+                className="flex-1"
+                disabled={verificationCode.length !== 6 || !selectedEventId}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Start Scanning
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 4: Ready to Scan
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -296,21 +664,41 @@ export default function Scanner() {
             </div>
           </Link>
           <div className="flex items-center gap-2">
-            {isAuthenticated && (
-              <span className="text-xs text-green-500 flex items-center gap-1">
-                <Shield className="w-3 h-3" /> Admin
-              </span>
-            )}
-            <Link to="/admin">
-              <Button variant="outline" size="sm">
-                Admin Panel
+            {session && session.staffId !== "admin" && (
+              <Button variant="outline" size="sm" onClick={handleEndSession}>
+                End Session
               </Button>
-            </Link>
+            )}
+            {isAuthenticated && (
+              <Link to="/admin">
+                <Button variant="outline" size="sm">
+                  Admin Panel
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-lg">
+        {/* Session Info */}
+        {session && (
+          <div className="card-glass rounded-2xl p-4 mb-6 border border-primary/30">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <User className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-foreground">{session.staffName}</div>
+                <div className="text-sm text-muted-foreground">
+                  {session.eventTitle} • {scannedCount} scanned
+                </div>
+              </div>
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            </div>
+          </div>
+        )}
+
         {/* Manual Entry */}
         <div className="card-glass rounded-2xl p-6 mb-6">
           <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
@@ -485,4 +873,3 @@ export default function Scanner() {
     </div>
   );
 }
-

@@ -35,6 +35,7 @@ import {
   CalendarOff,
   FileText,
   UserCheck,
+  IdCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -107,10 +108,11 @@ import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
 import { AdminTeamManagement } from "@/components/admin/AdminTeamManagement";
 import { AuditLogPage } from "@/components/admin/AuditLogPage";
+import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
 import { BarChart3, Shield, History } from "lucide-react";
 import { addAuditLog } from "@/lib/adminService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -123,6 +125,7 @@ const sidebarItems = [
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
+  { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard, superAdminOnly: true },
   { id: "team" as Tab, label: "Admin Team", icon: Shield, superAdminOnly: true },
   { id: "audit" as Tab, label: "Audit Log", icon: History, superAdminOnly: true },
   { id: "settings" as Tab, label: "Settings", icon: Settings },
@@ -1994,6 +1997,11 @@ export default function Admin() {
               </div>
               <AnalyticsDashboard />
             </div>
+          )}
+
+          {/* Event Staff (Super Admin Only) */}
+          {activeTab === "event-staff" && isSuperAdmin && (
+            <EventStaffManagement />
           )}
 
           {/* Admin Team (Super Admin Only) */}

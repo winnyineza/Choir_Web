@@ -11,7 +11,7 @@ import { formatCurrency } from "@/lib/flutterwave";
 import { addToCalendar } from "@/lib/exportUtils";
 import { ShareButtons } from "@/components/ShareButtons";
 import { useToast } from "@/hooks/use-toast";
-import { getBookableEvents, type Event as DataEvent, type EventTicket } from "@/lib/dataService";
+import { getBookableEvents, isEventSoldOut, getAvailableCount, type Event as DataEvent, type EventTicket } from "@/lib/dataService";
 import { Link } from "react-router-dom";
 import choirImage from "@/assets/choir-group.jpg";
 import { LivestreamModal } from "@/components/events/LivestreamModal";
