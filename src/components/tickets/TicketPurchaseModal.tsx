@@ -16,6 +16,7 @@ import { TicketConfirmation } from "./TicketConfirmation";
 import { generateTxRef, isFlutterwaveConfigured, FLUTTERWAVE_PUBLIC_KEY, formatCurrency } from "@/lib/flutterwave";
 import { createOrder, confirmOrder, type TicketTier, type TicketOrder } from "@/lib/ticketService";
 import { validatePromoCode, usePromoCode, type PromoValidation } from "@/lib/promoService";
+import { sendTicketConfirmationEmail } from "@/lib/ticketEmailService";
 import { useToast } from "@/hooks/use-toast";
 
 export interface TicketEvent {
@@ -222,6 +223,16 @@ export function TicketPurchaseModal({
         // Dispatch event to refresh events page
         window.dispatchEvent(new Event("eventsUpdated"));
         
+        // Send ticket confirmation email automatically
+        sendTicketConfirmationEmail(confirmed).then((result) => {
+          if (result.success) {
+            toast({
+              title: "Ticket sent to your email! 📧",
+              description: `Confirmation sent to ${confirmed.customer.email}`,
+            });
+          }
+        });
+        
         setConfirmedOrder(confirmed);
         setStep("confirmation");
         
@@ -320,6 +331,16 @@ export function TicketPurchaseModal({
             
             // Dispatch event to refresh events page
             window.dispatchEvent(new Event("eventsUpdated"));
+            
+            // Send ticket confirmation email automatically
+            sendTicketConfirmationEmail(confirmed).then((result) => {
+              if (result.success) {
+                toast({
+                  title: "Ticket sent to your email! 📧",
+                  description: `Confirmation sent to ${confirmed.customer.email}`,
+                });
+              }
+            });
             
             setConfirmedOrder(confirmed);
             setStep("confirmation");
