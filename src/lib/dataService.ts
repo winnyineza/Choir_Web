@@ -71,6 +71,7 @@ export interface Settings {
   momoNumber: string;
   bankAccount: string;
   bankName: string;
+  memberPortalPin: string;
 }
 
 // ============ STORAGE KEYS ============
@@ -413,6 +414,7 @@ const DEFAULT_SETTINGS: Settings = {
   momoNumber: "0780623144",
   bankAccount: "",
   bankName: "",
+  memberPortalPin: "2024",
 };
 
 export function getSettings(): Settings {

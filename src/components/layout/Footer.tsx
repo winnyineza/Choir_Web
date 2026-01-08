@@ -23,6 +23,7 @@ const quickLinks = [
   { name: "Releases", href: "/releases" },
   { name: "Gallery", href: "/gallery" },
   { name: "Contact", href: "/contact" },
+  { name: "Member Portal", href: "/member-portal" },
 ];
 
 export function Footer() {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Info, Users, Calendar, Music, Image, Mail, Heart } from "lucide-react";
+import { Menu, X, Info, Users, Calendar, Music, Image, Mail, Heart, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import logo from "@/assets/LogoTSC.jpg";
@@ -80,6 +80,12 @@ export function Header() {
         {/* CTA Buttons */}
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/member-portal">
+              <UserCircle className="w-4 h-4 mr-1" />
+              Members
+            </Link>
+          </Button>
           <Button variant="gold-outline" size="sm" asChild>
             <Link to="/join">Join Choir</Link>
           </Button>
@@ -128,15 +134,25 @@ export function Header() {
               </Link>
             );
           })}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary/10">
-            <ThemeToggle />
-            <div className="flex gap-2">
-              <Button variant="gold-outline" size="sm" asChild>
-                <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join</Link>
-              </Button>
-              <Button variant="gold" size="sm" asChild>
-                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
-              </Button>
+          <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-primary/10">
+            <Link
+              to="/member-portal"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="px-4 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3 text-primary bg-primary/10"
+            >
+              <UserCircle className="w-5 h-5" />
+              Member Portal
+            </Link>
+            <div className="flex items-center justify-between">
+              <ThemeToggle />
+              <div className="flex gap-2">
+                <Button variant="gold-outline" size="sm" asChild>
+                  <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join</Link>
+                </Button>
+                <Button variant="gold" size="sm" asChild>
+                  <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
+                </Button>
+              </div>
             </div>
           </div>
         </nav>

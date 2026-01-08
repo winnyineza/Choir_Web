@@ -22,13 +22,15 @@ export interface VerificationCode {
   used: boolean;
 }
 
+import { getSettings } from './dataService';
+
 const LEAVE_REQUESTS_KEY = 'choir_leave_requests';
 const VERIFICATION_CODES_KEY = 'choir_verification_codes';
-const MEMBER_PORTAL_PIN = '2024'; // Common PIN for all members
 
-// PIN Verification
+// PIN Verification - gets PIN from settings (configurable in admin)
 export function verifyPortalPin(pin: string): boolean {
-  return pin === MEMBER_PORTAL_PIN;
+  const settings = getSettings();
+  return pin === settings.memberPortalPin;
 }
 
 // Leave Request CRUD

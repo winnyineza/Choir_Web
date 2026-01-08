@@ -2053,6 +2053,42 @@ export default function Admin() {
                 </div>
               </div>
 
+              {/* Member Portal Settings */}
+              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Member Portal
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="memberPortalPin">Portal Access PIN (4 digits)</Label>
+                    <Input
+                      id="memberPortalPin"
+                      type="text"
+                      maxLength={4}
+                      pattern="[0-9]*"
+                      value={settings.memberPortalPin || "2024"}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setSettingsState({ ...settings, memberPortalPin: value });
+                      }}
+                      className="mt-1 bg-secondary border-primary/20 font-mono text-lg tracking-widest max-w-32"
+                      placeholder="0000"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Share this PIN with choir members so they can access the portal
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <p className="text-sm text-foreground font-medium mb-1">Member Portal URL:</p>
+                    <code className="text-xs text-primary break-all">
+                      {window.location.origin}/member-portal
+                    </code>
+                  </div>
+                  <Button variant="gold" onClick={handleSaveSettings}>Save Portal Settings</Button>
+                </div>
+              </div>
+
               {/* Clear All Data Section */}
               <div className="card-glass rounded-2xl p-6 max-w-2xl border border-destructive/20">
                 <h3 className="font-semibold text-destructive mb-2">Reset All Data</h3>
