@@ -17,6 +17,7 @@ export interface AdminUser {
   lastLogin?: string;
   createdBy?: string;
   isActive: boolean;
+  memberId?: string; // Link to choir member profile (admins are also members)
 }
 
 export interface AdminInvite {
@@ -29,6 +30,7 @@ export interface AdminInvite {
   createdBy: string;
   expiresAt: string;
   used: boolean;
+  memberId?: string; // Link to choir member
 }
 
 export interface AuditLogEntry {
@@ -202,7 +204,8 @@ export function createInvite(
   email: string,
   name: string,
   role: AdminRole,
-  createdBy: string
+  createdBy: string,
+  memberId?: string
 ): AdminInvite {
   // Check if user already exists
   if (getAdminByEmail(email)) {
@@ -229,6 +232,7 @@ export function createInvite(
     createdBy,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
     used: false,
+    memberId,
   };
   
   invites.push(invite);
@@ -261,6 +265,7 @@ export function useInvite(code: string, password: string): AdminUser | null {
       password,
       role: invite.role,
       createdBy: invite.createdBy,
+      memberId: invite.memberId,
     },
     invite.createdBy
   );
@@ -345,6 +350,17 @@ export function getRoleLabel(role: AdminRole): string {
     case "admin": return "Admin";
     default: return role;
   }
+}
+
+// Get admin by member ID
+export function getAdminByMemberId(memberId: string): AdminUser | null {
+  const users = getAllAdminUsers();
+  return users.find(u => u.memberId === memberId) || null;
+}
+
+// Check if a member is already an admin
+export function isMemberAdmin(memberId: string): boolean {
+  return getAdminByMemberId(memberId) !== null;
 }
 
 // Initialize on load

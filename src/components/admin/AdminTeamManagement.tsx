@@ -28,6 +28,7 @@ import {
   UserX,
   UserCheck,
   AlertCircle,
+  Music,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,18 +41,22 @@ import {
   reactivateAdminUser,
   deleteAdminUser,
   getRoleLabel,
+  isMemberAdmin,
   type AdminUser,
   type AdminInvite,
   type AdminRole,
 } from "@/lib/adminService";
+import { getAllMembers, type Member } from "@/lib/dataService";
 
 export function AdminTeamManagement() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [invites, setInvites] = useState<AdminInvite[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState<string | null>(null);
   
   // Invite form
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<AdminRole>("admin");
@@ -62,13 +67,47 @@ export function AdminTeamManagement() {
   const loadData = () => {
     setAdmins(getAllAdminUsers());
     setInvites(getAllInvites().filter(i => !i.used));
+    setMembers(getAllMembers());
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // Get members who are not already admins
+  const availableMembers = members.filter(m => !isMemberAdmin(m.id));
+
+  // Get member info for an admin
+  const getMemberForAdmin = (admin: AdminUser): Member | undefined => {
+    if (!admin.memberId) return undefined;
+    return members.find(m => m.id === admin.memberId);
+  };
+
+  // Handle member selection - auto-fill name and email
+  const handleMemberSelect = (memberId: string) => {
+    setSelectedMemberId(memberId);
+    if (memberId) {
+      const member = members.find(m => m.id === memberId);
+      if (member) {
+        setInviteName(member.name);
+        setInviteEmail(member.email);
+      }
+    } else {
+      setInviteName("");
+      setInviteEmail("");
+    }
+  };
+
   const handleCreateInvite = () => {
+    if (!selectedMemberId) {
+      toast({
+        title: "Select a Member",
+        description: "Please select a choir member to invite as admin",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!inviteEmail || !inviteName) {
       toast({
         title: "Missing Information",
@@ -79,12 +118,13 @@ export function AdminTeamManagement() {
     }
 
     try {
-      const invite = createInvite(inviteEmail, inviteName, inviteRole, currentUser!.id);
+      createInvite(inviteEmail, inviteName, inviteRole, currentUser!.id, selectedMemberId);
       toast({
         title: "Invite Created!",
         description: `Invite sent to ${inviteEmail}`,
       });
       setIsInviteModalOpen(false);
+      setSelectedMemberId("");
       setInviteEmail("");
       setInviteName("");
       setInviteRole("admin");
@@ -237,77 +277,87 @@ export function AdminTeamManagement() {
       <div className="space-y-4">
         <h3 className="font-semibold text-foreground">Team Members</h3>
         <div className="space-y-2">
-          {admins.map((admin) => (
-            <div
-              key={admin.id}
-              className={`flex items-center justify-between p-4 rounded-xl border ${
-                admin.isActive
-                  ? "bg-secondary/50 border-primary/10"
-                  : "bg-muted/50 border-muted opacity-60"
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  admin.role === "super_admin" ? "bg-primary/20" : "bg-secondary"
-                }`}>
-                  {admin.role === "super_admin" ? (
-                    <ShieldCheck className="w-5 h-5 text-primary" />
-                  ) : (
-                    <Shield className="w-5 h-5 text-muted-foreground" />
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">{admin.name}</span>
-                    {admin.id === currentUser?.id && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                        You
-                      </span>
-                    )}
-                    {!admin.isActive && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">
-                        Inactive
-                      </span>
+          {admins.map((admin) => {
+            const member = getMemberForAdmin(admin);
+            return (
+              <div
+                key={admin.id}
+                className={`flex items-center justify-between p-4 rounded-xl border ${
+                  admin.isActive
+                    ? "bg-secondary/50 border-primary/10"
+                    : "bg-muted/50 border-muted opacity-60"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    admin.role === "super_admin" ? "bg-primary/20" : "bg-secondary"
+                  }`}>
+                    {admin.role === "super_admin" ? (
+                      <ShieldCheck className="w-5 h-5 text-primary" />
+                    ) : (
+                      <Shield className="w-5 h-5 text-muted-foreground" />
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{admin.email}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {getRoleLabel(admin.role)} • Last login: {admin.lastLogin ? formatDate(admin.lastLogin) : "Never"}
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-foreground">{admin.name}</span>
+                      {admin.id === currentUser?.id && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          You
+                        </span>
+                      )}
+                      {!admin.isActive && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">
+                          Inactive
+                        </span>
+                      )}
+                      {/* Show member info if linked */}
+                      {member && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 flex items-center gap-1">
+                          <Music className="w-3 h-3" />
+                          {member.voicePart}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{admin.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {getRoleLabel(admin.role)} • Last login: {admin.lastLogin ? formatDate(admin.lastLogin) : "Never"}
+                    </p>
+                  </div>
                 </div>
+                
+                {admin.id !== currentUser?.id && admin.role !== "super_admin" && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleUserStatus(admin)}
+                    >
+                      {admin.isActive ? (
+                        <>
+                          <UserX className="w-4 h-4 mr-1" />
+                          Deactivate
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="w-4 h-4 mr-1" />
+                          Reactivate
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteUser(admin)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
-              
-              {admin.id !== currentUser?.id && admin.role !== "super_admin" && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleToggleUserStatus(admin)}
-                  >
-                    {admin.isActive ? (
-                      <>
-                        <UserX className="w-4 h-4 mr-1" />
-                        Deactivate
-                      </>
-                    ) : (
-                      <>
-                        <UserCheck className="w-4 h-4 mr-1" />
-                        Reactivate
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteUser(admin)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -316,54 +366,65 @@ export function AdminTeamManagement() {
         <div className="space-y-4">
           <h3 className="font-semibold text-foreground">Pending Invites</h3>
           <div className="space-y-2">
-            {invites.map((invite) => (
-              <div
-                key={invite.id}
-                className="flex items-center justify-between p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-yellow-500" />
+            {invites.map((invite) => {
+              const member = invite.memberId ? members.find(m => m.id === invite.memberId) : undefined;
+              return (
+                <div
+                  key={invite.id}
+                  className="flex items-center justify-between p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                      <Mail className="w-5 h-5 text-yellow-500" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-foreground">{invite.name}</span>
+                        {member && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 flex items-center gap-1">
+                            <Music className="w-3 h-3" />
+                            {member.voicePart}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{invite.email}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Expires: {formatDate(invite.expiresAt)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-foreground">{invite.name}</span>
-                    <p className="text-sm text-muted-foreground">{invite.email}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      Expires: {formatDate(invite.expiresAt)}
-                    </p>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyInviteLink(invite)}
+                    >
+                      {copiedInvite === invite.id ? (
+                        <>
+                          <Check className="w-4 h-4 mr-1" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4 mr-1" />
+                          Copy Link
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteInvite(invite.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCopyInviteLink(invite)}
-                  >
-                    {copiedInvite === invite.id ? (
-                      <>
-                        <Check className="w-4 h-4 mr-1" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4 mr-1" />
-                        Copy Link
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteInvite(invite.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -378,14 +439,46 @@ export function AdminTeamManagement() {
           </DialogHeader>
           
           <div className="space-y-4 mt-4">
+            {/* Member Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="memberSelect">Select Choir Member *</Label>
+              <Select value={selectedMemberId} onValueChange={handleMemberSelect}>
+                <SelectTrigger className="bg-secondary border-primary/20">
+                  <SelectValue placeholder="Choose a member to promote..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMembers.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No available members
+                    </SelectItem>
+                  ) : (
+                    availableMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{member.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({member.voicePart})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Only choir members can be made admins. Add them as a member first.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="inviteName">Full Name</Label>
               <Input
                 id="inviteName"
                 value={inviteName}
                 onChange={(e) => setInviteName(e.target.value)}
-                placeholder="John Doe"
+                placeholder="Auto-filled from member"
                 className="bg-secondary border-primary/20"
+                disabled={!!selectedMemberId}
               />
             </div>
             
@@ -396,9 +489,12 @@ export function AdminTeamManagement() {
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="john@example.com"
+                placeholder="Auto-filled from member"
                 className="bg-secondary border-primary/20"
               />
+              <p className="text-xs text-muted-foreground">
+                You can edit the email if different from member record
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -431,7 +527,12 @@ export function AdminTeamManagement() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setIsInviteModalOpen(false)}
+                onClick={() => {
+                  setIsInviteModalOpen(false);
+                  setSelectedMemberId("");
+                  setInviteName("");
+                  setInviteEmail("");
+                }}
               >
                 Cancel
               </Button>
@@ -439,6 +540,7 @@ export function AdminTeamManagement() {
                 variant="gold"
                 className="flex-1"
                 onClick={handleCreateInvite}
+                disabled={!selectedMemberId}
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Send Invite
@@ -450,4 +552,3 @@ export function AdminTeamManagement() {
     </div>
   );
 }
-
