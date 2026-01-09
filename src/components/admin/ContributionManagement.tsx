@@ -536,6 +536,155 @@ export function ContributionManagement() {
           )}
         </div>
       </div>
+
+      {/* Monthly Dues Overview Table */}
+      {members.length > 0 && contributionTypes.some(t => t.category === "monthly") && (
+        <div className="card-glass rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-primary/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <h3 className="font-semibold text-foreground flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary" />
+              Monthly Dues Overview - {bulkYear}
+            </h3>
+            <div className="flex gap-2">
+              {[2023, 2024, 2025, 2026].map(year => (
+                <button
+                  key={year}
+                  onClick={() => setBulkYear(year)}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-medium transition-all",
+                    bulkYear === year
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="text-left p-3 text-sm font-medium text-muted-foreground sticky left-0 bg-secondary/50 z-10">
+                    Member
+                  </th>
+                  {MONTH_NAMES.map((month, i) => (
+                    <th key={i} className="p-2 text-center text-xs font-medium text-muted-foreground w-16">
+                      {month.slice(0, 3)}
+                    </th>
+                  ))}
+                  <th className="p-3 text-center text-sm font-medium text-muted-foreground">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...members]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(member => {
+                    const paidMonths = getPaidMonthsForMember(member.id, bulkYear);
+                    const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
+                    const totalPaid = paidMonths.length * (monthlyType?.amount || 0);
+                    
+                    return (
+                      <tr key={member.id} className="border-t border-primary/10 hover:bg-secondary/30 transition-colors">
+                        <td className="p-3 font-medium text-foreground sticky left-0 bg-background z-10">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate max-w-[150px]">{member.name}</span>
+                          </div>
+                        </td>
+                        {MONTH_NAMES.map((_, monthIndex) => {
+                          const month = monthIndex + 1;
+                          const isPaid = paidMonths.includes(month);
+                          const isFuture = bulkYear === new Date().getFullYear() && month > new Date().getMonth() + 1;
+                          
+                          return (
+                            <td key={month} className="p-2 text-center">
+                              {isFuture ? (
+                                <span className="text-muted-foreground/30">—</span>
+                              ) : isPaid ? (
+                                <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-red-400/50 mx-auto" />
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="p-3 text-center">
+                          <span className={cn(
+                            "font-medium",
+                            paidMonths.length === 12 ? "text-green-500" :
+                            paidMonths.length >= 6 ? "text-yellow-500" :
+                            "text-muted-foreground"
+                          )}>
+                            {paidMonths.length}/12
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+              {/* Summary Row */}
+              <tfoot className="bg-secondary/30 border-t-2 border-primary/20">
+                <tr>
+                  <td className="p-3 font-semibold text-foreground sticky left-0 bg-secondary/30 z-10">
+                    Total Paid
+                  </td>
+                  {MONTH_NAMES.map((_, monthIndex) => {
+                    const month = monthIndex + 1;
+                    const paidCount = members.filter(m => 
+                      getPaidMonthsForMember(m.id, bulkYear).includes(month)
+                    ).length;
+                    const isFuture = bulkYear === new Date().getFullYear() && month > new Date().getMonth() + 1;
+                    
+                    return (
+                      <td key={month} className="p-2 text-center">
+                        {isFuture ? (
+                          <span className="text-muted-foreground/30">—</span>
+                        ) : (
+                          <span className={cn(
+                            "text-xs font-medium",
+                            paidCount === members.length ? "text-green-500" :
+                            paidCount > 0 ? "text-yellow-500" :
+                            "text-red-400"
+                          )}>
+                            {paidCount}/{members.length}
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="p-3 text-center font-semibold text-primary">
+                    {(() => {
+                      const totalPayments = members.reduce((sum, m) => 
+                        sum + getPaidMonthsForMember(m.id, bulkYear).length, 0
+                      );
+                      const maxPayments = members.length * 12;
+                      return `${totalPayments}/${maxPayments}`;
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {/* Legend */}
+          <div className="p-3 border-t border-primary/10 flex flex-wrap gap-4 text-xs text-muted-foreground bg-secondary/20">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span>Paid</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-red-400/50" />
+              <span>Not Paid</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground/30">—</span>
+              <span>Future Month</span>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Recent Contributions */}
       <div className="card-glass rounded-xl overflow-hidden">
