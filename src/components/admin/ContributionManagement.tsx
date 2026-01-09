@@ -48,6 +48,7 @@ import {
   getContributionStats,
   getMonthlyDuesReport,
   getSpecialContributionProgress,
+  getContributionsByMember,
   getMonthName,
   MONTH_NAMES,
   type Contribution,
@@ -76,7 +77,13 @@ export function ContributionManagement() {
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showAddType, setShowAddType] = useState(false);
   const [showMonthlyReport, setShowMonthlyReport] = useState(false);
+  const [showBulkMonthlyDues, setShowBulkMonthlyDues] = useState(false);
   const [editingType, setEditingType] = useState<ContributionType | null>(null);
+  
+  // Bulk monthly dues state
+  const [bulkMemberId, setBulkMemberId] = useState("");
+  const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   
   // Forms
   const [contributionForm, setContributionForm] = useState({
@@ -124,6 +131,94 @@ export function ContributionManagement() {
       return true;
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // Get paid months for a member in a specific year
+  const getPaidMonthsForMember = (memberId: string, year: number): number[] => {
+    const memberContribs = getContributionsByMember(memberId);
+    return memberContribs
+      .filter(c => c.category === "monthly" && c.year === year && c.month)
+      .map(c => c.month!)
+      .filter((m, i, arr) => arr.indexOf(m) === i); // unique
+  };
+
+  // Load paid months when member or year changes in bulk modal
+  useEffect(() => {
+    if (bulkMemberId && showBulkMonthlyDues) {
+      const paidMonths = getPaidMonthsForMember(bulkMemberId, bulkYear);
+      setSelectedMonths([]); // Reset selection, only show already paid
+    }
+  }, [bulkMemberId, bulkYear, showBulkMonthlyDues]);
+
+  // Handle bulk monthly dues save
+  const handleBulkMonthlyDuesSave = () => {
+    const member = members.find(m => m.id === bulkMemberId);
+    const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
+    
+    if (!member) {
+      toast({ title: "Error", description: "Please select a member.", variant: "destructive" });
+      return;
+    }
+    
+    if (!monthlyType) {
+      toast({ title: "Error", description: "No active monthly dues type found. Please create one first.", variant: "destructive" });
+      return;
+    }
+    
+    if (selectedMonths.length === 0) {
+      toast({ title: "Error", description: "Please select at least one month.", variant: "destructive" });
+      return;
+    }
+    
+    // Get already paid months
+    const alreadyPaid = getPaidMonthsForMember(bulkMemberId, bulkYear);
+    
+    // Only add contributions for newly selected months (not already paid)
+    const newMonths = selectedMonths.filter(m => !alreadyPaid.includes(m));
+    
+    if (newMonths.length === 0) {
+      toast({ title: "No new months", description: "All selected months are already paid.", variant: "destructive" });
+      return;
+    }
+    
+    // Create contribution for each new month
+    newMonths.forEach(month => {
+      createContribution({
+        memberId: member.id,
+        memberName: member.name,
+        memberEmail: member.email,
+        typeId: monthlyType.id,
+        typeName: monthlyType.name,
+        category: "monthly",
+        amount: monthlyType.amount,
+        month,
+        year: bulkYear,
+        paymentMethod: "cash",
+        recordedBy: currentUser?.name || "Admin",
+      });
+    });
+    
+    toast({ 
+      title: "Contributions Recorded", 
+      description: `${newMonths.length} month(s) recorded for ${member.name}.` 
+    });
+    
+    setShowBulkMonthlyDues(false);
+    setBulkMemberId("");
+    setSelectedMonths([]);
+    loadData();
+  };
+
+  // Toggle month selection for bulk entry
+  const toggleMonthSelection = (month: number) => {
+    const alreadyPaid = getPaidMonthsForMember(bulkMemberId, bulkYear);
+    if (alreadyPaid.includes(month)) return; // Can't unselect already paid months
+    
+    setSelectedMonths(prev => 
+      prev.includes(month) 
+        ? prev.filter(m => m !== month)
+        : [...prev, month]
+    );
+  };
   
   // Handle add contribution
   const handleAddContribution = () => {
@@ -327,17 +422,21 @@ export function ContributionManagement() {
       {/* Actions */}
       <div className="flex flex-col md:flex-row gap-4 justify-between">
         <div className="flex flex-wrap gap-2">
-          <Button variant="gold" onClick={() => setShowAddContribution(true)}>
+          <Button variant="gold" onClick={() => setShowBulkMonthlyDues(true)}>
+            <Calendar className="w-4 h-4 mr-2" />
+            Monthly Dues
+          </Button>
+          <Button variant="outline" onClick={() => setShowAddContribution(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Record Contribution
+            Record Other
           </Button>
           <Button variant="outline" onClick={() => setShowAddType(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Type
           </Button>
           <Button variant="outline" onClick={() => setShowMonthlyReport(true)}>
-            <Calendar className="w-4 h-4 mr-2" />
-            Monthly Report
+            <Users className="w-4 h-4 mr-2" />
+            Report
           </Button>
         </div>
         
@@ -830,6 +929,171 @@ export function ContributionManagement() {
                   No members found.
                 </div>
               )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Bulk Monthly Dues Modal */}
+      <Dialog open={showBulkMonthlyDues} onOpenChange={(open) => { 
+        setShowBulkMonthlyDues(open); 
+        if (!open) { 
+          setBulkMemberId(""); 
+          setSelectedMonths([]); 
+        } 
+      }}>
+        <DialogContent className="max-w-2xl bg-background border-primary/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Record Monthly Dues
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Member Selection */}
+            <div>
+              <Label>Select Member *</Label>
+              <Select
+                value={bulkMemberId}
+                onValueChange={setBulkMemberId}
+              >
+                <SelectTrigger className="mt-1 bg-secondary border-primary/20">
+                  <SelectValue placeholder="Choose a member..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map(member => (
+                    <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Year Selection */}
+            <div>
+              <Label>Year</Label>
+              <div className="flex gap-2 mt-2">
+                {[2023, 2024, 2025, 2026].map(year => (
+                  <button
+                    key={year}
+                    onClick={() => setBulkYear(year)}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                      bulkYear === year
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Month Grid */}
+            {bulkMemberId && (
+              <div>
+                <Label className="mb-3 block">
+                  Select Months to Record
+                  <span className="text-muted-foreground text-xs ml-2">
+                    (Click to select/deselect)
+                  </span>
+                </Label>
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                  {MONTH_NAMES.map((name, index) => {
+                    const month = index + 1;
+                    const alreadyPaid = getPaidMonthsForMember(bulkMemberId, bulkYear).includes(month);
+                    const isSelected = selectedMonths.includes(month);
+                    const isFutureMonth = bulkYear === new Date().getFullYear() && month > new Date().getMonth() + 1;
+                    
+                    return (
+                      <button
+                        key={month}
+                        onClick={() => !alreadyPaid && !isFutureMonth && toggleMonthSelection(month)}
+                        disabled={alreadyPaid || isFutureMonth}
+                        className={cn(
+                          "p-4 rounded-xl border-2 transition-all text-center",
+                          alreadyPaid && "bg-green-500/10 border-green-500/30 cursor-default",
+                          isSelected && !alreadyPaid && "bg-primary/20 border-primary",
+                          !alreadyPaid && !isSelected && !isFutureMonth && "bg-secondary border-primary/10 hover:border-primary/30 cursor-pointer",
+                          isFutureMonth && "bg-secondary/50 border-primary/5 opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <p className={cn(
+                          "font-medium text-sm",
+                          alreadyPaid ? "text-green-500" : 
+                          isSelected ? "text-primary" : 
+                          isFutureMonth ? "text-muted-foreground" : "text-foreground"
+                        )}>
+                          {name.slice(0, 3)}
+                        </p>
+                        <div className="mt-1">
+                          {alreadyPaid ? (
+                            <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                          ) : isSelected ? (
+                            <CheckCircle className="w-5 h-5 text-primary mx-auto" />
+                          ) : isFutureMonth ? (
+                            <Clock className="w-5 h-5 text-muted-foreground mx-auto" />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border-2 border-primary/30 mx-auto" />
+                          )}
+                        </div>
+                        {alreadyPaid && (
+                          <p className="text-xs text-green-400 mt-1">Paid</p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500/30" />
+                    <span>Already Paid</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-primary/20 border-2 border-primary" />
+                    <span>Selected</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-secondary border border-primary/10" />
+                    <span>Unpaid</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Summary & Save */}
+            {bulkMemberId && selectedMonths.length > 0 && (
+              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Recording {selectedMonths.length} month(s)</p>
+                    <p className="font-semibold text-foreground">
+                      {selectedMonths.sort((a, b) => a - b).map(m => MONTH_NAMES[m - 1].slice(0, 3)).join(", ")}
+                    </p>
+                  </div>
+                  <p className="text-lg font-bold text-primary">
+                    {formatCurrency((contributionTypes.find(t => t.category === "monthly" && t.isActive)?.amount || 0) * selectedMonths.length)}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setShowBulkMonthlyDues(false); setBulkMemberId(""); setSelectedMonths([]); }}>
+                Cancel
+              </Button>
+              <Button 
+                variant="gold" 
+                className="flex-1" 
+                onClick={handleBulkMonthlyDuesSave}
+                disabled={!bulkMemberId || selectedMonths.length === 0}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Record {selectedMonths.length} Month(s)
+              </Button>
             </div>
           </div>
         </DialogContent>
