@@ -29,6 +29,8 @@ import {
   Info,
   Bell,
   Pin,
+  Wallet,
+  DollarSign,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
@@ -52,9 +54,18 @@ import {
   getActiveAnnouncements,
   type Announcement,
 } from "@/lib/announcementService";
+import {
+  getContributionsByMemberEmail,
+  getMemberContributionStatus,
+  getActiveContributionTypes,
+  getMonthName,
+  type Contribution,
+  type MemberContributionStatus,
+} from "@/lib/contributionService";
+import { formatCurrency } from "@/lib/flutterwave";
 import { cn } from "@/lib/utils";
 
-type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests";
+type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
 export default function MemberPortal() {
   useDocumentTitle("Member Portal");
@@ -87,6 +98,8 @@ export default function MemberPortal() {
   const [myAttendance, setMyAttendance] = useState<AttendanceRecord[]>([]);
   const [attendanceStats, setAttendanceStats] = useState<ReturnType<typeof getMemberAttendanceStatsByEmail> | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [myContributions, setMyContributions] = useState<Contribution[]>([]);
+  const [contributionStatus, setContributionStatus] = useState<MemberContributionStatus | null>(null);
 
   // Load announcements when PIN is verified
   useEffect(() => {
@@ -94,6 +107,15 @@ export default function MemberPortal() {
       setAnnouncements(getActiveAnnouncements("members"));
     }
   }, [view]);
+
+  // Load contributions when member logs in
+  useEffect(() => {
+    if (memberInfo) {
+      const contributions = getContributionsByMemberEmail(memberInfo.email);
+      setMyContributions(contributions);
+      setContributionStatus(getMemberContributionStatus(memberInfo.id, memberInfo.name, memberInfo.email));
+    }
+  }, [memberInfo]);
 
   // PIN input handling
   const handlePinChange = (index: number, value: string) => {
@@ -529,7 +551,7 @@ export default function MemberPortal() {
                 )}
 
                 {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
                     onClick={() => {
                       if (!memberInfo) {
@@ -574,6 +596,30 @@ export default function MemberPortal() {
                       <div>
                         <h3 className="font-semibold text-foreground">My Attendance</h3>
                         <p className="text-sm text-muted-foreground">View your attendance history</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (!memberInfo) {
+                        toast({
+                          title: "Enter your email first",
+                          description: "We need your email to view your contributions.",
+                        });
+                        return;
+                      }
+                      setView("contributions");
+                    }}
+                    className="card-glass rounded-2xl p-6 text-left hover:border-primary/30 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-yellow-500/20 flex items-center justify-center group-hover:bg-yellow-500/30 transition-colors">
+                        <Wallet className="w-6 h-6 text-yellow-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">My Contributions</h3>
+                        <p className="text-sm text-muted-foreground">View dues & payments</p>
                       </div>
                     </div>
                   </button>
@@ -1056,6 +1102,169 @@ export default function MemberPortal() {
                   <Button variant="gold-outline" className="flex-1" onClick={resetLeaveForm}>
                     Back to Dashboard
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Contributions View */}
+            {view === "contributions" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="card-glass rounded-2xl p-6">
+                  <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="sm" onClick={() => setView("dashboard")}>
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
+                    <div>
+                      <h1 className="font-display text-2xl font-bold">
+                        My <span className="gold-text">Contributions</span>
+                      </h1>
+                      <p className="text-muted-foreground">
+                        View your dues and payment history
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary Stats */}
+                {contributionStatus && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-green-500">
+                        {formatCurrency(contributionStatus.totalPaid)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Total Paid</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-primary">
+                        {formatCurrency(contributionStatus.monthlyDuesPaid)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Monthly Dues</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-yellow-500">
+                        {formatCurrency(contributionStatus.specialContributions)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Special Contributions</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Outstanding Dues */}
+                {contributionStatus && contributionStatus.unpaidMonths.length > 0 && (
+                  <div className="card-glass rounded-2xl p-6 border-l-4 border-l-red-500">
+                    <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                      Outstanding Monthly Dues
+                    </h2>
+                    <div className="space-y-2">
+                      {contributionStatus.unpaidMonths.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-red-500/10">
+                          <span className="text-foreground">
+                            {getMonthName(item.month)} {item.year}
+                          </span>
+                          <span className="font-semibold text-red-400">
+                            {formatCurrency(item.expectedAmount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-4">
+                      Please contact the choir treasurer to make payments.
+                    </p>
+                  </div>
+                )}
+
+                {/* Special Contributions Status */}
+                {contributionStatus && contributionStatus.specialStatus.length > 0 && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Wallet className="w-5 h-5 text-primary" />
+                      Special Contributions
+                    </h2>
+                    <div className="space-y-3">
+                      {contributionStatus.specialStatus.map((item) => (
+                        <div key={item.typeId} className="p-3 rounded-lg bg-secondary/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-foreground">{item.typeName}</span>
+                            {item.isPaid ? (
+                              <span className="flex items-center gap-1 text-green-400 text-sm">
+                                <CheckCircle className="w-4 h-4" /> Paid
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-yellow-400 text-sm">
+                                <Clock className="w-4 h-4" /> Pending
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Expected: {formatCurrency(item.expectedAmount)}</span>
+                            <span className={item.isPaid ? "text-green-400" : "text-foreground"}>
+                              Paid: {formatCurrency(item.paidAmount)}
+                            </span>
+                          </div>
+                          {!item.isPaid && item.paidAmount > 0 && (
+                            <div className="mt-2">
+                              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full"
+                                  style={{ width: `${Math.min(100, (item.paidAmount / item.expectedAmount) * 100)}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {((item.paidAmount / item.expectedAmount) * 100).toFixed(0)}% paid
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment History */}
+                <div className="card-glass rounded-2xl p-6">
+                  <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Payment History
+                  </h2>
+                  {myContributions.length > 0 ? (
+                    <div className="space-y-3">
+                      {myContributions
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((contribution) => (
+                          <div key={contribution.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "p-2 rounded-lg",
+                                contribution.category === "monthly" ? "bg-blue-500/20" : "bg-yellow-500/20"
+                              )}>
+                                <DollarSign className={cn(
+                                  "w-4 h-4",
+                                  contribution.category === "monthly" ? "text-blue-500" : "text-yellow-500"
+                                )} />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">{contribution.typeName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {contribution.month && contribution.year
+                                    ? `${getMonthName(contribution.month)} ${contribution.year}`
+                                    : new Date(contribution.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="font-semibold text-green-500">
+                              {formatCurrency(contribution.amount)}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Wallet className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>No contributions recorded yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

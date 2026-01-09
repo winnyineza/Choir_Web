@@ -137,12 +137,13 @@ import {
 import { AnnouncementManagement } from "@/components/admin/AnnouncementManagement";
 import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
 import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
-import { BarChart3, Shield, History, Mail } from "lucide-react";
+import { ContributionManagement } from "@/components/admin/ContributionManagement";
+import { BarChart3, Shield, History, Mail, Wallet } from "lucide-react";
 import { addAuditLog } from "@/lib/adminService";
 import { ContactSubmissions } from "@/components/admin/ContactSubmissions";
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "contributions" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -151,6 +152,7 @@ const sidebarItems = [
   { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket },
   { id: "attendance" as Tab, label: "Attendance", icon: UserCheck },
   { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
+  { id: "contributions" as Tab, label: "Contributions", icon: Wallet },
   { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
   { id: "messages" as Tab, label: "Messages", icon: Mail },
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
@@ -1978,6 +1980,14 @@ export default function Admin() {
                   <li>• Members can view their request status in the portal</li>
                 </ul>
               </div>
+            </div>
+          )}
+
+          {/* Contributions */}
+          {activeTab === "contributions" && (
+            <div className="space-y-6">
+              <h2 className="font-display text-2xl font-bold">Member Contributions</h2>
+              <ContributionManagement />
             </div>
           )}
 
