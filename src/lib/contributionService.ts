@@ -123,6 +123,72 @@ export function getContributionsByMonth(month: number, year: number): Contributi
   return getAllContributions().filter(c => c.month === month && c.year === year);
 }
 
+// Get amount paid by a member for a specific month/year
+export function getMemberMonthlyPayment(memberId: string, month: number, year: number): number {
+  const contributions = getAllContributions();
+  return contributions
+    .filter(c => c.memberId === memberId && c.month === month && c.year === year && c.category === "monthly")
+    .reduce((sum, c) => sum + c.amount, 0);
+}
+
+// Update or create a contribution for a specific member/month
+export function setMemberMonthlyPayment(
+  memberId: string,
+  memberName: string,
+  memberEmail: string,
+  month: number,
+  year: number,
+  amount: number,
+  recordedBy: string
+): Contribution | null {
+  const contributions = getAllContributions();
+  const monthlyType = getAllContributionTypes().find(t => t.category === "monthly" && t.isActive);
+  
+  if (!monthlyType) return null;
+  
+  // Find existing contribution for this member/month/year
+  const existingIndex = contributions.findIndex(
+    c => c.memberId === memberId && c.month === month && c.year === year && c.category === "monthly"
+  );
+  
+  if (amount <= 0) {
+    // Remove the contribution if amount is 0 or negative
+    if (existingIndex !== -1) {
+      contributions.splice(existingIndex, 1);
+      localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(contributions));
+    }
+    return null;
+  }
+  
+  if (existingIndex !== -1) {
+    // Update existing
+    contributions[existingIndex].amount = amount;
+    contributions[existingIndex].recordedBy = recordedBy;
+    localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(contributions));
+    return contributions[existingIndex];
+  } else {
+    // Create new
+    const newContribution: Contribution = {
+      id: `contrib-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      memberId,
+      memberName,
+      memberEmail,
+      typeId: monthlyType.id,
+      typeName: monthlyType.name,
+      category: "monthly",
+      amount,
+      month,
+      year,
+      paymentMethod: "cash",
+      recordedBy,
+      createdAt: new Date().toISOString(),
+    };
+    contributions.push(newContribution);
+    localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(contributions));
+    return newContribution;
+  }
+}
+
 export function createContribution(
   data: Omit<Contribution, "id" | "createdAt">
 ): Contribution {

@@ -49,6 +49,8 @@ import {
   getMonthlyDuesReport,
   getSpecialContributionProgress,
   getContributionsByMember,
+  getMemberMonthlyPayment,
+  setMemberMonthlyPayment,
   getMonthName,
   MONTH_NAMES,
   type Contribution,
@@ -84,6 +86,17 @@ export function ContributionManagement() {
   const [bulkMemberId, setBulkMemberId] = useState("");
   const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
+  
+  // Cell click payment state
+  const [cellPayment, setCellPayment] = useState<{
+    memberId: string;
+    memberName: string;
+    memberEmail: string;
+    month: number;
+    year: number;
+    amount: string;
+    expectedAmount: number;
+  } | null>(null);
   
   // Forms
   const [contributionForm, setContributionForm] = useState({
@@ -218,6 +231,54 @@ export function ContributionManagement() {
         ? prev.filter(m => m !== month)
         : [...prev, month]
     );
+  };
+
+  // Handle cell click in the overview table
+  const handleCellClick = (member: Member, month: number, year: number) => {
+    const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
+    const currentAmount = getMemberMonthlyPayment(member.id, month, year);
+    
+    setCellPayment({
+      memberId: member.id,
+      memberName: member.name,
+      memberEmail: member.email,
+      month,
+      year,
+      amount: currentAmount > 0 ? currentAmount.toString() : (monthlyType?.amount || 0).toString(),
+      expectedAmount: monthlyType?.amount || 0,
+    });
+  };
+
+  // Save cell payment
+  const handleSaveCellPayment = () => {
+    if (!cellPayment) return;
+    
+    const amount = parseFloat(cellPayment.amount) || 0;
+    
+    setMemberMonthlyPayment(
+      cellPayment.memberId,
+      cellPayment.memberName,
+      cellPayment.memberEmail,
+      cellPayment.month,
+      cellPayment.year,
+      amount,
+      currentUser?.name || "Admin"
+    );
+    
+    if (amount > 0) {
+      toast({
+        title: "Payment Recorded",
+        description: `${formatCurrency(amount)} for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
+      });
+    } else {
+      toast({
+        title: "Payment Removed",
+        description: `Payment cleared for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
+      });
+    }
+    
+    setCellPayment(null);
+    loadData();
   };
   
   // Handle add contribution
@@ -583,9 +644,9 @@ export function ContributionManagement() {
                 {[...members]
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map(member => {
-                    const paidMonths = getPaidMonthsForMember(member.id, bulkYear);
                     const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
-                    const totalPaid = paidMonths.length * (monthlyType?.amount || 0);
+                    const expectedAmount = monthlyType?.amount || 0;
+                    let paidMonthsCount = 0;
                     
                     return (
                       <tr key={member.id} className="border-t border-primary/10 hover:bg-secondary/30 transition-colors">
@@ -596,17 +657,37 @@ export function ContributionManagement() {
                         </td>
                         {MONTH_NAMES.map((_, monthIndex) => {
                           const month = monthIndex + 1;
-                          const isPaid = paidMonths.includes(month);
+                          const amountPaid = getMemberMonthlyPayment(member.id, month, bulkYear);
                           const isFuture = bulkYear === new Date().getFullYear() && month > new Date().getMonth() + 1;
+                          const isFullyPaid = amountPaid >= expectedAmount;
+                          const isPartiallyPaid = amountPaid > 0 && amountPaid < expectedAmount;
+                          
+                          if (isFullyPaid) paidMonthsCount++;
                           
                           return (
-                            <td key={month} className="p-2 text-center">
+                            <td key={month} className="p-1 text-center">
                               {isFuture ? (
                                 <span className="text-muted-foreground/30">—</span>
-                              ) : isPaid ? (
-                                <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                               ) : (
-                                <XCircle className="w-5 h-5 text-red-400/50 mx-auto" />
+                                <button
+                                  onClick={() => handleCellClick(member, month, bulkYear)}
+                                  className={cn(
+                                    "w-full h-10 rounded-lg transition-all flex items-center justify-center",
+                                    isFullyPaid && "bg-green-500/20 hover:bg-green-500/30",
+                                    isPartiallyPaid && "bg-yellow-500/20 hover:bg-yellow-500/30",
+                                    !amountPaid && "bg-red-500/10 hover:bg-red-500/20"
+                                  )}
+                                >
+                                  {isFullyPaid ? (
+                                    <CheckCircle className="w-5 h-5 text-green-500" />
+                                  ) : isPartiallyPaid ? (
+                                    <span className="text-xs font-medium text-yellow-500">
+                                      {(amountPaid / 1000).toFixed(0)}k
+                                    </span>
+                                  ) : (
+                                    <XCircle className="w-4 h-4 text-red-400/50" />
+                                  )}
+                                </button>
                               )}
                             </td>
                           );
@@ -614,11 +695,11 @@ export function ContributionManagement() {
                         <td className="p-3 text-center">
                           <span className={cn(
                             "font-medium",
-                            paidMonths.length === 12 ? "text-green-500" :
-                            paidMonths.length >= 6 ? "text-yellow-500" :
+                            paidMonthsCount === 12 ? "text-green-500" :
+                            paidMonthsCount >= 6 ? "text-yellow-500" :
                             "text-muted-foreground"
                           )}>
-                            {paidMonths.length}/12
+                            {paidMonthsCount}/12
                           </span>
                         </td>
                       </tr>
@@ -633,8 +714,10 @@ export function ContributionManagement() {
                   </td>
                   {MONTH_NAMES.map((_, monthIndex) => {
                     const month = monthIndex + 1;
+                    const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
+                    const expectedAmount = monthlyType?.amount || 0;
                     const paidCount = members.filter(m => 
-                      getPaidMonthsForMember(m.id, bulkYear).includes(month)
+                      getMemberMonthlyPayment(m.id, month, bulkYear) >= expectedAmount
                     ).length;
                     const isFuture = bulkYear === new Date().getFullYear() && month > new Date().getMonth() + 1;
                     
@@ -657,9 +740,15 @@ export function ContributionManagement() {
                   })}
                   <td className="p-3 text-center font-semibold text-primary">
                     {(() => {
-                      const totalPayments = members.reduce((sum, m) => 
-                        sum + getPaidMonthsForMember(m.id, bulkYear).length, 0
-                      );
+                      const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
+                      const expectedAmount = monthlyType?.amount || 0;
+                      const totalPayments = members.reduce((sum, m) => {
+                        let count = 0;
+                        for (let month = 1; month <= 12; month++) {
+                          if (getMemberMonthlyPayment(m.id, month, bulkYear) >= expectedAmount) count++;
+                        }
+                        return sum + count;
+                      }, 0);
                       const maxPayments = members.length * 12;
                       return `${totalPayments}/${maxPayments}`;
                     })()}
@@ -671,16 +760,25 @@ export function ContributionManagement() {
           {/* Legend */}
           <div className="p-3 border-t border-primary/10 flex flex-wrap gap-4 text-xs text-muted-foreground bg-secondary/20">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              <span>Paid</span>
+              <div className="w-6 h-6 rounded bg-green-500/20 flex items-center justify-center">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+              </div>
+              <span>Full Payment</span>
             </div>
             <div className="flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-red-400/50" />
+              <div className="w-6 h-6 rounded bg-yellow-500/20 flex items-center justify-center">
+                <span className="text-xs font-medium text-yellow-500">3k</span>
+              </div>
+              <span>Partial (shows amount)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center">
+                <XCircle className="w-4 h-4 text-red-400/50" />
+              </div>
               <span>Not Paid</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground/30">—</span>
-              <span>Future Month</span>
+            <div className="ml-auto text-muted-foreground">
+              💡 Click any cell to record payment
             </div>
           </div>
         </div>
@@ -1245,6 +1343,111 @@ export function ContributionManagement() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cell Payment Dialog */}
+      <Dialog open={!!cellPayment} onOpenChange={(open) => !open && setCellPayment(null)}>
+        <DialogContent className="max-w-sm bg-background border-primary/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary" />
+              Record Payment
+            </DialogTitle>
+          </DialogHeader>
+          
+          {cellPayment && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-secondary/50 border border-primary/10">
+                <p className="font-semibold text-foreground">{cellPayment.memberName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {MONTH_NAMES[cellPayment.month - 1]} {cellPayment.year}
+                </p>
+              </div>
+              
+              <div>
+                <Label>Amount (RWF)</Label>
+                <Input
+                  type="number"
+                  value={cellPayment.amount}
+                  onChange={(e) => setCellPayment({ ...cellPayment, amount: e.target.value })}
+                  className="mt-1 bg-secondary border-primary/20 text-lg font-semibold"
+                  placeholder="0"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Expected: {formatCurrency(cellPayment.expectedAmount)}
+                </p>
+              </div>
+              
+              {/* Quick amount buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setCellPayment({ ...cellPayment, amount: cellPayment.expectedAmount.toString() })}
+                >
+                  Full ({formatCurrency(cellPayment.expectedAmount)})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setCellPayment({ ...cellPayment, amount: (cellPayment.expectedAmount / 2).toString() })}
+                >
+                  Half ({formatCurrency(cellPayment.expectedAmount / 2)})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCellPayment({ ...cellPayment, amount: "0" })}
+                  className="text-red-400"
+                >
+                  Clear
+                </Button>
+              </div>
+              
+              {/* Payment status preview */}
+              <div className={cn(
+                "p-3 rounded-xl border flex items-center gap-3",
+                parseFloat(cellPayment.amount) >= cellPayment.expectedAmount 
+                  ? "bg-green-500/10 border-green-500/30" 
+                  : parseFloat(cellPayment.amount) > 0 
+                    ? "bg-yellow-500/10 border-yellow-500/30"
+                    : "bg-red-500/10 border-red-500/30"
+              )}>
+                {parseFloat(cellPayment.amount) >= cellPayment.expectedAmount ? (
+                  <>
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                    <span className="text-green-500 font-medium">Fully Paid</span>
+                  </>
+                ) : parseFloat(cellPayment.amount) > 0 ? (
+                  <>
+                    <Clock className="w-6 h-6 text-yellow-500" />
+                    <span className="text-yellow-500 font-medium">
+                      Partial ({((parseFloat(cellPayment.amount) / cellPayment.expectedAmount) * 100).toFixed(0)}%)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-6 h-6 text-red-400" />
+                    <span className="text-red-400 font-medium">Not Paid</span>
+                  </>
+                )}
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setCellPayment(null)}>
+                  Cancel
+                </Button>
+                <Button variant="gold" className="flex-1" onClick={handleSaveCellPayment}>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Save
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
