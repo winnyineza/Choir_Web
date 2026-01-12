@@ -1,18 +1,26 @@
 // Contribution Service - Track member dues and special contributions
 
+import { getAllMembers } from "./dataService";
+
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
 
-export type ContributionCategory = "monthly" | "special" | "event" | "other";
+export type ContributionCategory = "monthly" | "special";
+
+export interface RateHistoryEntry {
+  amount: number;
+  effectiveFrom: string; // ISO date - when this rate became effective
+}
 
 export interface ContributionType {
   id: string;
   name: string;
   category: ContributionCategory;
-  amount: number; // Expected amount
+  amount: number; // Current expected amount
   description?: string;
   // For monthly dues
   isRecurring?: boolean;
+  rateHistory?: RateHistoryEntry[]; // Track rate changes over time
   // For special contributions
   targetAmount?: number; // Total goal (e.g., uniform fund = 500,000 RWF)
   deadline?: string; // ISO date
@@ -29,6 +37,7 @@ export interface Contribution {
   typeName: string;
   category: ContributionCategory;
   amount: number;
+  expectedAmount?: number; // Historical rate - what was expected when payment was recorded
   // For monthly dues
   month?: number; // 1-12
   year?: number;
@@ -74,12 +83,60 @@ export function createContributionType(
 
 export function updateContributionType(
   id: string,
-  data: Partial<ContributionType>
+  data: Partial<ContributionType>,
+  options?: { createAnnouncement?: boolean }
 ): ContributionType | null {
   const types = getAllContributionTypes();
   const index = types.findIndex(t => t.id === id);
   
   if (index === -1) return null;
+  
+  const oldType = types[index];
+  const newAmount = data.amount;
+  
+  // Track rate history for monthly dues when amount changes
+  if (oldType.category === "monthly" && newAmount && newAmount !== oldType.amount) {
+    const rateHistory = oldType.rateHistory || [];
+    
+    // If no history yet, add the original rate first (effective from creation)
+    if (rateHistory.length === 0) {
+      rateHistory.push({
+        amount: oldType.amount,
+        effectiveFrom: oldType.createdAt,
+      });
+    }
+    
+    // Add the new rate with today's effective date
+    rateHistory.push({
+      amount: newAmount,
+      effectiveFrom: new Date().toISOString(),
+    });
+    
+    data.rateHistory = rateHistory;
+    
+    // Create announcement for rate change if requested (default: true for monthly)
+    if (options?.createAnnouncement !== false) {
+      try {
+        // Import dynamically to avoid circular dependency
+        const { createAnnouncement } = require("./announcementService");
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 7); // Show for 7 days
+        
+        createAnnouncement({
+          title: "Monthly Contribution Update",
+          content: `The monthly contribution amount has changed from ${oldType.amount.toLocaleString()} RWF to ${newAmount.toLocaleString()} RWF, effective immediately. Please note that unpaid months before this change will still use the previous rate.`,
+          priority: "high",
+          audience: "members",
+          isPinned: true,
+          isActive: true,
+          expiresAt: expiryDate.toISOString(),
+          createdBy: "System",
+        });
+      } catch (e) {
+        console.error("Failed to create announcement:", e);
+      }
+    }
+  }
   
   types[index] = { ...types[index], ...data };
   localStorage.setItem(CONTRIBUTION_TYPES_KEY, JSON.stringify(types));
@@ -94,6 +151,44 @@ export function deleteContributionType(id: string): boolean {
   
   localStorage.setItem(CONTRIBUTION_TYPES_KEY, JSON.stringify(filtered));
   return true;
+}
+
+// Get the rate that was active for a specific month/year
+// This finds the rate that was in effect at the END of that month
+export function getMonthlyRateForPeriod(month: number, year: number): number {
+  const monthlyType = getAllContributionTypes().find(t => t.category === "monthly" && t.isActive);
+  if (!monthlyType) return 0;
+  
+  const rateHistory = monthlyType.rateHistory;
+  
+  // If no rate history, use current amount
+  if (!rateHistory || rateHistory.length === 0) {
+    return monthlyType.amount;
+  }
+  
+  // Find the rate that was active at the end of the specified month
+  // End of month = last day of that month at 23:59:59
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59); // month is 1-12, so month gives us last day
+  
+  // Sort history by effectiveFrom date (oldest first)
+  const sortedHistory = [...rateHistory].sort(
+    (a, b) => new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime()
+  );
+  
+  // Find the last rate that was effective before or on the end of the target month
+  let applicableRate = sortedHistory[0].amount; // Start with the oldest rate
+  
+  for (const entry of sortedHistory) {
+    const effectiveDate = new Date(entry.effectiveFrom);
+    if (effectiveDate <= endOfMonth) {
+      applicableRate = entry.amount;
+    } else {
+      // This rate became effective after the target month, stop looking
+      break;
+    }
+  }
+  
+  return applicableRate;
 }
 
 // ============ CONTRIBUTIONS ============
@@ -131,6 +226,32 @@ export function getMemberMonthlyPayment(memberId: string, month: number, year: n
     .reduce((sum, c) => sum + c.amount, 0);
 }
 
+// Get payment details including historical expected amount
+export function getMemberMonthlyPaymentDetails(memberId: string, month: number, year: number): {
+  amountPaid: number;
+  expectedAmount: number;
+  hasHistoricalRate: boolean;
+} {
+  const contributions = getAllContributions();
+  const monthlyContribs = contributions.filter(
+    c => c.memberId === memberId && c.month === month && c.year === year && c.category === "monthly"
+  );
+  
+  const amountPaid = monthlyContribs.reduce((sum, c) => sum + c.amount, 0);
+  
+  // Get the expected amount from:
+  // 1. The stored historical rate on the payment (if exists)
+  // 2. The rate that was active for that month (from rate history)
+  const storedExpected = monthlyContribs.find(c => c.expectedAmount)?.expectedAmount;
+  const rateForMonth = getMonthlyRateForPeriod(month, year);
+  
+  return {
+    amountPaid,
+    expectedAmount: storedExpected ?? rateForMonth,
+    hasHistoricalRate: !!storedExpected || rateForMonth > 0,
+  };
+}
+
 // Update or create a contribution for a specific member/month
 export function setMemberMonthlyPayment(
   memberId: string,
@@ -139,12 +260,16 @@ export function setMemberMonthlyPayment(
   month: number,
   year: number,
   amount: number,
-  recordedBy: string
+  recordedBy: string,
+  expectedAmount?: number // Optional - if not provided, uses current type amount
 ): Contribution | null {
   const contributions = getAllContributions();
   const monthlyType = getAllContributionTypes().find(t => t.category === "monthly" && t.isActive);
   
   if (!monthlyType) return null;
+  
+  // Use provided expected amount or current type amount
+  const rateAtTimeOfPayment = expectedAmount ?? monthlyType.amount;
   
   // Find existing contribution for this member/month/year
   const existingIndex = contributions.findIndex(
@@ -161,13 +286,17 @@ export function setMemberMonthlyPayment(
   }
   
   if (existingIndex !== -1) {
-    // Update existing
+    // Update existing - keep the original expectedAmount (historical rate)
     contributions[existingIndex].amount = amount;
     contributions[existingIndex].recordedBy = recordedBy;
+    // Only update expectedAmount if it wasn't set before (migration for old data)
+    if (!contributions[existingIndex].expectedAmount) {
+      contributions[existingIndex].expectedAmount = rateAtTimeOfPayment;
+    }
     localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(contributions));
     return contributions[existingIndex];
   } else {
-    // Create new
+    // Create new - store the expected amount at time of payment
     const newContribution: Contribution = {
       id: `contrib-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       memberId,
@@ -177,6 +306,7 @@ export function setMemberMonthlyPayment(
       typeName: monthlyType.name,
       category: "monthly",
       amount,
+      expectedAmount: rateAtTimeOfPayment, // Historical rate tracking
       month,
       year,
       paymentMethod: "cash",
@@ -326,10 +456,13 @@ export interface ContributionStats {
   thisYearTotal: number;
   contributionCount: number;
   uniqueContributors: number;
+  outstandingDues: number;
 }
 
 export function getContributionStats(): ContributionStats {
   const contributions = getAllContributions();
+  const members = getAllMembers();
+  const types = getAllContributionTypes();
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
@@ -353,6 +486,55 @@ export function getContributionStats(): ContributionStats {
   
   const uniqueContributors = new Set(contributions.map(c => c.memberId)).size;
   
+  // Calculate outstanding dues with historical rate support
+  let outstandingDues = 0;
+  
+  // Calculate unpaid monthly dues for all active members
+  const activeMembers = members.filter(m => m.status === "active");
+  activeMembers.forEach(member => {
+    // Determine the starting month for this member based on their join date
+    const joinDate = new Date(member.joinedDate);
+    const joinYear = joinDate.getFullYear();
+    const joinMonth = joinDate.getMonth() + 1; // 1-12
+    
+    // Only calculate dues for current year, starting from when they joined
+    let startMonth = 1;
+    if (joinYear === currentYear) {
+      // Member joined this year - start from their join month
+      startMonth = joinMonth;
+    } else if (joinYear > currentYear) {
+      // Member joins in the future - no dues yet
+      return;
+    }
+    // If joinYear < currentYear, they owe from January (startMonth = 1)
+    
+    // Check each month from their start month to current month
+    for (let month = startMonth; month <= currentMonth; month++) {
+      // Get the rate that was active for this specific month
+      const rateForMonth = getMonthlyRateForPeriod(month, currentYear);
+      
+      const paidForMonth = contributions.find(
+        c => c.memberId === member.id && 
+             c.category === "monthly" && 
+             c.month === month && 
+             c.year === currentYear
+      );
+      
+      if (!paidForMonth) {
+        // No payment - use the rate that was active for that month
+        outstandingDues += rateForMonth;
+      } else {
+        // Use the historical rate stored with the payment, or the rate for that month
+        const expectedAmount = paidForMonth.expectedAmount ?? rateForMonth;
+        if (paidForMonth.amount < expectedAmount) {
+          // Partial payment - add the remaining
+          outstandingDues += (expectedAmount - paidForMonth.amount);
+        }
+        // If fully paid against historical rate, no outstanding dues for this month
+      }
+    }
+  });
+  
   return {
     totalCollected,
     monthlyDuesCollected,
@@ -361,6 +543,7 @@ export function getContributionStats(): ContributionStats {
     thisYearTotal,
     contributionCount: contributions.length,
     uniqueContributors,
+    outstandingDues,
   };
 }
 

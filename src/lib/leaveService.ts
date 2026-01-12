@@ -1,5 +1,14 @@
 // Leave Request Service - Manages member leave requests
 
+// Approval vote from an admin
+export interface ApprovalVote {
+  adminId: string;
+  adminName: string;
+  vote: 'approve' | 'deny';
+  votedAt: string;
+  notes?: string;
+}
+
 export interface LeaveRequest {
   id: string;
   memberId: string;
@@ -8,7 +17,12 @@ export interface LeaveRequest {
   startDate: string;
   endDate: string;
   reason: string;
-  status: 'pending' | 'approved' | 'denied';
+  status: 'pending' | 'partial' | 'approved' | 'denied';
+  // Multi-approval tracking
+  votes: ApprovalVote[];
+  approvalCount: number;
+  denialCount: number;
+  // Legacy fields (for backward compatibility)
   adminNotes?: string;
   reviewedBy?: string;
   reviewedAt?: string;
@@ -21,6 +35,11 @@ export interface VerificationCode {
   expiresAt: number;
   used: boolean;
 }
+
+// Constants for approval rules
+export const REQUIRED_APPROVALS = 3;
+export const REQUIRED_DENIALS = 2;
+export const MINIMUM_NOTICE_DAYS = 2;
 
 import { getSettings } from './dataService';
 
@@ -40,11 +59,15 @@ export function getAllLeaveRequests(): LeaveRequest[] {
 }
 
 export function getPendingLeaveRequests(): LeaveRequest[] {
-  return getAllLeaveRequests().filter(r => r.status === 'pending');
+  return getAllLeaveRequests().filter(r => r.status === 'pending' || r.status === 'partial');
 }
 
 export function getApprovedLeaveRequests(): LeaveRequest[] {
   return getAllLeaveRequests().filter(r => r.status === 'approved');
+}
+
+export function getPartiallyApprovedRequests(): LeaveRequest[] {
+  return getAllLeaveRequests().filter(r => r.status === 'partial');
 }
 
 export function getLeaveRequestById(id: string): LeaveRequest | undefined {
@@ -82,12 +105,43 @@ export function getMembersOnLeaveForDate(date: string): LeaveRequest[] {
   });
 }
 
-export function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>): LeaveRequest {
+// Validate minimum notice period (2 days)
+export function validateLeaveRequestDate(startDate: string): { valid: boolean; error?: string } {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const minDate = new Date(today);
+  minDate.setDate(minDate.getDate() + MINIMUM_NOTICE_DAYS);
+  
+  if (start < minDate) {
+    const minDateStr = minDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    return {
+      valid: false,
+      error: `Leave requests must be submitted at least ${MINIMUM_NOTICE_DAYS} days in advance. Earliest available date: ${minDateStr}`,
+    };
+  }
+  
+  return { valid: true };
+}
+
+export function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'createdAt' | 'votes' | 'approvalCount' | 'denialCount'>): LeaveRequest | { error: string } {
+  // Validate minimum notice period
+  const validation = validateLeaveRequestDate(request.startDate);
+  if (!validation.valid) {
+    return { error: validation.error! };
+  }
+  
   const requests = getAllLeaveRequests();
   const newRequest: LeaveRequest = {
     ...request,
     id: `leave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     status: 'pending',
+    votes: [],
+    approvalCount: 0,
+    denialCount: 0,
     createdAt: new Date().toISOString(),
   };
   
@@ -100,44 +154,106 @@ export function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' |
   return newRequest;
 }
 
-export function approveLeaveRequest(id: string, adminName: string, notes?: string): LeaveRequest | null {
-  const requests = getAllLeaveRequests();
-  const index = requests.findIndex(r => r.id === id);
-  
-  if (index === -1) return null;
-  
-  requests[index] = {
-    ...requests[index],
-    status: 'approved',
-    reviewedBy: adminName,
-    reviewedAt: new Date().toISOString(),
-    adminNotes: notes,
-  };
-  
-  localStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(requests));
-  window.dispatchEvent(new Event('storage'));
-  
-  return requests[index];
+// Check if an admin has already voted on a request
+export function hasAdminVoted(request: LeaveRequest, adminId: string): boolean {
+  return request.votes?.some(v => v.adminId === adminId) || false;
 }
 
-export function denyLeaveRequest(id: string, adminName: string, notes?: string): LeaveRequest | null {
+// Get approval progress for display
+export function getApprovalProgress(request: LeaveRequest): {
+  approvals: number;
+  denials: number;
+  required: number;
+  requiredDenials: number;
+  status: string;
+} {
+  return {
+    approvals: request.approvalCount || 0,
+    denials: request.denialCount || 0,
+    required: REQUIRED_APPROVALS,
+    requiredDenials: REQUIRED_DENIALS,
+    status: request.status,
+  };
+}
+
+// Cast a vote (approve or deny) on a leave request
+export function castVote(
+  id: string, 
+  adminId: string, 
+  adminName: string, 
+  vote: 'approve' | 'deny', 
+  notes?: string
+): LeaveRequest | { error: string } | null {
   const requests = getAllLeaveRequests();
   const index = requests.findIndex(r => r.id === id);
   
   if (index === -1) return null;
   
-  requests[index] = {
-    ...requests[index],
-    status: 'denied',
-    reviewedBy: adminName,
-    reviewedAt: new Date().toISOString(),
-    adminNotes: notes,
-  };
+  const request = requests[index];
   
+  // Check if request is already finalized
+  if (request.status === 'approved' || request.status === 'denied') {
+    return { error: 'This leave request has already been finalized.' };
+  }
+  
+  // Initialize votes array if not present (backward compatibility)
+  if (!request.votes) {
+    request.votes = [];
+    request.approvalCount = 0;
+    request.denialCount = 0;
+  }
+  
+  // Check if admin has already voted
+  if (hasAdminVoted(request, adminId)) {
+    return { error: 'You have already voted on this leave request.' };
+  }
+  
+  // Add the vote
+  const newVote: ApprovalVote = {
+    adminId,
+    adminName,
+    vote,
+    votedAt: new Date().toISOString(),
+    notes,
+  };
+  request.votes.push(newVote);
+  
+  // Update counts
+  if (vote === 'approve') {
+    request.approvalCount = (request.approvalCount || 0) + 1;
+  } else {
+    request.denialCount = (request.denialCount || 0) + 1;
+  }
+  
+  // Determine new status
+  if (request.denialCount >= REQUIRED_DENIALS) {
+    // 2+ denials = automatic rejection
+    request.status = 'denied';
+    request.reviewedAt = new Date().toISOString();
+  } else if (request.approvalCount >= REQUIRED_APPROVALS) {
+    // 3 approvals = fully approved
+    request.status = 'approved';
+    request.reviewedAt = new Date().toISOString();
+  } else if (request.approvalCount > 0) {
+    // Has some approvals but not enough yet
+    request.status = 'partial';
+  }
+  // Otherwise stays 'pending'
+  
+  requests[index] = request;
   localStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(requests));
   window.dispatchEvent(new Event('storage'));
   
-  return requests[index];
+  return request;
+}
+
+// Legacy functions for backward compatibility (now use castVote internally)
+export function approveLeaveRequest(id: string, adminId: string, adminName: string, notes?: string): LeaveRequest | { error: string } | null {
+  return castVote(id, adminId, adminName, 'approve', notes);
+}
+
+export function denyLeaveRequest(id: string, adminId: string, adminName: string, notes?: string): LeaveRequest | { error: string } | null {
+  return castVote(id, adminId, adminName, 'deny', notes);
 }
 
 export function deleteLeaveRequest(id: string): boolean {
@@ -214,6 +330,8 @@ export function getLeaveRequestStats() {
   return {
     total: requests.length,
     pending: requests.filter(r => r.status === 'pending').length,
+    partial: requests.filter(r => r.status === 'partial').length,
+    awaitingReview: requests.filter(r => r.status === 'pending' || r.status === 'partial').length,
     approved: requests.filter(r => r.status === 'approved').length,
     denied: requests.filter(r => r.status === 'denied').length,
   };

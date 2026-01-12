@@ -6,6 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Lock,
   Mail,
   Calendar,
@@ -31,14 +37,22 @@ import {
   Pin,
   Wallet,
   DollarSign,
+  Download,
+  Printer,
+  Phone,
+  User,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
-import { getAllMembers, type Member } from "@/lib/dataService";
+import { getAllMembers, type Member, type EmergencyContact } from "@/lib/dataService";
+import { BirthdayAlert } from "@/components/BirthdayAlert";
 import {
   verifyPortalPin,
   createLeaveRequest,
   getLeaveRequestsByEmail,
+  validateLeaveRequestDate,
+  MINIMUM_NOTICE_DAYS,
+  REQUIRED_APPROVALS,
   type LeaveRequest,
 } from "@/lib/leaveService";
 import {
@@ -64,6 +78,7 @@ import {
 } from "@/lib/contributionService";
 import { formatCurrency } from "@/lib/flutterwave";
 import { cn } from "@/lib/utils";
+import { exportMemberStatement } from "@/lib/exportUtils";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
@@ -100,6 +115,7 @@ export default function MemberPortal() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [myContributions, setMyContributions] = useState<Contribution[]>([]);
   const [contributionStatus, setContributionStatus] = useState<MemberContributionStatus | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
 
   // Load announcements when PIN is verified
   useEffect(() => {
@@ -298,7 +314,7 @@ export default function MemberPortal() {
     const result = verifyEmailCode(email, code);
 
     if (result.success) {
-      createLeaveRequest({
+      const leaveResult = createLeaveRequest({
         memberId: memberInfo?.id || "",
         memberName: memberInfo?.name || "",
         memberEmail: email,
@@ -307,10 +323,21 @@ export default function MemberPortal() {
         reason,
       });
 
+      // Check if there was an error (e.g., date validation failed)
+      if (leaveResult && 'error' in leaveResult) {
+        toast({
+          title: "Request Failed",
+          description: leaveResult.error,
+          variant: "destructive",
+        });
+        setView("request");
+        return;
+      }
+
       setView("success");
       toast({
         title: "Request submitted! ✅",
-        description: "Your leave request has been sent to the admins.",
+        description: `Your leave request has been sent for review. It requires ${REQUIRED_APPROVALS} approvals.`,
       });
     } else {
       toast({
@@ -336,13 +363,33 @@ export default function MemberPortal() {
     }
   };
 
-  const getStatusBadge = (status: LeaveRequest["status"]) => {
+  const getStatusBadge = (status: LeaveRequest["status"], request?: LeaveRequest) => {
     switch (status) {
       case "pending":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs">
-            <Clock className="w-3 h-3" /> Pending
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs">
+              <Clock className="w-3 h-3" /> Awaiting Review
+            </span>
+            {request && (
+              <span className="text-[10px] text-muted-foreground">
+                {request.approvalCount || 0}/{REQUIRED_APPROVALS} approvals
+              </span>
+            )}
+          </div>
+        );
+      case "partial":
+        return (
+          <div className="flex flex-col items-end gap-1">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs">
+              <Clock className="w-3 h-3" /> In Progress
+            </span>
+            {request && (
+              <span className="text-[10px] text-muted-foreground">
+                {request.approvalCount || 0}/{REQUIRED_APPROVALS} approvals
+              </span>
+            )}
+          </div>
         );
       case "approved":
         return (
@@ -456,6 +503,14 @@ export default function MemberPortal() {
             {/* Dashboard */}
             {view === "dashboard" && (
               <div className="space-y-6">
+                {/* Birthday Alert */}
+                {memberInfo && (
+                  <BirthdayAlert 
+                    currentUserEmail={memberInfo.email}
+                    currentUserName={memberInfo.name}
+                  />
+                )}
+                
                 {/* Header */}
                 <div className="card-glass rounded-2xl p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -625,6 +680,42 @@ export default function MemberPortal() {
                   </button>
                 </div>
 
+                {/* Emergency Contact (if logged in and has one) */}
+                {memberInfo && memberInfo.emergencyContact && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Phone className="w-5 h-5 text-primary" />
+                      Emergency Contact
+                    </h2>
+                    <div className="bg-secondary/30 rounded-xl p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground">{memberInfo.emergencyContact.name}</p>
+                          <p className="text-sm text-muted-foreground">{memberInfo.emergencyContact.relationship}</p>
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm flex items-center gap-2">
+                              <Phone className="w-3 h-3 text-primary" />
+                              {memberInfo.emergencyContact.phone}
+                            </p>
+                            {memberInfo.emergencyContact.altPhone && (
+                              <p className="text-sm flex items-center gap-2 text-muted-foreground">
+                                <Phone className="w-3 h-3" />
+                                {memberInfo.emergencyContact.altPhone} (Alt)
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Contact your choir administrator if this information needs to be updated.
+                    </p>
+                  </div>
+                )}
+
                 {/* Attendance Stats (if logged in) */}
                 {memberInfo && attendanceStats && (
                   <div className="card-glass rounded-2xl p-6">
@@ -721,7 +812,7 @@ export default function MemberPortal() {
                             </p>
                             <p className="text-xs text-muted-foreground truncate max-w-[200px]">{request.reason}</p>
                           </div>
-                          {getStatusBadge(request.status)}
+                          {getStatusBadge(request.status, request)}
                         </div>
                       ))}
                     </div>
@@ -839,7 +930,7 @@ export default function MemberPortal() {
                               </p>
                               <p className="text-sm text-muted-foreground">{request.reason}</p>
                             </div>
-                            {getStatusBadge(request.status)}
+                            {getStatusBadge(request.status, request)}
                           </div>
                           {request.adminNotes && (
                             <p className="text-xs text-muted-foreground mt-2 p-2 rounded bg-secondary">
@@ -895,7 +986,11 @@ export default function MemberPortal() {
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
                           className="pl-10 bg-secondary border-primary/20"
-                          min={new Date().toISOString().split("T")[0]}
+                          min={(() => {
+                            const minDate = new Date();
+                            minDate.setDate(minDate.getDate() + MINIMUM_NOTICE_DAYS);
+                            return minDate.toISOString().split("T")[0];
+                          })()}
                         />
                       </div>
                     </div>
@@ -1111,29 +1206,55 @@ export default function MemberPortal() {
               <div className="space-y-6">
                 {/* Header */}
                 <div className="card-glass rounded-2xl p-6">
-                  <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" onClick={() => setView("dashboard")}>
-                      <ArrowLeft className="w-4 h-4" />
-                    </Button>
-                    <div>
-                      <h1 className="font-display text-2xl font-bold">
-                        My <span className="gold-text">Contributions</span>
-                      </h1>
-                      <p className="text-muted-foreground">
-                        View your dues and payment history
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Button variant="ghost" size="sm" onClick={() => setView("dashboard")}>
+                        <ArrowLeft className="w-4 h-4" />
+                      </Button>
+                      <div>
+                        <h1 className="font-display text-2xl font-bold">
+                          My <span className="gold-text">Contributions</span>
+                        </h1>
+                        <p className="text-muted-foreground">
+                          View your dues and payment history
+                        </p>
+                      </div>
                     </div>
+                    {memberInfo && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          exportMemberStatement(memberInfo.id, memberInfo.name, memberInfo.email);
+                          toast({ title: "Statement Downloaded", description: "Your contribution statement has been exported to CSV" });
+                        }}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Statement
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 {/* Summary Stats */}
                 {contributionStatus && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="card-glass rounded-xl p-4 text-center">
                       <p className="text-2xl font-bold text-green-500">
                         {formatCurrency(contributionStatus.totalPaid)}
                       </p>
                       <p className="text-xs text-muted-foreground">Total Paid</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center border border-red-500/30 bg-red-500/5">
+                      <p className="text-2xl font-bold text-red-500">
+                        {formatCurrency(
+                          contributionStatus.unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0) +
+                          contributionStatus.specialStatus
+                            .filter(s => !s.isPaid)
+                            .reduce((sum, s) => sum + (s.expectedAmount - s.paidAmount), 0)
+                        )}
+                      </p>
+                      <p className="text-xs text-red-400">Outstanding Dues</p>
                     </div>
                     <div className="card-glass rounded-xl p-4 text-center">
                       <p className="text-2xl font-bold text-primary">
@@ -1184,7 +1305,13 @@ export default function MemberPortal() {
                     </h2>
                     <div className="space-y-3">
                       {contributionStatus.specialStatus.map((item) => (
-                        <div key={item.typeId} className="p-3 rounded-lg bg-secondary/50">
+                        <div 
+                          key={item.typeId} 
+                          className={cn(
+                            "p-3 rounded-lg",
+                            item.isPaid ? "bg-green-500/10" : "bg-secondary/50 border-l-4 border-l-red-500"
+                          )}
+                        >
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-foreground">{item.typeName}</span>
                             {item.isPaid ? (
@@ -1192,8 +1319,9 @@ export default function MemberPortal() {
                                 <CheckCircle className="w-4 h-4" /> Paid
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-yellow-400 text-sm">
-                                <Clock className="w-4 h-4" /> Pending
+                              <span className="flex items-center gap-1 text-red-400 text-sm font-medium">
+                                <AlertCircle className="w-4 h-4" /> 
+                                {formatCurrency(item.expectedAmount - item.paidAmount)} due
                               </span>
                             )}
                           </div>
@@ -1203,16 +1331,17 @@ export default function MemberPortal() {
                               Paid: {formatCurrency(item.paidAmount)}
                             </span>
                           </div>
-                          {!item.isPaid && item.paidAmount > 0 && (
+                          {!item.isPaid && (
                             <div className="mt-2">
-                              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                              <div className="w-full h-2 bg-red-500/20 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-primary rounded-full"
+                                  className="h-full bg-green-500 rounded-full"
                                   style={{ width: `${Math.min(100, (item.paidAmount / item.expectedAmount) * 100)}%` }}
                                 />
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {((item.paidAmount / item.expectedAmount) * 100).toFixed(0)}% paid
+                              <p className="text-xs text-red-400 mt-1">
+                                {((item.paidAmount / item.expectedAmount) * 100).toFixed(0)}% paid • 
+                                <span className="font-medium"> {formatCurrency(item.expectedAmount - item.paidAmount)} remaining</span>
                               </p>
                             </div>
                           )}
@@ -1253,9 +1382,20 @@ export default function MemberPortal() {
                                 </p>
                               </div>
                             </div>
-                            <p className="font-semibold text-green-500">
-                              {formatCurrency(contribution.amount)}
-                            </p>
+                            <div className="flex items-center gap-3">
+                              <p className="font-semibold text-green-500">
+                                {formatCurrency(contribution.amount)}
+                              </p>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setSelectedReceipt(contribution)}
+                                className="text-xs"
+                              >
+                                <FileText className="w-3 h-3 mr-1" />
+                                Receipt
+                              </Button>
+                            </div>
                           </div>
                         ))}
                     </div>
@@ -1266,6 +1406,141 @@ export default function MemberPortal() {
                     </div>
                   )}
                 </div>
+
+                {/* Receipt Modal */}
+                <Dialog open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
+                  <DialogContent className="max-w-md bg-background border-primary/20">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-primary" />
+                        Payment Receipt
+                      </DialogTitle>
+                    </DialogHeader>
+                    
+                    {selectedReceipt && (
+                      <div className="space-y-6" id="receipt-content">
+                        {/* Receipt Header */}
+                        <div className="text-center border-b border-primary/20 pb-4">
+                          <h3 className="font-display text-xl font-bold">
+                            Chorale de Kigali
+                          </h3>
+                          <p className="text-sm text-muted-foreground">Official Payment Receipt</p>
+                        </div>
+                        
+                        {/* Receipt Details */}
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Receipt No:</span>
+                            <span className="font-mono text-foreground">{selectedReceipt.id.slice(0, 8).toUpperCase()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Date:</span>
+                            <span className="text-foreground">{new Date(selectedReceipt.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Member:</span>
+                            <span className="text-foreground">{selectedReceipt.memberName}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Payment Info */}
+                        <div className="bg-secondary/50 rounded-xl p-4 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Description:</span>
+                            <span className="text-foreground font-medium">{selectedReceipt.typeName}</span>
+                          </div>
+                          {selectedReceipt.month && selectedReceipt.year && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Period:</span>
+                              <span className="text-foreground">{getMonthName(selectedReceipt.month)} {selectedReceipt.year}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Payment Method:</span>
+                            <span className="text-foreground capitalize">{selectedReceipt.paymentMethod || "Cash"}</span>
+                          </div>
+                          {selectedReceipt.reference && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Reference:</span>
+                              <span className="font-mono text-foreground">{selectedReceipt.reference}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Amount */}
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-1">Amount Paid</p>
+                          <p className="text-3xl font-bold text-green-500">{formatCurrency(selectedReceipt.amount)}</p>
+                        </div>
+                        
+                        {/* Footer */}
+                        <div className="text-center text-xs text-muted-foreground border-t border-primary/20 pt-4">
+                          <p>Recorded by: {selectedReceipt.recordedBy || "System"}</p>
+                          <p className="mt-1">Thank you for your contribution!</p>
+                        </div>
+                        
+                        {/* Print Button */}
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => {
+                            const content = document.getElementById('receipt-content');
+                            if (content) {
+                              const printWindow = window.open('', '_blank');
+                              if (printWindow) {
+                                printWindow.document.write(`
+                                  <html>
+                                    <head>
+                                      <title>Receipt - ${selectedReceipt.id.slice(0, 8).toUpperCase()}</title>
+                                      <style>
+                                        body { font-family: system-ui, sans-serif; padding: 40px; max-width: 400px; margin: 0 auto; }
+                                        .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+                                        .header h3 { font-size: 20px; margin: 0; }
+                                        .header p { color: #666; font-size: 12px; }
+                                        .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+                                        .label { color: #666; }
+                                        .value { font-weight: 500; }
+                                        .amount-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+                                        .amount { font-size: 28px; font-weight: bold; color: #22c55e; }
+                                        .footer { text-align: center; font-size: 11px; color: #666; border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <div class="header">
+                                        <h3>Chorale de Kigali</h3>
+                                        <p>Official Payment Receipt</p>
+                                      </div>
+                                      <div class="row"><span class="label">Receipt No:</span><span class="value">${selectedReceipt.id.slice(0, 8).toUpperCase()}</span></div>
+                                      <div class="row"><span class="label">Date:</span><span class="value">${new Date(selectedReceipt.createdAt).toLocaleDateString()}</span></div>
+                                      <div class="row"><span class="label">Member:</span><span class="value">${selectedReceipt.memberName}</span></div>
+                                      <div class="row"><span class="label">Description:</span><span class="value">${selectedReceipt.typeName}</span></div>
+                                      ${selectedReceipt.month && selectedReceipt.year ? `<div class="row"><span class="label">Period:</span><span class="value">${getMonthName(selectedReceipt.month)} ${selectedReceipt.year}</span></div>` : ''}
+                                      <div class="row"><span class="label">Payment Method:</span><span class="value">${(selectedReceipt.paymentMethod || 'Cash').charAt(0).toUpperCase() + (selectedReceipt.paymentMethod || 'cash').slice(1)}</span></div>
+                                      ${selectedReceipt.reference ? `<div class="row"><span class="label">Reference:</span><span class="value">${selectedReceipt.reference}</span></div>` : ''}
+                                      <div class="amount-box">
+                                        <p style="margin:0 0 5px 0;font-size:12px;color:#666;">Amount Paid</p>
+                                        <p class="amount">${selectedReceipt.amount.toLocaleString()} RWF</p>
+                                      </div>
+                                      <div class="footer">
+                                        <p>Recorded by: ${selectedReceipt.recordedBy || 'System'}</p>
+                                        <p>Thank you for your contribution!</p>
+                                      </div>
+                                    </body>
+                                  </html>
+                                `);
+                                printWindow.document.close();
+                                printWindow.print();
+                              }
+                            }
+                          }}
+                        >
+                          <Printer className="w-4 h-4 mr-2" />
+                          Print Receipt
+                        </Button>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
           </div>

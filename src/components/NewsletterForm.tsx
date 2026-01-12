@@ -119,3 +119,4 @@ export function NewsletterForm({ variant = "default", className = "" }: Newslett
   );
 }
 
+

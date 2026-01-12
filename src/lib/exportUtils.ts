@@ -5,10 +5,20 @@ import { formatCurrency } from "./flutterwave";
 import { getAllMembers, getAllEvents, getAllGalleryItems, getSettings } from "./dataService";
 import { getAllOrders } from "./ticketService";
 import { getAllLeaveRequests } from "./leaveService";
-import { getAllSessions } from "./attendanceService";
+import { getAllSessions, getAllAttendanceRecords, getAttendanceByMember, getMemberAttendanceStats, type AttendanceRecord } from "./attendanceService";
 import { getAllAlbums, getAllMusicVideos, getAllPlatforms } from "./releaseService";
 import { getAllPromoCodes } from "./promoService";
 import { getAllAdminUsers, getAuditLog } from "./adminService";
+import { 
+  getAllContributions, 
+  getAllContributionTypes,
+  getContributionsByMember,
+  getMemberContributionStatus,
+  getMonthName,
+  MONTH_NAMES,
+} from "./contributionService";
+import { getAllExpenses, getCategoryLabel } from "./expenseService";
+import { getAllDonations, Donation } from "./donationService";
 
 // Export orders to CSV
 export function exportOrdersToCSV(orders: TicketOrder[], filename: string = "ticket-orders") {
@@ -262,41 +272,126 @@ export function exportMembersToCSV(): void {
   downloadCSV(headers, rows, "members");
 }
 
-// Export attendance to CSV
+// Export attendance summary to CSV
 export function exportAttendanceToCSV(): void {
-  const sessions = getAllAttendanceSessions();
-  const members = getAllMembers();
+  const sessions = getAllSessions();
   
-  const headers = ["Date", "Title", "Total Present", "Total Absent", "Total Excused"];
+  const headers = ["Date", "Title", "Total Present", "Total Absent", "Total Excused", "Total Late", "Attendance Rate"];
   
   const rows = sessions.map((s) => {
-    const present = Object.values(s.records).filter(r => r === "present").length;
-    const absent = Object.values(s.records).filter(r => r === "absent").length;
-    const excused = Object.values(s.records).filter(r => r === "excused").length;
+    const total = s.totalPresent + s.totalAbsent + s.totalExcused + s.totalLate;
+    const attended = s.totalPresent + s.totalLate;
+    const countable = total - s.totalExcused;
+    const rate = countable > 0 ? Math.round((attended / countable) * 100) : 100;
     
-    return [s.date, s.title, present, absent, excused];
+    return [
+      new Date(s.date).toLocaleDateString(),
+      s.title,
+      s.totalPresent,
+      s.totalAbsent,
+      s.totalExcused,
+      s.totalLate,
+      `${rate}%`,
+    ];
   });
 
   downloadCSV(headers, rows, "attendance-summary");
 }
 
-// Export detailed attendance to CSV
+// Export detailed attendance records to CSV
 export function exportDetailedAttendanceToCSV(): void {
-  const sessions = getAllAttendanceSessions();
+  const records = getAllAttendanceRecords();
+  
+  const headers = ["Date", "Member Name", "Email", "Voice Part", "Status", "Notes", "Marked By"];
+  
+  const rows = records.map((r) => [
+    new Date(r.date).toLocaleDateString(),
+    r.memberName,
+    r.memberEmail,
+    r.memberVoice,
+    r.status,
+    r.notes || "",
+    r.markedBy || "",
+  ]);
+
+  downloadCSV(headers, rows, "attendance-detailed");
+}
+
+// Export attendance by member
+export function exportAttendanceByMemberToCSV(): void {
   const members = getAllMembers();
   
-  // Create headers: Date, Title, then each member name
-  const headers = ["Date", "Title", ...members.map(m => m.name)];
+  const headers = ["Member Name", "Email", "Voice Part", "Total Sessions", "Present", "Absent", "Excused", "Late", "Attendance Rate"];
   
-  const rows = sessions.map((s) => {
+  const rows = members.map((m) => {
+    const stats = getMemberAttendanceStats(m.id);
     return [
-      s.date,
-      s.title,
-      ...members.map(m => s.records[m.id] || "absent"),
+      m.name,
+      m.email,
+      m.voice,
+      stats.total,
+      stats.present,
+      stats.absent,
+      stats.excused,
+      stats.late,
+      `${stats.percentage}%`,
     ];
   });
 
-  downloadCSV(headers, rows, "attendance-detailed");
+  // Sort by attendance rate descending
+  rows.sort((a, b) => parseInt(b[8] as string) - parseInt(a[8] as string));
+
+  downloadCSV(headers, rows, "attendance-by-member");
+}
+
+// Export attendance for a specific month
+export function exportMonthlyAttendanceToCSV(year: number, month: number): void {
+  const records = getAllAttendanceRecords();
+  const members = getAllMembers();
+  
+  // Filter records for the specified month
+  const monthRecords = records.filter(r => {
+    const date = new Date(r.date);
+    return date.getFullYear() === year && date.getMonth() === month;
+  });
+
+  // Get unique dates for the month
+  const uniqueDates = [...new Set(monthRecords.map(r => r.date))].sort();
+  
+  // Create headers
+  const headers = ["Member Name", "Voice Part", ...uniqueDates.map(d => new Date(d).toLocaleDateString()), "Rate"];
+  
+  const rows = members.map((m) => {
+    const memberRecords = monthRecords.filter(r => r.memberId === m.id);
+    const recordsByDate = memberRecords.reduce((acc, r) => {
+      acc[r.date] = r.status;
+      return acc;
+    }, {} as Record<string, string>);
+    
+    const present = memberRecords.filter(r => r.status === "present" || r.status === "late").length;
+    const total = memberRecords.filter(r => r.status !== "excused").length;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+    
+    return [
+      m.name,
+      m.voice,
+      ...uniqueDates.map(d => {
+        const status = recordsByDate[d];
+        if (!status) return "-";
+        switch (status) {
+          case "present": return "P";
+          case "absent": return "A";
+          case "excused": return "E";
+          case "late": return "L";
+          default: return "-";
+        }
+      }),
+      `${rate}%`,
+    ];
+  });
+
+  const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+  downloadCSV(headers, rows, `attendance-${monthName}-${year}`);
 }
 
 // Export financial report to CSV
@@ -373,6 +468,271 @@ export function exportLeaveRequestsToCSV(): void {
   downloadCSV(headers, rows, "leave-requests");
 }
 
+// Export all contributions to CSV
+export function exportContributionsToCSV(): void {
+  const contributions = getAllContributions();
+  const types = getAllContributionTypes();
+  
+  const headers = [
+    "Date",
+    "Member Name",
+    "Member Email",
+    "Contribution Type",
+    "Category",
+    "Amount (RWF)",
+    "Month",
+    "Year",
+    "Payment Method",
+    "Reference",
+    "Recorded By",
+    "Notes",
+  ];
+  
+  const rows = contributions
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((c) => [
+      new Date(c.createdAt).toLocaleDateString(),
+      c.memberName,
+      c.memberEmail,
+      c.typeName,
+      c.category,
+      c.amount,
+      c.month ? getMonthName(c.month) : "",
+      c.year || "",
+      c.paymentMethod || "cash",
+      c.reference || "",
+      c.recordedBy || "",
+      c.notes || "",
+    ]);
+
+  // Add summary
+  const totalAmount = contributions.reduce((sum, c) => sum + c.amount, 0);
+  const monthlyTotal = contributions.filter(c => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
+  const specialTotal = contributions.filter(c => c.category === "special" || c.category === "event").reduce((sum, c) => sum + c.amount, 0);
+  
+  rows.push([]);
+  rows.push(["SUMMARY", "", "", "", "", "", "", "", "", "", "", ""]);
+  rows.push(["Total Contributions", "", "", "", "", totalAmount, "", "", "", "", "", ""]);
+  rows.push(["Monthly Dues Total", "", "", "", "", monthlyTotal, "", "", "", "", "", ""]);
+  rows.push(["Special/Event Total", "", "", "", "", specialTotal, "", "", "", "", "", ""]);
+  rows.push(["Total Records", "", "", "", "", contributions.length, "", "", "", "", "", ""]);
+
+  downloadCSV(headers, rows, "contributions");
+}
+
+// Export contributions by member (for member statement)
+export function exportMemberStatement(memberId: string, memberName: string, memberEmail: string): void {
+  const contributions = getContributionsByMember(memberId);
+  const status = getMemberContributionStatus(memberId, memberName, memberEmail);
+  
+  const headers = [
+    "Date",
+    "Description",
+    "Category",
+    "Amount (RWF)",
+    "Payment Method",
+    "Reference",
+  ];
+  
+  const rows = contributions
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((c) => [
+      new Date(c.createdAt).toLocaleDateString(),
+      c.typeName + (c.month && c.year ? ` - ${getMonthName(c.month)} ${c.year}` : ""),
+      c.category,
+      c.amount,
+      c.paymentMethod || "cash",
+      c.reference || "",
+    ]);
+
+  // Add summary
+  rows.push([]);
+  rows.push(["MEMBER STATEMENT SUMMARY", "", "", "", "", ""]);
+  rows.push(["Member Name", memberName, "", "", "", ""]);
+  rows.push(["Email", memberEmail, "", "", "", ""]);
+  rows.push(["Generated", new Date().toLocaleString(), "", "", "", ""]);
+  rows.push([]);
+  rows.push(["Total Paid", "", "", status?.totalPaid || 0, "", ""]);
+  rows.push(["Monthly Dues Paid", "", "", status?.monthlyDuesPaid || 0, "", ""]);
+  rows.push(["Special Contributions", "", "", status?.specialContributions || 0, "", ""]);
+  
+  if (status?.unpaidMonths && status.unpaidMonths.length > 0) {
+    rows.push([]);
+    rows.push(["OUTSTANDING DUES", "", "", "", "", ""]);
+    status.unpaidMonths.forEach(item => {
+      rows.push([`${getMonthName(item.month)} ${item.year}`, "Monthly Dues", "monthly", item.expectedAmount, "UNPAID", ""]);
+    });
+  }
+
+  downloadCSV(headers, rows, `member-statement-${memberName.replace(/\s+/g, "-").toLowerCase()}`);
+}
+
+// Export monthly dues report
+export function exportMonthlyDuesReport(year: number): void {
+  const members = getAllMembers();
+  const types = getAllContributionTypes();
+  const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
+  const expectedAmount = monthlyType?.amount || 0;
+  
+  const headers = ["Member Name", "Email", ...MONTH_NAMES, "Total Paid", "Months Paid"];
+  
+  const rows = members.map(member => {
+    const status = getMemberContributionStatus(member.id, member.name, member.email);
+    const contributions = getContributionsByMember(member.id).filter(c => c.category === "monthly" && c.year === year);
+    
+    const monthlyPayments = MONTH_NAMES.map((_, index) => {
+      const monthContrib = contributions.find(c => c.month === index + 1);
+      return monthContrib ? monthContrib.amount : 0;
+    });
+    
+    const totalPaid = monthlyPayments.reduce((sum, p) => sum + p, 0);
+    const monthsPaid = monthlyPayments.filter(p => p >= expectedAmount).length;
+    
+    return [member.name, member.email, ...monthlyPayments, totalPaid, `${monthsPaid}/12`];
+  });
+  
+  // Add totals row
+  const monthTotals = MONTH_NAMES.map((_, index) => {
+    return rows.reduce((sum, row) => sum + (row[index + 2] as number), 0);
+  });
+  const grandTotal = monthTotals.reduce((sum, t) => sum + t, 0);
+  
+  rows.push([]);
+  rows.push(["TOTALS", "", ...monthTotals, grandTotal, ""]);
+
+  downloadCSV(headers, rows, `monthly-dues-${year}`);
+}
+
+// Export annual financial summary
+export function exportAnnualFinancialSummary(year: number): void {
+  const contributions = getAllContributions().filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
+  const orders = getAllOrders().filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
+  const expenses = getAllExpenses().filter(e => new Date(e.date).getFullYear() === year);
+  const donations = getAllDonations().filter(d => new Date(d.date).getFullYear() === year);
+  
+  const headers = ["Category", "Description", "Amount (RWF)"];
+  
+  // Contribution totals by type
+  const types = getAllContributionTypes();
+  const rows: any[][] = [];
+  
+  // INCOME SECTION
+  rows.push(["=== INCOME ===", "", ""]);
+  rows.push([]);
+  rows.push(["MEMBER CONTRIBUTIONS", "", ""]);
+  
+  const monthlyTotal = contributions.filter(c => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
+  rows.push(["Monthly Dues", `${contributions.filter(c => c.category === "monthly").length} payments`, monthlyTotal]);
+  
+  types.filter(t => t.category !== "monthly").forEach(type => {
+    const typeTotal = contributions.filter(c => c.typeId === type.id).reduce((sum, c) => sum + c.amount, 0);
+    if (typeTotal > 0) {
+      rows.push([type.name, `${contributions.filter(c => c.typeId === type.id).length} payments`, typeTotal]);
+    }
+  });
+  
+  const contributionsTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+  rows.push(["Subtotal - Contributions", "", contributionsTotal]);
+  
+  rows.push([]);
+  rows.push(["TICKET SALES", "", ""]);
+  
+  const ticketRevenue = orders.reduce((sum, o) => sum + o.subtotal, 0);
+  const serviceFees = orders.reduce((sum, o) => sum + o.serviceFee, 0);
+  rows.push(["Ticket Revenue", `${orders.length} orders`, ticketRevenue]);
+  rows.push(["Service Fees", "", serviceFees]);
+  rows.push(["Subtotal - Tickets", "", ticketRevenue + serviceFees]);
+  
+  rows.push([]);
+  rows.push(["DONATIONS", "", ""]);
+  
+  const donationsTotal = donations.reduce((sum, d) => sum + d.amount, 0);
+  rows.push(["Total Donations", `${donations.length} donors`, donationsTotal]);
+  
+  const totalIncome = contributionsTotal + ticketRevenue + serviceFees + donationsTotal;
+  rows.push([]);
+  rows.push(["TOTAL INCOME", "", totalIncome]);
+  
+  // EXPENSES SECTION
+  rows.push([]);
+  rows.push(["=== EXPENSES ===", "", ""]);
+  rows.push([]);
+  
+  const expenseCategories = [...new Set(expenses.map(e => e.category))];
+  expenseCategories.forEach(cat => {
+    const catExpenses = expenses.filter(e => e.category === cat);
+    const catTotal = catExpenses.reduce((sum, e) => sum + e.amount, 0);
+    rows.push([getCategoryLabel(cat), `${catExpenses.length} transactions`, catTotal]);
+  });
+  
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  rows.push([]);
+  rows.push(["TOTAL EXPENSES", "", totalExpenses]);
+  
+  // NET BALANCE
+  rows.push([]);
+  rows.push(["=== SUMMARY ===", "", ""]);
+  rows.push([]);
+  rows.push(["Total Income", "", totalIncome]);
+  rows.push(["  - Contributions", "", contributionsTotal]);
+  rows.push(["  - Ticket Sales", "", ticketRevenue + serviceFees]);
+  rows.push(["  - Donations", "", donationsTotal]);
+  rows.push(["Total Expenses", "", totalExpenses]);
+  rows.push([]);
+  const netBalance = totalIncome - totalExpenses;
+  rows.push([netBalance >= 0 ? "NET SURPLUS" : "NET DEFICIT", `Year ${year}`, Math.abs(netBalance)]);
+
+  downloadCSV(headers, rows, `annual-financial-summary-${year}`);
+}
+
+// Export donations to CSV
+export function exportDonationsToCSV(): void {
+  const donations = getAllDonations();
+  
+  const headers = [
+    "Date",
+    "Donor Name",
+    "Email",
+    "Amount (RWF)",
+    "Payment Method",
+    "Reference",
+    "Message",
+    "Recorded By",
+    "Recorded At",
+  ];
+
+  const getMethodLabel = (method: string) => {
+    switch (method) {
+      case "bank": return "Bank Transfer";
+      case "mtn": return "MTN MoMo";
+      case "airtel": return "Airtel Money";
+      case "cash": return "Cash";
+      default: return "Other";
+    }
+  };
+
+  const rows = donations
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .map(d => [
+      d.date,
+      d.donorName,
+      d.donorEmail || "",
+      d.amount,
+      getMethodLabel(d.method),
+      d.reference || "",
+      d.message || "",
+      d.recordedBy,
+      new Date(d.createdAt).toLocaleString(),
+    ]);
+
+  // Add summary
+  const total = donations.reduce((sum, d) => sum + d.amount, 0);
+  rows.push([]);
+  rows.push(["TOTAL", "", "", total, "", "", "", "", ""]);
+
+  downloadCSV(headers, rows, "donations");
+}
+
 // Helper function to download CSV
 function downloadCSV(headers: string[], rows: any[][], filename: string): void {
   const csvContent = [
@@ -402,6 +762,7 @@ export function getBackupStats() {
     albums: getAllAlbums().length,
     musicVideos: getAllMusicVideos().length,
     promoCodes: getAllPromoCodes().length,
+    donations: getAllDonations().length,
   };
 }
 

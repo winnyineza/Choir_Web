@@ -83,6 +83,10 @@ import {
   approveLeaveRequest,
   denyLeaveRequest,
   getLeaveRequestStats,
+  hasAdminVoted,
+  getApprovalProgress,
+  REQUIRED_APPROVALS,
+  REQUIRED_DENIALS,
   type LeaveRequest,
 } from "@/lib/leaveService";
 import {
@@ -138,12 +142,27 @@ import { AnnouncementManagement } from "@/components/admin/AnnouncementManagemen
 import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
 import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
 import { ContributionManagement } from "@/components/admin/ContributionManagement";
-import { BarChart3, Shield, History, Mail, Wallet } from "lucide-react";
-import { addAuditLog } from "@/lib/adminService";
+import { getAllContributions } from "@/lib/contributionService";
+import { getAllExpenses } from "@/lib/expenseService";
+import { getAllDonations } from "@/lib/donationService";
+import { BarChart3, Shield, History, Mail, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
+import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer } from "@/lib/adminService";
 import { ContactSubmissions } from "@/components/admin/ContactSubmissions";
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
+import { ExpenseManagement } from "@/components/admin/ExpenseManagement";
+import { Treasury } from "@/components/admin/Treasury";
+import { ExecutiveDashboard } from "@/components/admin/ExecutiveDashboard";
+import { BirthdayAlert } from "@/components/BirthdayAlert";
+import { DisciplinaryManagement } from "@/components/admin/DisciplinaryManagement";
+import { GalleryManagement } from "@/components/admin/GalleryManagement";
+import { MusicReleasesManagement } from "@/components/admin/MusicReleasesManagement";
+import { PromoManagement } from "@/components/admin/PromoManagement";
+import { InventoryManagement } from "@/components/admin/InventoryManagement";
+import { MeetingMinutesComponent } from "@/components/admin/MeetingMinutes";
+import { DocumentManagement } from "@/components/admin/DocumentManagement";
+import { Package, FileText as FileTextIcon, FolderOpen } from "lucide-react";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "contributions" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -152,16 +171,22 @@ const sidebarItems = [
   { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket },
   { id: "attendance" as Tab, label: "Attendance", icon: UserCheck },
   { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
+  { id: "disciplinary" as Tab, label: "Disciplinary", icon: AlertTriangle },
   { id: "contributions" as Tab, label: "Contributions", icon: Wallet },
+  { id: "expenses" as Tab, label: "Expenses", icon: Receipt },
+  { id: "treasury" as Tab, label: "Treasury", icon: PiggyBank },
   { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
   { id: "messages" as Tab, label: "Messages", icon: Mail },
   { id: "releases" as Tab, label: "Releases", icon: Disc3 },
   { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
   { id: "gallery" as Tab, label: "Gallery", icon: Image },
+  { id: "inventory" as Tab, label: "Inventory", icon: Package },
+  { id: "minutes" as Tab, label: "Minutes", icon: FileTextIcon },
+  { id: "documents" as Tab, label: "Documents", icon: FolderOpen },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
-  { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard, superAdminOnly: true },
-  { id: "team" as Tab, label: "Admin Team", icon: Shield, superAdminOnly: true },
-  { id: "audit" as Tab, label: "Audit Log", icon: History, superAdminOnly: true },
+  { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard },
+  { id: "team" as Tab, label: "Admin Team", icon: Shield },
+  { id: "audit" as Tab, label: "Audit Log", icon: History },
   { id: "settings" as Tab, label: "Settings", icon: Settings },
 ];
 
@@ -170,10 +195,20 @@ export default function Admin() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, isLoading, logout, isSuperAdmin, currentUser } = useAuth();
   const { toast } = useToast();
+  
+  // Role preview mode (Super Admin only)
+  const [previewRole, setPreviewRole] = useState<string | null>(null);
+  
+  // Create a simulated user for preview mode
+  const effectiveUser = previewRole && currentUser ? {
+    ...currentUser,
+    role: previewRole as any,
+  } : currentUser;
 
-  // Filter sidebar items based on role
+  // Filter sidebar items based on role permissions (use effectiveUser for preview)
+  const accessibleTabs = getAccessibleTabs(effectiveUser);
   const visibleSidebarItems = sidebarItems.filter(
-    item => !item.superAdminOnly || isSuperAdmin
+    item => accessibleTabs.includes(item.id)
   );
 
   // Data states
@@ -188,6 +223,16 @@ export default function Admin() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveFilter, setLeaveFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [unreadMessages, setUnreadMessages] = useState(0);
+  
+  // Financial totals for Finance dashboard
+  const [financialTotals, setFinancialTotals] = useState({
+    contributions: 0,
+    donations: 0,
+    expenses: 0,
+    ticketRevenue: 0,
+    totalIncome: 0,
+    balance: 0,
+  });
   
   // Attendance state
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
@@ -222,6 +267,7 @@ export default function Admin() {
   const [orderFilter, setOrderFilter] = useState<"all" | "pending" | "confirmed" | "used">("all");
   const [orderSearch, setOrderSearch] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   // Settings state
   const [settings, setSettingsState] = useState(getSettings());
@@ -231,7 +277,8 @@ export default function Admin() {
     setMembers(getAllMembers());
     setEvents(getAllEvents());
     setGallery(getAllGalleryItems());
-    setOrders(getAllOrders());
+    const allOrders = getAllOrders();
+    setOrders(allOrders);
     setPromoCodes(getAllPromoCodes());
     setAlbums(getAllAlbums());
     setMusicVideos(getAllMusicVideos());
@@ -240,6 +287,27 @@ export default function Admin() {
     setAttendanceSessions(getRecentSessions(20));
     setDashboardStats(getDashboardStats());
     setUnreadMessages(getUnreadContactCount());
+    
+    // Calculate financial totals
+    const contributions = getAllContributions();
+    const donations = getAllDonations();
+    const expenses = getAllExpenses();
+    const confirmedOrders = allOrders.filter(o => o.status === "confirmed");
+    
+    const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+    const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
+    const expenseTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const totalIncome = contributionTotal + donationTotal + ticketRevenue;
+    
+    setFinancialTotals({
+      contributions: contributionTotal,
+      donations: donationTotal,
+      expenses: expenseTotal,
+      ticketRevenue,
+      totalIncome,
+      balance: totalIncome - expenseTotal,
+    });
   };
 
   // Load data on mount
@@ -437,14 +505,67 @@ export default function Admin() {
   const handleDeleteMember = (id: string, name: string) => {
     if (confirm(`Are you sure you want to remove ${name} from the choir?`)) {
       deleteMember(id);
+      if (currentUser) {
+        addAuditLog(currentUser, "DELETE_MEMBER", `Deleted member: ${name}`);
+      }
       loadData();
       toast({ title: "Member Removed", description: `${name} has been removed.` });
     }
   };
 
+  // Bulk member actions
+  const toggleMemberSelection = (id: string) => {
+    setSelectedMembers(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllMembers = () => {
+    if (selectedMembers.length === filteredMembers.length) {
+      setSelectedMembers([]);
+    } else {
+      setSelectedMembers(filteredMembers.map(m => m.id));
+    }
+  };
+
+  const handleBulkStatusUpdate = (status: Member["status"]) => {
+    if (selectedMembers.length === 0) return;
+    if (!confirm(`Update ${selectedMembers.length} member(s) to ${status}?`)) return;
+    
+    selectedMembers.forEach(id => {
+      updateMember(id, { status });
+    });
+    
+    loadData();
+    setSelectedMembers([]);
+    toast({ 
+      title: "Members Updated", 
+      description: `${selectedMembers.length} member(s) updated to ${status}.` 
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedMembers.length === 0) return;
+    if (!confirm(`Delete ${selectedMembers.length} member(s)? This cannot be undone.`)) return;
+    
+    selectedMembers.forEach(id => {
+      deleteMember(id);
+    });
+    
+    loadData();
+    setSelectedMembers([]);
+    toast({ 
+      title: "Members Deleted", 
+      description: `${selectedMembers.length} member(s) have been removed.` 
+    });
+  };
+
   const handleDeleteEvent = (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
       deleteEvent(id);
+      if (currentUser) {
+        addAuditLog(currentUser, "DELETE_EVENT", `Deleted event: ${title}`);
+      }
       loadData();
       toast({ title: "Event Deleted", description: `"${title}" has been deleted.` });
     }
@@ -453,6 +574,9 @@ export default function Admin() {
   const handleDeleteGalleryItem = (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
       deleteGalleryItem(id);
+      if (currentUser) {
+        addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${title}`);
+      }
       loadData();
       toast({ title: "Media Deleted", description: `"${title}" has been removed.` });
     }
@@ -477,6 +601,9 @@ export default function Admin() {
   // Settings save
   const handleSaveSettings = () => {
     updateSettings(settings);
+    if (currentUser) {
+      addAuditLog(currentUser, "UPDATE_SETTINGS", "Updated system settings");
+    }
     toast({ title: "Settings Saved", description: "Your changes have been saved." });
   };
 
@@ -503,6 +630,27 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background flex">
+      {/* Preview Mode Banner - Fixed at top */}
+      {previewRole && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 px-4 py-2 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4" />
+            <span className="text-sm font-medium">
+              Preview Mode: Viewing as <strong>{getRoleLabel(previewRole as any)}</strong>
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPreviewRole(null)}
+            className="text-yellow-900 hover:text-yellow-800 hover:bg-yellow-400/50"
+          >
+            <X className="w-4 h-4 mr-1" />
+            Exit Preview
+          </Button>
+        </div>
+      )}
+      
       {/* Sidebar */}
       <aside
         className={cn(
@@ -518,7 +666,16 @@ export default function Admin() {
               </div>
               <div>
                 <h1 className="font-display text-lg font-bold gold-text">Admin Panel</h1>
-                <p className="text-xs text-muted-foreground">Serenades of Praise</p>
+                <p className="text-xs text-muted-foreground">
+                  {previewRole ? (
+                    <span className="text-yellow-500 flex items-center gap-1">
+                      <Eye className="w-3 h-3" />
+                      {getRoleLabel(previewRole as any)} View
+                    </span>
+                  ) : (
+                    "Serenades of Praise"
+                  )}
+                </p>
               </div>
             </Link>
           </div>
@@ -595,7 +752,7 @@ export default function Admin() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className={cn("flex-1 flex flex-col min-h-screen", previewRole && "pt-10")}>
         {/* Header */}
         <header className="h-16 border-b border-primary/10 flex items-center justify-between px-4 lg:px-8">
           <button className="lg:hidden p-2 text-foreground" onClick={() => setSidebarOpen(true)}>
@@ -645,111 +802,358 @@ export default function Admin() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-4 lg:p-8 overflow-auto">
+        <main className="flex-1 overflow-auto">
+          {/* Birthday Alert */}
+          <BirthdayAlert 
+            currentUserEmail={currentUser?.email} 
+            currentUserName={currentUser?.name}
+          />
+          
+          <div className="p-4 lg:p-8">
           {/* Dashboard */}
           {activeTab === "dashboard" && (
-            <div className="space-y-8">
-              {/* Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="card-glass rounded-2xl p-6">
-                  <p className="text-sm text-muted-foreground mb-1">Total Members</p>
-                  <p className="text-3xl font-bold gold-text">{dashboardStats.totalMembers}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    +{dashboardStats.newMembersThisMonth} this month
-                  </p>
-                </div>
-                <div className="card-glass rounded-2xl p-6">
-                  <p className="text-sm text-muted-foreground mb-1">Upcoming Events</p>
-                  <p className="text-3xl font-bold gold-text">{dashboardStats.upcomingEvents}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Next: {dashboardStats.nextEvent}
-                  </p>
-                </div>
-                <div className="card-glass rounded-2xl p-6">
-                  <p className="text-sm text-muted-foreground mb-1">Ticket Revenue</p>
-                  <p className="text-3xl font-bold gold-text">{formatCurrency(orderStats.revenue)}</p>
-                  <p className="text-xs text-muted-foreground mt-2">{orderStats.total} orders</p>
-                </div>
-                <div className="card-glass rounded-2xl p-6">
-                  <p className="text-sm text-muted-foreground mb-1">Gallery Items</p>
-                  <p className="text-3xl font-bold gold-text">{gallery.length}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Photos & Videos</p>
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div>
-                <h2 className="font-display text-lg font-semibold mb-4">Quick Actions</h2>
-                <div className="flex flex-wrap gap-4">
-                  <Button variant="gold" onClick={() => setShowAddEvent(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Event
-                  </Button>
-                  <Button variant="gold-outline" onClick={() => setShowAddMember(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Member
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowUploadGallery(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Upload to Gallery
-                  </Button>
-                  <Link to="/scanner">
-                    <Button variant="outline">
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Ticket Scanner
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Recent Events */}
-              <div>
-                <h2 className="font-display text-lg font-semibold mb-4">Upcoming Events</h2>
-                <div className="card-glass rounded-2xl overflow-hidden">
-                  {events.length > 0 ? (
-                    <table className="w-full">
-                      <thead className="bg-secondary/50">
-                        <tr>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Event</th>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Date</th>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Location</th>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {events.slice(0, 5).map((event) => (
-                          <tr key={event.id} className="border-t border-primary/10">
-                            <td className="p-4 font-medium text-foreground">{event.title}</td>
-                            <td className="p-4 text-muted-foreground hidden md:table-cell">
-                              {new Date(event.date).toLocaleDateString()}
-                            </td>
-                            <td className="p-4 text-muted-foreground hidden md:table-cell">{event.location}</td>
-                            <td className="p-4">
-                              <span className={cn(
-                                "px-2 py-1 rounded-full text-xs font-semibold",
-                                event.isFree ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
-                              )}>
-                                {event.isFree ? "Free" : "Paid"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="p-8 text-center text-muted-foreground">
-                      <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>No events yet. Create your first event to get started!</p>
-                      <div className="flex gap-3 justify-center mt-4">
-                        <Button variant="gold" onClick={() => setShowAddEvent(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Event
+            <div className="space-y-6">
+              {/* Role Welcome Banner with Preview Switcher */}
+              <div className="card-glass rounded-2xl p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-xl font-bold text-foreground">
+                      Welcome back, {currentUser?.name?.split(" ")[0]}!
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                      <span className="inline-flex items-center gap-2 px-2 py-0.5 bg-primary/20 rounded-full text-xs font-medium text-primary">
+                        {effectiveUser && getRoleLabel(effectiveUser.role)}
+                      </span>
+                      {previewRole && (
+                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 rounded-full text-xs font-medium text-yellow-500">
+                          <Eye className="w-3 h-3" />
+                          Preview Mode
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  {/* Role Preview Switcher - Super Admin Only */}
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">View as:</span>
+                      <select
+                        value={previewRole || ""}
+                        onChange={(e) => setPreviewRole(e.target.value || null)}
+                        className="px-3 py-1.5 text-sm rounded-lg bg-secondary border border-primary/20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      >
+                        <option value="">My Role (Super Admin)</option>
+                        <option value="main_admin">Main Admin</option>
+                        <option value="finance">Finance</option>
+                        <option value="secretary">Secretary</option>
+                        <option value="disciplinary">Disciplinary</option>
+                        <option value="reviewer">Reviewer</option>
+                      </select>
+                      {previewRole && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPreviewRole(null)}
+                          className="text-yellow-500 hover:text-yellow-400"
+                        >
+                          <X className="w-4 h-4" />
                         </Button>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Executive Dashboard for Super Admin and Main Admin */}
+              {(effectiveUser?.role === "super_admin" || effectiveUser?.role === "main_admin") && (
+                <ExecutiveDashboard onNavigate={setActiveTab} />
+              )}
+
+              {/* Finance Dashboard */}
+              {effectiveUser?.role === "finance" && (
+                <>
+                  {/* Finance Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <PiggyBank className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{formatCurrency(financialTotals.contributions)}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Contributions</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Heart className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{formatCurrency(financialTotals.donations)}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Donations</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Ticket className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{formatCurrency(financialTotals.ticketRevenue)}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Tickets</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-red-500/20 flex items-center justify-center">
+                          <TrendingDown className="w-4 h-4 text-red-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-red-400">{formatCurrency(financialTotals.expenses)}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Expenses</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-green-500/20 flex items-center justify-center">
+                          <TrendingUp className="w-4 h-4 text-green-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-green-400">{formatCurrency(financialTotals.totalIncome)}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Total Income</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all border border-primary/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Wallet className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className={cn("text-2xl font-bold", financialTotals.balance >= 0 ? "text-green-400" : "text-red-400")}>
+                          {formatCurrency(financialTotals.balance)}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Balance</p>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div>
+                    <h2 className="font-display text-lg font-semibold mb-4">Quick Actions</h2>
+                    <div className="flex flex-wrap gap-4">
+                      <Button variant="gold" onClick={() => setActiveTab("treasury")}>
+                        <PiggyBank className="w-4 h-4 mr-2" />
+                        View Treasury
+                      </Button>
+                      <Button variant="gold-outline" onClick={() => setActiveTab("contributions")}>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        Manage Contributions
+                      </Button>
+                      <Button variant="outline" onClick={() => setActiveTab("expenses")}>
+                        <TrendingDown className="w-4 h-4 mr-2" />
+                        Record Expense
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Secretary Dashboard */}
+              {effectiveUser?.role === "secretary" && (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Users className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{dashboardStats.totalMembers}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Members</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Calendar className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{dashboardStats.upcomingEvents}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Upcoming Events</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <UserCheck className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{attendanceSessions.length}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Sessions</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Image className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{gallery.length}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Gallery Items</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                          <CalendarOff className="w-4 h-4 text-yellow-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-400">{leaveRequests.filter(l => l.status === "pending").length}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Pending Leave</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                          <Mail className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <p className={cn("text-2xl font-bold", unreadMessages > 0 ? "text-blue-400" : "text-foreground")}>{unreadMessages}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Unread Messages</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 className="font-display text-lg font-semibold mb-4">Quick Actions</h2>
+                    <div className="flex flex-wrap gap-4">
+                      <Button variant="gold" onClick={() => setShowAddEvent(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Event
+                      </Button>
+                      <Button variant="gold-outline" onClick={() => { setEditingMember(null); setShowAddMember(true); }}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Member
+                      </Button>
+                      <Button variant="outline" onClick={() => setActiveTab("attendance")}>
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Take Attendance
+                      </Button>
+                      {leaveRequests.filter(l => l.status === "pending").length > 0 && (
+                        <Button variant="outline" onClick={() => setActiveTab("leave")}>
+                          <CalendarOff className="w-4 h-4 mr-2" />
+                          Review Leave ({leaveRequests.filter(l => l.status === "pending").length})
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upcoming Events Table */}
+                  {events.length > 0 && (
+                    <div>
+                      <h2 className="font-display text-lg font-semibold mb-4">Upcoming Events</h2>
+                      <div className="card-glass rounded-2xl overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-secondary/50">
+                            <tr>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground">Event</th>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Location</th>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground">Type</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {events.slice(0, 5).map((event) => (
+                              <tr key={event.id} className="border-t border-primary/10">
+                                <td className="p-4 font-medium text-foreground">{event.title}</td>
+                                <td className="p-4 text-muted-foreground hidden md:table-cell">
+                                  {new Date(event.date).toLocaleDateString()}
+                                </td>
+                                <td className="p-4 text-muted-foreground hidden md:table-cell">{event.location}</td>
+                                <td className="p-4">
+                                  <span className={cn(
+                                    "px-2 py-1 rounded-full text-xs font-semibold",
+                                    event.isFree ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
+                                  )}>
+                                    {event.isFree ? "Free" : "Paid"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Disciplinary Dashboard */}
+              {effectiveUser?.role === "disciplinary" && (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                          <CalendarOff className="w-4 h-4 text-yellow-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-400">{leaveRequests.filter(l => l.status === "pending").length}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Pending Leave Requests</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-green-500/20 flex items-center justify-center">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                        </div>
+                        <p className="text-2xl font-bold text-green-400">{leaveRequests.filter(l => l.status === "approved").length}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Approved This Month</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <Users className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{dashboardStats.totalMembers}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Total Members</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h2 className="font-display text-lg font-semibold mb-4">Quick Actions</h2>
+                    <div className="flex flex-wrap gap-4">
+                      <Button variant="gold" onClick={() => setActiveTab("leave")}>
+                        <CalendarOff className="w-4 h-4 mr-2" />
+                        Review Leave Requests ({leaveRequests.filter(l => l.status === "pending").length})
+                      </Button>
+                      <Button variant="outline" onClick={() => setActiveTab("members")}>
+                        <Users className="w-4 h-4 mr-2" />
+                        View Members
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Pending Leave Requests */}
+                  {leaveRequests.filter(l => l.status === "pending").length > 0 && (
+                    <div>
+                      <h2 className="font-display text-lg font-semibold mb-4">Pending Leave Requests</h2>
+                      <div className="card-glass rounded-2xl overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-secondary/50">
+                            <tr>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground">Member</th>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                              <th className="text-left p-4 text-sm font-medium text-muted-foreground">Reason</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {leaveRequests.filter(l => l.status === "pending").slice(0, 5).map((request) => (
+                              <tr key={request.id} className="border-t border-primary/10">
+                                <td className="p-4 font-medium text-foreground">{request.memberName}</td>
+                                <td className="p-4 text-muted-foreground hidden md:table-cell">
+                                  {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                                </td>
+                                <td className="p-4 text-muted-foreground truncate max-w-[200px]">{request.reason}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -757,7 +1161,12 @@ export default function Admin() {
           {activeTab === "members" && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <h2 className="font-display text-lg font-semibold">All Members ({members.length})</h2>
+                <div>
+                  <h2 className="font-display text-lg font-semibold">All Members ({members.length})</h2>
+                  {!canEditMembers(effectiveUser) && (
+                    <p className="text-xs text-muted-foreground mt-1">View only mode</p>
+                  )}
+                </div>
                 <div className="flex gap-3 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -768,10 +1177,12 @@ export default function Admin() {
                       className="pl-10 bg-secondary border-primary/20"
                     />
                   </div>
-                  <Button variant="gold" onClick={() => { setEditingMember(null); setShowAddMember(true); }}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Member
-                  </Button>
+                  {canEditMembers(effectiveUser) && (
+                    <Button variant="gold" onClick={() => { setEditingMember(null); setShowAddMember(true); }}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Member
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -818,11 +1229,51 @@ export default function Admin() {
                 </div>
               )}
               
+              {/* Bulk Actions Bar */}
+              {selectedMembers.length > 0 && canEditMembers(effectiveUser) && (
+                <div className="card-glass rounded-xl p-3 flex items-center justify-between gap-4 mb-4">
+                  <p className="text-sm font-medium">
+                    <span className="text-primary">{selectedMembers.length}</span> member(s) selected
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Active")}>
+                      <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                      Set Active
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Inactive")}>
+                      <XCircle className="w-4 h-4 mr-1 text-red-500" />
+                      Set Inactive
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Pending")}>
+                      <Clock className="w-4 h-4 mr-1 text-yellow-500" />
+                      Set Pending
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedMembers([])}>
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="card-glass rounded-2xl overflow-hidden">
                 {filteredMembers.length > 0 ? (
                   <table className="w-full">
                     <thead className="bg-secondary/50">
                       <tr>
+                        {canEditMembers(effectiveUser) && (
+                          <th className="w-12 p-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0}
+                              onChange={toggleAllMembers}
+                              className="rounded border-primary/30"
+                            />
+                          </th>
+                        )}
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Email</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Voice</th>
@@ -832,8 +1283,32 @@ export default function Admin() {
                     </thead>
                     <tbody>
                       {filteredMembers.map((member) => (
-                        <tr key={member.id} className="border-t border-primary/10">
-                          <td className="p-4 font-medium text-foreground">{member.name}</td>
+                        <tr key={member.id} className={cn(
+                          "border-t border-primary/10",
+                          selectedMembers.includes(member.id) && "bg-primary/5"
+                        )}>
+                          {canEditMembers(effectiveUser) && (
+                            <td className="w-12 p-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedMembers.includes(member.id)}
+                                onChange={() => toggleMemberSelection(member.id)}
+                                className="rounded border-primary/30"
+                              />
+                            </td>
+                          )}
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              {member.photo ? (
+                                <img src={member.photo} alt={member.name} className="w-8 h-8 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                  <span className="text-xs font-medium text-primary">{member.name.charAt(0)}</span>
+                                </div>
+                              )}
+                              <span className="font-medium text-foreground">{member.name}</span>
+                            </div>
+                          </td>
                           <td className="p-4 text-muted-foreground hidden md:table-cell">{member.email}</td>
                           <td className="p-4 text-muted-foreground">{member.voice}</td>
                           <td className="p-4">
@@ -854,13 +1329,15 @@ export default function Admin() {
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteMember(member.id, member.name)}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
+                            {canEditMembers(effectiveUser) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteMember(member.id, member.name)}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1786,16 +2263,22 @@ export default function Admin() {
           {activeTab === "leave" && (
             <div className="space-y-6">
               {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="card-glass rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-foreground">{leaveRequests.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Requests</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
                 </div>
                 <div className="card-glass rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-yellow-400">
                     {leaveRequests.filter(r => r.status === "pending").length}
                   </p>
-                  <p className="text-xs text-muted-foreground">Pending</p>
+                  <p className="text-xs text-muted-foreground">New (0/{REQUIRED_APPROVALS})</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-orange-400">
+                    {leaveRequests.filter(r => r.status === "partial").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">In Progress</p>
                 </div>
                 <div className="card-glass rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-green-400">
@@ -1814,18 +2297,18 @@ export default function Admin() {
               {/* Filters */}
               <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div className="flex gap-2 flex-wrap">
-                  {(["all", "pending", "approved", "denied"] as const).map((filter) => (
+                  {(["all", "pending", "partial", "approved", "denied"] as const).map((filter) => (
                     <button
                       key={filter}
-                      onClick={() => setLeaveFilter(filter)}
+                      onClick={() => setLeaveFilter(filter as any)}
                       className={cn(
-                        "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 capitalize",
+                        "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
                         leaveFilter === filter
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {filter}
+                      {filter === "partial" ? "In Progress" : filter.charAt(0).toUpperCase() + filter.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -1878,68 +2361,133 @@ export default function Admin() {
                               <p className="text-muted-foreground text-sm max-w-[200px] truncate">{request.reason}</p>
                             </td>
                             <td className="p-4">
-                              <span className={cn(
-                                "px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1",
-                                request.status === "approved" && "bg-green-500/20 text-green-400",
-                                request.status === "pending" && "bg-yellow-500/20 text-yellow-400",
-                                request.status === "denied" && "bg-red-500/20 text-red-400"
-                              )}>
-                                {request.status === "approved" && <CheckCircle className="w-3 h-3" />}
-                                {request.status === "pending" && <Clock className="w-3 h-3" />}
-                                {request.status === "denied" && <XCircle className="w-3 h-3" />}
-                                {request.status}
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className={cn(
+                                  "px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 w-fit",
+                                  request.status === "approved" && "bg-green-500/20 text-green-400",
+                                  request.status === "pending" && "bg-yellow-500/20 text-yellow-400",
+                                  request.status === "partial" && "bg-orange-500/20 text-orange-400",
+                                  request.status === "denied" && "bg-red-500/20 text-red-400"
+                                )}>
+                                  {request.status === "approved" && <CheckCircle className="w-3 h-3" />}
+                                  {request.status === "pending" && <Clock className="w-3 h-3" />}
+                                  {request.status === "partial" && <Clock className="w-3 h-3" />}
+                                  {request.status === "denied" && <XCircle className="w-3 h-3" />}
+                                  {request.status === "partial" ? "In Progress" : request.status}
+                                </span>
+                                {/* Show approval progress */}
+                                {(request.status === "pending" || request.status === "partial") && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {request.approvalCount || 0}/{REQUIRED_APPROVALS} approvals
+                                    {(request.denialCount || 0) > 0 && (
+                                      <span className="text-red-400 ml-1">• {request.denialCount} denial{request.denialCount > 1 ? "s" : ""}</span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-4 text-right">
-                              {request.status === "pending" && (
+                              {(request.status === "pending" || request.status === "partial") && (
                                 <>
                                   {/* Prevent admins from approving their own leave requests */}
                                   {currentUser?.memberId === request.memberId ? (
                                     <span className="text-xs text-muted-foreground italic">
                                       Cannot review own request
                                     </span>
+                                  ) : currentUser && hasAdminVoted(request, currentUser.id) ? (
+                                    <span className="text-xs text-muted-foreground italic flex items-center gap-1 justify-end">
+                                      <CheckCircle className="w-3 h-3 text-primary" />
+                                      You voted
+                                    </span>
                                   ) : (
-                                    <>
+                                    <div className="flex gap-1 justify-end">
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-green-400 hover:text-green-300"
+                                        className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
                                         onClick={() => {
-                                          approveLeaveRequest(request.id, currentUser?.name || "Admin");
+                                          const result = approveLeaveRequest(
+                                            request.id, 
+                                            currentUser?.id || "admin",
+                                            currentUser?.name || "Admin"
+                                          );
                                           loadData();
-                                          toast({
-                                            title: "Leave Approved",
-                                            description: `${request.memberName}'s leave request has been approved.`,
-                                          });
+                                          if (result && 'error' in result) {
+                                            toast({
+                                              title: "Error",
+                                              description: result.error,
+                                              variant: "destructive",
+                                            });
+                                          } else if (result) {
+                                            if (currentUser) {
+                                              addAuditLog(currentUser, "APPROVE_LEAVE", `Approved leave request for: ${request.memberName}`);
+                                            }
+                                            const progress = getApprovalProgress(result);
+                                            if (result.status === "approved") {
+                                              toast({
+                                                title: "Leave Fully Approved! ✅",
+                                                description: `${request.memberName}'s leave request has been approved (${progress.approvals}/${progress.required}).`,
+                                              });
+                                            } else {
+                                              toast({
+                                                title: "Vote Recorded",
+                                                description: `Your approval has been recorded (${progress.approvals}/${progress.required}).`,
+                                              });
+                                            }
+                                          }
                                         }}
                                         title="Approve"
                                       >
-                                        <CheckCircle className="w-4 h-4" />
+                                        <ThumbsUp className="w-4 h-4" />
                                       </Button>
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-destructive"
+                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                         onClick={() => {
                                           const notes = prompt("Reason for denial (optional):");
-                                          denyLeaveRequest(request.id, currentUser?.name || "Admin", notes || undefined);
+                                          const result = denyLeaveRequest(
+                                            request.id, 
+                                            currentUser?.id || "admin",
+                                            currentUser?.name || "Admin", 
+                                            notes || undefined
+                                          );
                                           loadData();
-                                          toast({
-                                            title: "Leave Denied",
-                                            description: `${request.memberName}'s leave request has been denied.`,
-                                          });
+                                          if (result && 'error' in result) {
+                                            toast({
+                                              title: "Error",
+                                              description: result.error,
+                                              variant: "destructive",
+                                            });
+                                          } else if (result) {
+                                            if (currentUser) {
+                                              addAuditLog(currentUser, "DENY_LEAVE", `Denied leave request for: ${request.memberName}`);
+                                            }
+                                            const progress = getApprovalProgress(result);
+                                            if (result.status === "denied") {
+                                              toast({
+                                                title: "Leave Denied ❌",
+                                                description: `${request.memberName}'s leave request has been denied (${progress.denials}/${progress.requiredDenials} denials).`,
+                                              });
+                                            } else {
+                                              toast({
+                                                title: "Vote Recorded",
+                                                description: `Your denial has been recorded (${progress.denials}/${progress.requiredDenials} denials).`,
+                                              });
+                                            }
+                                          }
                                         }}
                                         title="Deny"
                                       >
-                                        <XCircle className="w-4 h-4" />
+                                        <ThumbsDown className="w-4 h-4" />
                                       </Button>
-                                    </>
+                                    </div>
                                   )}
                                 </>
                               )}
-                              {request.status !== "pending" && request.reviewedBy && (
+                              {(request.status === "approved" || request.status === "denied") && (
                                 <span className="text-xs text-muted-foreground">
-                                  by {request.reviewedBy}
+                                  {request.approvalCount || 0} approvals, {request.denialCount || 0} denials
                                 </span>
                               )}
                             </td>
@@ -1983,6 +2531,9 @@ export default function Admin() {
             </div>
           )}
 
+          {/* Disciplinary */}
+          {activeTab === "disciplinary" && <DisciplinaryManagement />}
+
           {/* Contributions */}
           {activeTab === "contributions" && (
             <div className="space-y-6">
@@ -1991,539 +2542,39 @@ export default function Admin() {
             </div>
           )}
 
+          {activeTab === "expenses" && (
+            <div className="space-y-6">
+              <h2 className="font-display text-2xl font-bold">Choir Expenses</h2>
+              <ExpenseManagement />
+            </div>
+          )}
+
+          {activeTab === "treasury" && (
+            <Treasury onRefresh={loadData} />
+          )}
+
           {/* Announcements */}
           {activeTab === "announcements" && (
             <AnnouncementManagement />
           )}
 
           {/* Gallery */}
-          {activeTab === "gallery" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="font-display text-lg font-semibold">Manage Gallery ({gallery.length})</h2>
-                <Button variant="gold" onClick={() => setShowUploadGallery(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Upload Media
-                </Button>
-              </div>
-              
-              {gallery.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {gallery.map((item) => (
-                    <div key={item.id} className="card-glass rounded-xl overflow-hidden group relative">
-                      <div className="aspect-square relative">
-                        <img
-                          src={item.thumbnail || item.url}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "https://via.placeholder.com/300?text=Image";
-                          }}
-                        />
-                        {item.type === "video" && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-background/30">
-                            <Video className="w-12 h-12 text-white" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            onClick={() => handleDeleteGalleryItem(item.id, item.title)}
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="p-3">
-                        <p className="font-medium text-foreground text-sm truncate">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.category}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="card-glass rounded-2xl p-12 text-center">
-                  <Image className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-muted-foreground mb-4">No media in gallery yet.</p>
-                  <Button variant="gold" onClick={() => setShowUploadGallery(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Upload Media
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+          {activeTab === "gallery" && <GalleryManagement />}
+
+          {/* Inventory */}
+          {activeTab === "inventory" && <InventoryManagement />}
+
+          {/* Meeting Minutes */}
+          {activeTab === "minutes" && <MeetingMinutesComponent />}
+
+          {/* Documents */}
+          {activeTab === "documents" && <DocumentManagement />}
 
           {/* Promo Codes */}
-          {activeTab === "promos" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="font-display text-lg font-semibold">Promo Codes ({promoCodes.length})</h2>
-                <Button
-                  variant="gold"
-                  onClick={() => {
-                    const code = createPromoCode({
-                      discountType: "percentage",
-                      discountValue: 10,
-                      minPurchase: 5000,
-                      maxUses: 50,
-                      validFrom: new Date().toISOString(),
-                      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                      isActive: true,
-                    });
-                    loadData();
-                    toast({
-                      title: "Promo Code Created",
-                      description: `Code ${code.code} has been created (10% off).`,
-                    });
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Promo Code
-                </Button>
-              </div>
-
-              <div className="card-glass rounded-2xl overflow-hidden">
-                {promoCodes.length > 0 ? (
-                  <table className="w-full">
-                    <thead className="bg-secondary/50">
-                      <tr>
-                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Code</th>
-                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Discount</th>
-                        <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Min. Purchase</th>
-                        <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Uses</th>
-                        <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                        <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {promoCodes.map((promo) => {
-                        const isExpired = new Date(promo.validUntil) < new Date();
-                        const isActive = promo.isActive && !isExpired;
-                        return (
-                          <tr key={promo.id} className="border-t border-primary/10">
-                            <td className="p-4">
-                              <span className="font-mono font-bold text-primary">{promo.code}</span>
-                            </td>
-                            <td className="p-4">
-                              <span className="flex items-center gap-1 text-foreground">
-                                <Percent className="w-4 h-4 text-primary" />
-                                {promo.discountType === "percentage"
-                                  ? `${promo.discountValue}%`
-                                  : formatCurrency(promo.discountValue)}
-                              </span>
-                            </td>
-                            <td className="p-4 text-muted-foreground hidden md:table-cell">
-                              {formatCurrency(promo.minPurchase)}
-                            </td>
-                            <td className="p-4 text-muted-foreground hidden md:table-cell">
-                              {promo.usedCount} / {promo.maxUses || "∞"}
-                            </td>
-                            <td className="p-4">
-                              <span
-                                className={cn(
-                                  "px-2 py-1 rounded-full text-xs font-semibold",
-                                  isActive
-                                    ? "bg-green-500/20 text-green-400"
-                                    : isExpired
-                                    ? "bg-red-500/20 text-red-400"
-                                    : "bg-yellow-500/20 text-yellow-400"
-                                )}
-                              >
-                                {isActive ? "Active" : isExpired ? "Expired" : "Inactive"}
-                              </span>
-                            </td>
-                            <td className="p-4 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  updatePromoCode(promo.id, { isActive: !promo.isActive });
-                                  loadData();
-                                  toast({
-                                    title: promo.isActive ? "Code Deactivated" : "Code Activated",
-                                    description: `${promo.code} is now ${promo.isActive ? "inactive" : "active"}.`,
-                                  });
-                                }}
-                                title={promo.isActive ? "Deactivate" : "Activate"}
-                              >
-                                {promo.isActive ? (
-                                  <XCircle className="w-4 h-4 text-yellow-500" />
-                                ) : (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (confirm(`Delete promo code ${promo.code}?`)) {
-                                    deletePromoCode(promo.id);
-                                    loadData();
-                                    toast({ title: "Promo Code Deleted" });
-                                  }
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="p-12 text-center">
-                    <Tag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="font-semibold text-foreground mb-2">No Promo Codes</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Create promo codes to offer discounts on ticket purchases.
-                    </p>
-                    <Button
-                      variant="gold"
-                      onClick={() => {
-                        const code = createPromoCode({
-                          discountType: "percentage",
-                          discountValue: 10,
-                          minPurchase: 5000,
-                          maxUses: 50,
-                          validFrom: new Date().toISOString(),
-                          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                          isActive: true,
-                        });
-                        loadData();
-                        toast({
-                          title: "Promo Code Created",
-                          description: `Code ${code.code} has been created (10% off).`,
-                        });
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create First Code
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="card-glass rounded-2xl p-6">
-                <h3 className="font-semibold text-foreground mb-4">Quick Create</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const code = createPromoCode({
-                        discountType: "percentage",
-                        discountValue: 10,
-                        minPurchase: 0,
-                        maxUses: 100,
-                        validFrom: new Date().toISOString(),
-                        validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                        isActive: true,
-                      });
-                      loadData();
-                      toast({ title: "Created!", description: `Code: ${code.code} (10% off, 7 days)` });
-                    }}
-                  >
-                    10% Off (7 days)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const code = createPromoCode({
-                        discountType: "percentage",
-                        discountValue: 20,
-                        minPurchase: 10000,
-                        maxUses: 50,
-                        validFrom: new Date().toISOString(),
-                        validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-                        isActive: true,
-                      });
-                      loadData();
-                      toast({ title: "Created!", description: `Code: ${code.code} (20% off, 14 days)` });
-                    }}
-                  >
-                    20% Off (14 days)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const code = createPromoCode({
-                        discountType: "fixed",
-                        discountValue: 5000,
-                        minPurchase: 15000,
-                        maxUses: 30,
-                        validFrom: new Date().toISOString(),
-                        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                        isActive: true,
-                      });
-                      loadData();
-                      toast({ title: "Created!", description: `Code: ${code.code} (5,000 RWF off, 30 days)` });
-                    }}
-                  >
-                    5,000 RWF Off (30 days)
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeTab === "promos" && <PromoManagement />}
 
           {/* Releases */}
-          {activeTab === "releases" && (
-            <div className="space-y-8">
-              {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="card-glass rounded-xl p-4 text-center">
-                  <Disc3 className="w-8 h-8 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">{albums.length}</p>
-                  <p className="text-xs text-muted-foreground">Albums</p>
-                </div>
-                <div className="card-glass rounded-xl p-4 text-center">
-                  <Video className="w-8 h-8 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">{musicVideos.length}</p>
-                  <p className="text-xs text-muted-foreground">Music Videos</p>
-                </div>
-                <div className="card-glass rounded-xl p-4 text-center">
-                  <Music className="w-8 h-8 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">
-                    {albums.reduce((sum, a) => sum + a.trackCount, 0)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Total Tracks</p>
-                </div>
-                <div className="card-glass rounded-xl p-4 text-center">
-                  <Star className="w-8 h-8 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">
-                    {musicVideos.filter((v) => v.isFeatured).length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Featured</p>
-                </div>
-              </div>
-
-              {/* Streaming Platforms Section */}
-              <div className="card-glass rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="font-display text-lg font-semibold">Streaming Platforms</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Manage which platforms appear in the "Listen Everywhere" banner
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {streamingPlatforms.map((platform) => (
-                    <div
-                      key={platform.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                        platform.isVisible
-                          ? "bg-primary/10 border-primary/30"
-                          : "bg-secondary/30 border-transparent opacity-60"
-                      }`}
-                    >
-                      <Switch
-                        checked={platform.isVisible}
-                        onCheckedChange={(checked) => {
-                          const updated = streamingPlatforms.map((p) =>
-                            p.id === platform.id ? { ...p, isVisible: checked } : p
-                          );
-                          setStreamingPlatforms(updated);
-                          updateAllPlatforms(updated);
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground">{platform.name}</p>
-                        <Input
-                          placeholder="Artist profile URL (optional)"
-                          value={platform.url}
-                          onChange={(e) => {
-                            const updated = streamingPlatforms.map((p) =>
-                              p.id === platform.id ? { ...p, url: e.target.value } : p
-                            );
-                            setStreamingPlatforms(updated);
-                            updateAllPlatforms(updated);
-                          }}
-                          className="mt-1 h-7 text-xs bg-secondary/50 border-primary/10"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                <p className="text-xs text-muted-foreground mt-4">
-                  Toggle platforms on/off to show in the public "Listen Everywhere" banner. 
-                  Add your artist profile URLs for each platform (optional).
-                </p>
-              </div>
-
-              {/* Albums Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-lg font-semibold">Albums ({albums.length})</h2>
-                  <Button variant="gold" onClick={() => { setEditingAlbum(null); setShowAddAlbum(true); }}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Album
-                  </Button>
-                </div>
-
-                {albums.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {albums.map((album) => (
-                      <div key={album.id} className="card-glass rounded-2xl overflow-hidden group">
-                        <div className="relative aspect-square">
-                          <img
-                            src={album.coverImage}
-                            alt={album.title}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "https://via.placeholder.com/300?text=Album";
-                            }}
-                          />
-                          {album.isLatest && (
-                            <span className="absolute top-3 left-3 px-2 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                              Latest
-                            </span>
-                          )}
-                          <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => { setEditingAlbum(album); setShowAddAlbum(true); }}
-                            >
-                              <Pencil className="w-5 h-5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteAlbum(album.id, album.title)}
-                            >
-                              <Trash2 className="w-5 h-5 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-foreground">{album.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {album.year} • {album.trackCount} tracks
-                          </p>
-                          {album.listenUrl && (
-                            <p className="text-xs text-primary mt-1 truncate">
-                              🔗 {album.listenUrl.slice(0, 30)}...
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="card-glass rounded-2xl p-8 text-center">
-                    <Disc3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p className="text-muted-foreground mb-4">No albums yet. Add your first album!</p>
-                    <Button variant="gold" onClick={() => setShowAddAlbum(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Album
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Music Videos Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-lg font-semibold">Music Videos ({musicVideos.length})</h2>
-                  <Button variant="gold" onClick={() => { setEditingMusicVideo(null); setShowAddMusicVideo(true); }}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Video
-                  </Button>
-                </div>
-
-                {musicVideos.length > 0 ? (
-                  <div className="card-glass rounded-2xl overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-secondary/50">
-                        <tr>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Video</th>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">YouTube ID</th>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                          <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {musicVideos.map((video) => (
-                          <tr key={video.id} className="border-t border-primary/10">
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-16 h-10 rounded overflow-hidden shrink-0">
-                                  <img
-                                    src={video.thumbnail || `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
-                                    alt={video.title}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <div>
-                                  <p className="font-medium text-foreground">{video.title}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 hidden md:table-cell">
-                              <a
-                                href={`https://youtube.com/watch?v=${video.youtubeId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-mono text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
-                              >
-                                {video.youtubeId}
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex gap-1 flex-wrap">
-                                {video.isLatest && (
-                                  <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-semibold">
-                                    Latest
-                                  </span>
-                                )}
-                                {video.isFeatured && (
-                                  <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
-                                    Featured
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-4 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => { setEditingMusicVideo(video); setShowAddMusicVideo(true); }}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteMusicVideo(video.id, video.title)}
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="card-glass rounded-2xl p-8 text-center">
-                    <Video className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p className="text-muted-foreground mb-4">No music videos yet.</p>
-                    <Button variant="gold" onClick={() => setShowAddMusicVideo(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Music Video
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {activeTab === "releases" && <MusicReleasesManagement />}
 
           {/* Analytics */}
           {activeTab === "analytics" && (
@@ -2756,6 +2807,7 @@ export default function Admin() {
 
             </div>
           )}
+          </div>
         </main>
       </div>
 
@@ -2763,14 +2815,26 @@ export default function Admin() {
       <AddMemberModal
         isOpen={showAddMember}
         onClose={() => { setShowAddMember(false); setEditingMember(null); }}
-        onSuccess={loadData}
+        onSuccess={() => {
+          if (currentUser) {
+            addAuditLog(currentUser, editingMember ? "UPDATE_MEMBER" : "CREATE_MEMBER", 
+              editingMember ? `Updated member: ${editingMember.name}` : "Created new member");
+          }
+          loadData();
+        }}
         editMember={editingMember}
       />
 
       <AddEventModal
         isOpen={showAddEvent}
         onClose={() => { setShowAddEvent(false); setEditingEvent(null); }}
-        onSuccess={loadData}
+        onSuccess={() => {
+          if (currentUser) {
+            addAuditLog(currentUser, editingEvent ? "UPDATE_EVENT" : "CREATE_EVENT", 
+              editingEvent ? `Updated event: ${editingEvent.title}` : "Created new event");
+          }
+          loadData();
+        }}
         editEvent={editingEvent}
       />
 
@@ -2784,7 +2848,12 @@ export default function Admin() {
       <UploadGalleryModal
         isOpen={showUploadGallery}
         onClose={() => setShowUploadGallery(false)}
-        onSuccess={loadData}
+        onSuccess={() => {
+          if (currentUser) {
+            addAuditLog(currentUser, "UPLOAD_GALLERY", "Uploaded gallery item");
+          }
+          loadData();
+        }}
       />
 
       <TicketDetailModal

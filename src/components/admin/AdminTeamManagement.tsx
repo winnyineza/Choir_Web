@@ -29,6 +29,10 @@ import {
   UserCheck,
   AlertCircle,
   Music,
+  Wallet,
+  FileText,
+  Gavel,
+  Crown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +46,7 @@ import {
   deleteAdminUser,
   getRoleLabel,
   isMemberAdmin,
+  addAuditLog,
   type AdminUser,
   type AdminInvite,
   type AdminRole,
@@ -59,7 +64,7 @@ export function AdminTeamManagement() {
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<AdminRole>("admin");
+  const [inviteRole, setInviteRole] = useState<AdminRole>("secretary");
   
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -119,6 +124,9 @@ export function AdminTeamManagement() {
 
     try {
       createInvite(inviteEmail, inviteName, inviteRole, currentUser!.id, selectedMemberId);
+      if (currentUser) {
+        addAuditLog(currentUser, "CREATE_ADMIN_INVITE", `Created invite for ${inviteName} (${inviteEmail}) as ${getRoleLabel(inviteRole)}`);
+      }
       toast({
         title: "Invite Created!",
         description: `Invite sent to ${inviteEmail}`,
@@ -127,7 +135,7 @@ export function AdminTeamManagement() {
       setSelectedMemberId("");
       setInviteEmail("");
       setInviteName("");
-      setInviteRole("admin");
+      setInviteRole("secretary");
       loadData();
     } catch (err: any) {
       toast({
@@ -150,7 +158,11 @@ export function AdminTeamManagement() {
   };
 
   const handleDeleteInvite = (id: string) => {
+    const invite = invites.find(i => i.id === id);
     deleteInvite(id);
+    if (currentUser && invite) {
+      addAuditLog(currentUser, "DELETE_ADMIN_INVITE", `Cancelled invite for ${invite.name} (${invite.email})`);
+    }
     loadData();
     toast({
       title: "Invite Deleted",
@@ -162,12 +174,18 @@ export function AdminTeamManagement() {
     try {
       if (user.isActive) {
         deactivateAdminUser(user.id);
+        if (currentUser) {
+          addAuditLog(currentUser, "DEACTIVATE_ADMIN", `Deactivated admin: ${user.name}`);
+        }
         toast({
           title: "User Deactivated",
           description: `${user.name} can no longer access the admin panel`,
         });
       } else {
         reactivateAdminUser(user.id);
+        if (currentUser) {
+          addAuditLog(currentUser, "REACTIVATE_ADMIN", `Reactivated admin: ${user.name}`);
+        }
         toast({
           title: "User Reactivated",
           description: `${user.name} can now access the admin panel again`,
@@ -231,7 +249,7 @@ export function AdminTeamManagement() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -258,17 +276,27 @@ export function AdminTeamManagement() {
             </div>
           </div>
         </div>
-        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <ShieldCheck className="w-5 h-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">
-                {admins.filter(a => a.role === "super_admin").length}
-              </p>
-              <p className="text-sm text-muted-foreground">Super Admins</p>
-            </div>
+        <div className="col-span-2 p-4 rounded-xl bg-secondary/50 border border-primary/10">
+          <p className="text-sm text-muted-foreground mb-2">Role Breakdown</p>
+          <div className="flex flex-wrap gap-2">
+            <span className="px-2 py-1 rounded-full text-xs bg-primary/20 text-primary">
+              {admins.filter(a => a.role === "super_admin" && a.isActive).length} Super Admin
+            </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400">
+              {admins.filter(a => a.role === "main_admin" && a.isActive).length} Main Admin
+            </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400">
+              {admins.filter(a => a.role === "finance" && a.isActive).length} Finance
+            </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-400">
+              {admins.filter(a => a.role === "secretary" && a.isActive).length} Secretary
+            </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-orange-500/20 text-orange-400">
+              {admins.filter(a => a.role === "disciplinary" && a.isActive).length} Disciplinary
+            </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-cyan-500/20 text-cyan-400">
+              {admins.filter(a => a.role === "reviewer" && a.isActive).length} Reviewer
+            </span>
           </div>
         </div>
       </div>
@@ -290,10 +318,22 @@ export function AdminTeamManagement() {
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    admin.role === "super_admin" ? "bg-primary/20" : "bg-secondary"
+                    admin.role === "super_admin" ? "bg-primary/20" : 
+                    admin.role === "main_admin" ? "bg-blue-500/20" :
+                    admin.role === "finance" ? "bg-green-500/20" :
+                    admin.role === "secretary" ? "bg-purple-500/20" :
+                    admin.role === "disciplinary" ? "bg-orange-500/20" : "bg-secondary"
                   }`}>
                     {admin.role === "super_admin" ? (
-                      <ShieldCheck className="w-5 h-5 text-primary" />
+                      <Crown className="w-5 h-5 text-primary" />
+                    ) : admin.role === "main_admin" ? (
+                      <ShieldCheck className="w-5 h-5 text-blue-500" />
+                    ) : admin.role === "finance" ? (
+                      <Wallet className="w-5 h-5 text-green-500" />
+                    ) : admin.role === "secretary" ? (
+                      <FileText className="w-5 h-5 text-purple-500" />
+                    ) : admin.role === "disciplinary" ? (
+                      <Gavel className="w-5 h-5 text-orange-500" />
                     ) : (
                       <Shield className="w-5 h-5 text-muted-foreground" />
                     )}
@@ -504,13 +544,44 @@ export function AdminTeamManagement() {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="super_admin">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Super Admin</span>
+                      <span className="text-xs text-muted-foreground">Full access + admin management</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="main_admin">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Main Admin</span>
+                      <span className="text-xs text-muted-foreground">Full access (no admin management)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="finance">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Finance</span>
+                      <span className="text-xs text-muted-foreground">Treasury, contributions, expenses, tickets</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="secretary">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Secretary</span>
+                      <span className="text-xs text-muted-foreground">Members, events, attendance, gallery, announcements</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="disciplinary">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Disciplinary</span>
+                      <span className="text-xs text-muted-foreground">Leave requests + disciplinary records</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="reviewer">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Reviewer</span>
+                      <span className="text-xs text-muted-foreground">View-only access, can only approve leave requests</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Super Admins can manage other admins and access all settings
-              </p>
             </div>
             
             <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">

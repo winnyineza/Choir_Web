@@ -5,7 +5,7 @@ const ADMIN_USERS_KEY = "choir_admin_users";
 const ADMIN_INVITES_KEY = "choir_admin_invites";
 const AUDIT_LOG_KEY = "choir_audit_log";
 
-export type AdminRole = "super_admin" | "admin";
+export type AdminRole = "super_admin" | "main_admin" | "finance" | "secretary" | "disciplinary" | "reviewer";
 
 export interface AdminUser {
   id: string;
@@ -347,6 +347,10 @@ export function isSuperAdmin(user: AdminUser | null): boolean {
   return user?.role === "super_admin";
 }
 
+export function isMainAdmin(user: AdminUser | null): boolean {
+  return user?.role === "main_admin";
+}
+
 export function canManageUsers(user: AdminUser | null): boolean {
   return user?.role === "super_admin";
 }
@@ -355,12 +359,156 @@ export function canViewAuditLog(user: AdminUser | null): boolean {
   return user?.role === "super_admin";
 }
 
+export function canAccessSettings(user: AdminUser | null): boolean {
+  return user?.role === "super_admin";
+}
+
 export function getRoleLabel(role: AdminRole): string {
   switch (role) {
     case "super_admin": return "Super Admin";
-    case "admin": return "Admin";
+    case "main_admin": return "Main Admin";
+    case "finance": return "Finance";
+    case "secretary": return "Secretary";
+    case "disciplinary": return "Disciplinary";
+    case "reviewer": return "Reviewer";
     default: return role;
   }
+}
+
+// ============ PERMISSION SYSTEM ============
+
+// Define what each role can access
+export type Permission = 
+  | "dashboard"
+  | "members"
+  | "members_edit"
+  | "events"
+  | "tickets"
+  | "attendance"
+  | "leave"
+  | "disciplinary"
+  | "contributions"
+  | "expenses"
+  | "treasury"
+  | "announcements"
+  | "messages"
+  | "releases"
+  | "promos"
+  | "gallery"
+  | "inventory"
+  | "minutes"
+  | "documents"
+  | "analytics"
+  | "event_staff"
+  | "team"
+  | "audit"
+  | "settings";
+
+const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
+  super_admin: [
+    "dashboard", "members", "members_edit", "events", "tickets", "attendance",
+    "leave", "disciplinary", "contributions", "expenses", "treasury", "announcements", "messages",
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "analytics", "event_staff", "team", "audit", "settings"
+  ],
+  main_admin: [
+    "dashboard", "members", "members_edit", "events", "tickets", "attendance",
+    "leave", "disciplinary", "contributions", "expenses", "treasury", "announcements", "messages",
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "analytics", "event_staff"
+  ],
+  finance: [
+    "dashboard", "members", "tickets", "contributions", "expenses", "treasury"
+  ],
+  secretary: [
+    "dashboard", "members", "members_edit", "events", "attendance", "leave",
+    "announcements", "messages", "releases", "promos", "gallery", "inventory", "minutes", "documents"
+  ],
+  disciplinary: [
+    "dashboard", "members", "leave", "disciplinary"
+  ],
+  reviewer: [
+    "dashboard", "members", "events", "tickets", "attendance", "leave", "disciplinary",
+    "contributions", "expenses", "treasury", "announcements", "messages",
+    "releases", "promos", "gallery", "inventory", "minutes", "documents"
+  ],
+};
+
+// Check if user has a specific permission
+export function hasPermission(user: AdminUser | null, permission: Permission): boolean {
+  if (!user) return false;
+  const permissions = ROLE_PERMISSIONS[user.role] || [];
+  return permissions.includes(permission);
+}
+
+// Get all permissions for a user
+export function getUserPermissions(user: AdminUser | null): Permission[] {
+  if (!user) return [];
+  return ROLE_PERMISSIONS[user.role] || [];
+}
+
+// Check if user can edit (not just view) members
+export function canEditMembers(user: AdminUser | null): boolean {
+  return hasPermission(user, "members_edit");
+}
+
+// Check if user is a reviewer (read-only except leave approvals)
+export function isReviewer(user: AdminUser | null): boolean {
+  return user?.role === "reviewer";
+}
+
+// Check if user can approve leave requests
+export function canApproveLeave(user: AdminUser | null): boolean {
+  if (!user) return false;
+  // Reviewers, disciplinary, secretaries, and admins can approve leave
+  return ["super_admin", "main_admin", "secretary", "disciplinary", "reviewer"].includes(user.role);
+}
+
+// Check if user has write access (not read-only)
+export function hasWriteAccess(user: AdminUser | null, area: string): boolean {
+  if (!user) return false;
+  
+  // Reviewers can only write to leave requests
+  if (user.role === "reviewer") {
+    return area === "leave";
+  }
+  
+  // Other roles have full write access to their permitted areas
+  return true;
+}
+
+// Get accessible tabs for sidebar filtering
+export function getAccessibleTabs(user: AdminUser | null): string[] {
+  if (!user) return [];
+  
+  const tabPermissionMap: Record<string, Permission> = {
+    "dashboard": "dashboard",
+    "members": "members",
+    "events": "events",
+    "tickets": "tickets",
+    "attendance": "attendance",
+    "leave": "leave",
+    "disciplinary": "disciplinary",
+    "contributions": "contributions",
+    "expenses": "expenses",
+    "treasury": "treasury",
+    "announcements": "announcements",
+    "messages": "messages",
+    "releases": "releases",
+    "promos": "promos",
+    "gallery": "gallery",
+    "inventory": "inventory",
+    "minutes": "minutes",
+    "documents": "documents",
+    "analytics": "analytics",
+    "event-staff": "event_staff",
+    "team": "team",
+    "audit": "audit",
+    "settings": "settings",
+  };
+  
+  const userPermissions = getUserPermissions(user);
+  return Object.entries(tabPermissionMap)
+    .filter(([_, permission]) => userPermissions.includes(permission))
+    .map(([tab, _]) => tab);
 }
 
 // Get admin by member ID

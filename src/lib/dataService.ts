@@ -2,6 +2,13 @@
 
 // ============ TYPES ============
 
+export interface EmergencyContact {
+  name: string;
+  relationship: "Spouse" | "Parent" | "Sibling" | "Child" | "Friend" | "Other";
+  phone: string;
+  altPhone?: string;
+}
+
 export interface Member {
   id: string;
   name: string;
@@ -11,6 +18,8 @@ export interface Member {
   status: "Active" | "Pending" | "Inactive";
   joinedDate: string;
   photo?: string;
+  dateOfBirth?: string; // Format: "YYYY-MM-DD"
+  emergencyContact?: EmergencyContact;
 }
 
 export interface Event {
@@ -178,6 +187,70 @@ export function getMemberStats() {
       bass: members.filter((m) => m.voice === "Bass").length,
     },
   };
+}
+
+// ============ BIRTHDAYS ============
+
+export function getTodaysBirthdays(): Member[] {
+  const members = getAllMembers();
+  const today = new Date();
+  const todayMonth = today.getMonth() + 1;
+  const todayDay = today.getDate();
+  
+  return members.filter(m => {
+    if (!m.dateOfBirth || m.status !== "Active") return false;
+    const [, month, day] = m.dateOfBirth.split('-').map(Number);
+    return month === todayMonth && day === todayDay;
+  });
+}
+
+export function getUpcomingBirthdays(days: number = 7): { member: Member; daysUntil: number; date: string }[] {
+  const members = getAllMembers();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const upcomingBirthdays: { member: Member; daysUntil: number; date: string }[] = [];
+  
+  members.forEach(m => {
+    if (!m.dateOfBirth || m.status !== "Active") return;
+    
+    const [year, month, day] = m.dateOfBirth.split('-').map(Number);
+    let birthday = new Date(today.getFullYear(), month - 1, day);
+    birthday.setHours(0, 0, 0, 0);
+    
+    // If birthday already passed this year, use next year
+    if (birthday < today) {
+      birthday = new Date(today.getFullYear() + 1, month - 1, day);
+    }
+    
+    const diffTime = birthday.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Include today's birthdays (diffDays = 0) up to specified days
+    if (diffDays >= 0 && diffDays <= days) {
+      upcomingBirthdays.push({
+        member: m,
+        daysUntil: diffDays,
+        date: birthday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      });
+    }
+  });
+  
+  // Sort by days until birthday
+  return upcomingBirthdays.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+export function getMemberAge(dateOfBirth: string): number {
+  const today = new Date();
+  const birth = new Date(dateOfBirth);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  
+  return age;
 }
 
 // ============ EVENTS ============

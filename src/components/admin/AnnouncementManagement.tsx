@@ -42,6 +42,7 @@ import {
 } from "@/lib/announcementService";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
 
 const typeConfig = {
@@ -139,9 +140,15 @@ export function AnnouncementManagement() {
 
     if (editingAnnouncement) {
       updateAnnouncement(editingAnnouncement.id, data);
+      if (currentUser) {
+        addAuditLog(currentUser, "UPDATE_ANNOUNCEMENT", `Updated announcement: ${form.title}`);
+      }
       toast({ title: "Announcement Updated", description: "The announcement has been updated" });
     } else {
       createAnnouncement(data);
+      if (currentUser) {
+        addAuditLog(currentUser, "CREATE_ANNOUNCEMENT", `Created announcement: ${form.title}`);
+      }
       toast({ title: "Announcement Created", description: "The announcement is now live" });
     }
 
@@ -152,19 +159,31 @@ export function AnnouncementManagement() {
 
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this announcement?")) {
+      const announcement = announcements.find(a => a.id === id);
       deleteAnnouncement(id);
+      if (currentUser && announcement) {
+        addAuditLog(currentUser, "DELETE_ANNOUNCEMENT", `Deleted announcement: ${announcement.title}`);
+      }
       toast({ title: "Announcement Deleted" });
       loadData();
     }
   };
 
   const handleTogglePin = (id: string) => {
+    const announcement = announcements.find(a => a.id === id);
     toggleAnnouncementPin(id);
+    if (currentUser && announcement) {
+      addAuditLog(currentUser, "TOGGLE_ANNOUNCEMENT_PIN", `${announcement.isPinned ? "Unpinned" : "Pinned"} announcement: ${announcement.title}`);
+    }
     loadData();
   };
 
   const handleToggleActive = (id: string) => {
+    const announcement = announcements.find(a => a.id === id);
     toggleAnnouncementActive(id);
+    if (currentUser && announcement) {
+      addAuditLog(currentUser, "TOGGLE_ANNOUNCEMENT_ACTIVE", `${announcement.isActive ? "Deactivated" : "Activated"} announcement: ${announcement.title}`);
+    }
     loadData();
   };
 
@@ -454,4 +473,5 @@ export function AnnouncementManagement() {
     </div>
   );
 }
+
 

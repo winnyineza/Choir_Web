@@ -238,3 +238,4 @@ export function EventBookingModal({ event, isOpen, onClose }: EventBookingModalP
   );
 }
 
+

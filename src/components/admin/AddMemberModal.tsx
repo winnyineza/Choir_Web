@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,8 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { addMember, updateMember, type Member } from "@/lib/dataService";
-import { Loader2 } from "lucide-react";
+import { addMember, updateMember, type Member, type EmergencyContact } from "@/lib/dataService";
+import { Loader2, Cake, Upload, User, X, Phone, ChevronDown, ChevronUp } from "lucide-react";
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -32,7 +32,17 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
   const [phone, setPhone] = useState("");
   const [voice, setVoice] = useState<Member["voice"]>("Soprano");
   const [status, setStatus] = useState<Member["status"]>("Pending");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [photo, setPhoto] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showEmergencyContact, setShowEmergencyContact] = useState(false);
+  const [emergencyContact, setEmergencyContact] = useState<EmergencyContact>({
+    name: "",
+    relationship: "Spouse",
+    phone: "",
+    altPhone: "",
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Populate form when editing
@@ -43,6 +53,12 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
       setPhone(editMember.phone);
       setVoice(editMember.voice);
       setStatus(editMember.status);
+      setDateOfBirth(editMember.dateOfBirth || "");
+      setPhoto(editMember.photo || "");
+      if (editMember.emergencyContact) {
+        setEmergencyContact(editMember.emergencyContact);
+        setShowEmergencyContact(true);
+      }
     } else {
       resetForm();
     }
@@ -54,6 +70,45 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
     setPhone("");
     setVoice("Soprano");
     setStatus("Pending");
+    setDateOfBirth("");
+    setPhoto("");
+    setShowEmergencyContact(false);
+    setEmergencyContact({
+      name: "",
+      relationship: "Spouse",
+      phone: "",
+      altPhone: "",
+    });
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image under 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Convert to base64 for localStorage storage
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setPhoto(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removePhoto = () => {
+    setPhoto("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,14 +126,24 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
     setIsLoading(true);
 
     try {
+      const memberData = { 
+        name, 
+        email, 
+        phone, 
+        voice, 
+        status, 
+        dateOfBirth: dateOfBirth || undefined,
+        photo: photo || undefined,
+        emergencyContact: emergencyContact.name ? emergencyContact : undefined,
+      };
       if (editMember) {
-        updateMember(editMember.id, { name, email, phone, voice, status });
+        updateMember(editMember.id, memberData);
         toast({
           title: "Member Updated",
           description: `${name} has been updated successfully.`,
         });
       } else {
-        addMember({ name, email, phone, voice, status });
+        addMember(memberData);
         toast({
           title: "Member Added",
           description: `${name} has been added to the choir.`,
@@ -101,7 +166,7 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md bg-charcoal border-primary/20">
+      <DialogContent className="sm:max-w-md bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl gold-text">
             {editMember ? "Edit Member" : "Add New Member"}
@@ -109,6 +174,52 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {/* Photo Upload */}
+          <div className="flex flex-col items-center">
+            <div className="relative">
+              {photo ? (
+                <div className="relative">
+                  <img
+                    src={photo}
+                    alt="Profile"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={removePhoto}
+                    className="absolute -top-1 -right-1 p-1 rounded-full bg-red-500 text-white hover:bg-red-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-24 h-24 rounded-full bg-secondary border-2 border-dashed border-primary/30 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                >
+                  <User className="w-8 h-8 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Add Photo</span>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+            </div>
+            {photo && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-2 text-xs text-primary hover:underline"
+              >
+                Change Photo
+              </button>
+            )}
+          </div>
+
           <div>
             <Label htmlFor="name">Full Name *</Label>
             <Input
@@ -146,6 +257,21 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
           </div>
 
           <div>
+            <Label htmlFor="dateOfBirth" className="flex items-center gap-2">
+              <Cake className="w-4 h-4 text-primary" />
+              Date of Birth
+            </Label>
+            <Input
+              id="dateOfBirth"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              className="mt-1 bg-secondary border-primary/20"
+              max={new Date().toISOString().split('T')[0]}
+            />
+          </div>
+
+          <div>
             <Label htmlFor="voice">Voice Part *</Label>
             <Select value={voice} onValueChange={(v) => setVoice(v as Member["voice"])}>
               <SelectTrigger className="mt-1 bg-secondary border-primary/20">
@@ -172,6 +298,78 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
                 <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Emergency Contact Section */}
+          <div className="border border-primary/20 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowEmergencyContact(!showEmergencyContact)}
+              className="w-full p-3 flex items-center justify-between bg-secondary/50 hover:bg-secondary/70 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Phone className="w-4 h-4 text-primary" />
+                Emergency Contact
+              </span>
+              {showEmergencyContact ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+            {showEmergencyContact && (
+              <div className="p-3 space-y-3 bg-secondary/30">
+                <div>
+                  <Label htmlFor="ecName">Contact Name</Label>
+                  <Input
+                    id="ecName"
+                    value={emergencyContact.name}
+                    onChange={(e) => setEmergencyContact({ ...emergencyContact, name: e.target.value })}
+                    placeholder="Emergency contact name"
+                    className="mt-1 bg-secondary border-primary/20"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ecRelationship">Relationship</Label>
+                  <Select
+                    value={emergencyContact.relationship}
+                    onValueChange={(v) => setEmergencyContact({ ...emergencyContact, relationship: v as EmergencyContact["relationship"] })}
+                  >
+                    <SelectTrigger className="mt-1 bg-secondary border-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Spouse">Spouse</SelectItem>
+                      <SelectItem value="Parent">Parent</SelectItem>
+                      <SelectItem value="Sibling">Sibling</SelectItem>
+                      <SelectItem value="Child">Child</SelectItem>
+                      <SelectItem value="Friend">Friend</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="ecPhone">Phone Number</Label>
+                  <Input
+                    id="ecPhone"
+                    value={emergencyContact.phone}
+                    onChange={(e) => setEmergencyContact({ ...emergencyContact, phone: e.target.value })}
+                    placeholder="078xxxxxxx"
+                    className="mt-1 bg-secondary border-primary/20"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ecAltPhone">Alternative Phone (Optional)</Label>
+                  <Input
+                    id="ecAltPhone"
+                    value={emergencyContact.altPhone || ""}
+                    onChange={(e) => setEmergencyContact({ ...emergencyContact, altPhone: e.target.value })}
+                    placeholder="078xxxxxxx"
+                    className="mt-1 bg-secondary border-primary/20"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -207,4 +405,5 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
     </Dialog>
   );
 }
+
 
