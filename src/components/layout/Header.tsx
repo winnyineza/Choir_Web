@@ -86,9 +86,6 @@ export function Header() {
               Members
             </Link>
           </Button>
-          <Button variant="gold-outline" size="sm" asChild>
-            <Link to="/join">Join Choir</Link>
-          </Button>
           <Button variant="gold" size="sm" asChild>
             <Link to="/donate">
               <Heart className="w-4 h-4 mr-1" />
@@ -145,14 +142,9 @@ export function Header() {
             </Link>
             <div className="flex items-center justify-between">
               <ThemeToggle />
-              <div className="flex gap-2">
-                <Button variant="gold-outline" size="sm" asChild>
-                  <Link to="/join" onClick={() => setIsMobileMenuOpen(false)}>Join</Link>
-                </Button>
-                <Button variant="gold" size="sm" asChild>
-                  <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
-                </Button>
-              </div>
+              <Button variant="gold" size="sm" asChild>
+                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
+              </Button>
             </div>
           </div>
         </nav>

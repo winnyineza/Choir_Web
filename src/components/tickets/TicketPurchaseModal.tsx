@@ -15,7 +15,7 @@ import { ProcessingPayment } from "./ProcessingPayment";
 import { TicketConfirmation } from "./TicketConfirmation";
 import { generateTxRef, isFlutterwaveConfigured, FLUTTERWAVE_PUBLIC_KEY, formatCurrency } from "@/lib/flutterwave";
 import { createOrder, confirmOrder, type TicketTier, type TicketOrder } from "@/lib/ticketService";
-import { validatePromoCode, usePromoCode, type PromoValidation } from "@/lib/promoService";
+import { validatePromoCode, redeemPromoCode, type PromoValidation } from "@/lib/promoService";
 import { sendTicketConfirmationEmail } from "@/lib/ticketEmailService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -217,7 +217,7 @@ export function TicketPurchaseModal({
       if (confirmed) {
         // Mark promo code as used if applied
         if (promoValidation?.valid && promoCode) {
-          usePromoCode(promoCode);
+          redeemPromoCode(promoCode);
         }
         
         // Dispatch event to refresh events page
@@ -326,7 +326,7 @@ export function TicketPurchaseModal({
           if (confirmed) {
             // Mark promo code as used if applied
             if (promoValidation?.valid && promoCode) {
-              usePromoCode(promoCode);
+              redeemPromoCode(promoCode);
             }
             
             // Dispatch event to refresh events page

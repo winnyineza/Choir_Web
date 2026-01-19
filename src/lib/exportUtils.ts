@@ -685,6 +685,45 @@ export function exportAnnualFinancialSummary(year: number): void {
   downloadCSV(headers, rows, `annual-financial-summary-${year}`);
 }
 
+// Year-over-year comparison (finance + attendance + membership)
+export function exportYearOverYearReport(years: number[]): void {
+  const headers = ["Year", "Contributions", "Donations", "Ticket Revenue", "Expenses", "Net", "Attendance Sessions", "Members (end of year)"];
+  const rows: any[][] = [];
+
+  years.forEach((year) => {
+    const contributions = getAllContributions().filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
+    const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+
+    const donations = getAllDonations().filter(d => new Date(d.date).getFullYear() === year);
+    const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
+
+    const orders = getAllOrders().filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
+    const ticketRevenue = orders.reduce((sum, o) => sum + (o.subtotal + o.serviceFee), 0);
+
+    const expenses = getAllExpenses().filter(e => new Date(e.date).getFullYear() === year);
+    const expenseTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const net = contributionTotal + donationTotal + ticketRevenue - expenseTotal;
+
+    const attendanceSessions = getAllSessions().filter(s => new Date(s.date).getFullYear() === year).length;
+
+    const members = getAllMembers().filter(m => new Date(m.joinedDate).getFullYear() <= year);
+
+    rows.push([
+      year,
+      contributionTotal,
+      donationTotal,
+      ticketRevenue,
+      expenseTotal,
+      net,
+      attendanceSessions,
+      members.length,
+    ]);
+  });
+
+  downloadCSV(headers, rows, `year-over-year-${years.join("-")}`);
+}
+
 // Export donations to CSV
 export function exportDonationsToCSV(): void {
   const donations = getAllDonations();

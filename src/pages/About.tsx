@@ -164,10 +164,10 @@ export default function About() {
               Want to Be Part of Our <span className="gold-text">Story</span>?
             </h2>
             <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-              Join our choir family and use your musical gifts to serve God's kingdom.
+              Support our ministry and help us spread God's message through music.
             </p>
             <Button variant="hero" size="xl" asChild>
-              <Link to="/join">Join the Serenades</Link>
+              <Link to="/contact">Get in Touch</Link>
             </Button>
           </div>
         </section>

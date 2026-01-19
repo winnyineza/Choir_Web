@@ -186,8 +186,8 @@ export default function Ministry() {
                   </Link>
                 </Button>
                 <Button variant="gold-outline" size="lg" asChild>
-                  <Link to="/join">
-                    Join as Supporter
+                  <Link to="/contact">
+                    Contact Us
                   </Link>
                 </Button>
               </div>

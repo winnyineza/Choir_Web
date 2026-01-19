@@ -26,6 +26,28 @@ import {
   Eye,
   Settings,
   Shield,
+  UserPlus,
+  UserMinus,
+  UserCheck,
+  Users,
+  DollarSign,
+  Wallet,
+  Ticket,
+  Image,
+  Music,
+  FileText,
+  MessageSquare,
+  Megaphone,
+  Clock,
+  CalendarCheck,
+  Package,
+  AlertTriangle,
+  X,
+  Zap,
+  Activity,
+  TrendingUp,
+  BarChart3,
+  ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,8 +57,119 @@ import {
   type AuditLogEntry,
   type AdminUser,
 } from "@/lib/adminService";
+import { cn } from "@/lib/utils";
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 25;
+
+// Action categories for grouping
+const actionCategories: Record<string, { label: string; icon: typeof LogIn; color: string; actions: string[] }> = {
+  auth: {
+    label: "Authentication",
+    icon: Shield,
+    color: "text-green-500 bg-green-500/10 border-green-500/20",
+    actions: ["LOGIN", "LOGOUT", "PASSWORD_CHANGE", "PASSWORD_RESET"],
+  },
+  members: {
+    label: "Members",
+    icon: Users,
+    color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+    actions: ["CREATE_MEMBER", "UPDATE_MEMBER", "DELETE_MEMBER", "BULK_UPDATE_MEMBERS", "BULK_DELETE_MEMBERS"],
+  },
+  contributions: {
+    label: "Contributions",
+    icon: DollarSign,
+    color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+    actions: ["CREATE_CONTRIBUTION", "UPDATE_CONTRIBUTION", "DELETE_CONTRIBUTION", "RECORD_CONTRIBUTIONS", "CREATE_CONTRIBUTION_TYPE", "UPDATE_CONTRIBUTION_TYPE", "DELETE_CONTRIBUTION_TYPE"],
+  },
+  expenses: {
+    label: "Expenses",
+    icon: Wallet,
+    color: "text-red-500 bg-red-500/10 border-red-500/20",
+    actions: ["CREATE_EXPENSE", "UPDATE_EXPENSE", "DELETE_EXPENSE"],
+  },
+  donations: {
+    label: "Donations",
+    icon: DollarSign,
+    color: "text-pink-500 bg-pink-500/10 border-pink-500/20",
+    actions: ["CREATE_DONATION", "UPDATE_DONATION", "DELETE_DONATION"],
+  },
+  events: {
+    label: "Events & Tickets",
+    icon: Ticket,
+    color: "text-purple-500 bg-purple-500/10 border-purple-500/20",
+    actions: ["CREATE_EVENT", "UPDATE_EVENT", "DELETE_EVENT", "SCAN_TICKET"],
+  },
+  leave: {
+    label: "Leave Requests",
+    icon: CalendarCheck,
+    color: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20",
+    actions: ["APPROVE_LEAVE", "DENY_LEAVE", "CREATE_LEAVE"],
+  },
+  gallery: {
+    label: "Gallery",
+    icon: Image,
+    color: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
+    actions: ["ADD_GALLERY", "DELETE_GALLERY", "BULK_DELETE_GALLERY", "UPLOAD_GALLERY"],
+  },
+  music: {
+    label: "Music Releases",
+    icon: Music,
+    color: "text-violet-500 bg-violet-500/10 border-violet-500/20",
+    actions: ["CREATE_ALBUM", "UPDATE_ALBUM", "DELETE_ALBUM", "CREATE_VIDEO", "UPDATE_VIDEO", "DELETE_VIDEO"],
+  },
+  announcements: {
+    label: "Announcements",
+    icon: Megaphone,
+    color: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    actions: ["CREATE_ANNOUNCEMENT", "UPDATE_ANNOUNCEMENT", "DELETE_ANNOUNCEMENT", "TOGGLE_ANNOUNCEMENT_PIN", "TOGGLE_ANNOUNCEMENT_ACTIVE"],
+  },
+  disciplinary: {
+    label: "Disciplinary",
+    icon: AlertTriangle,
+    color: "text-red-600 bg-red-600/10 border-red-600/20",
+    actions: ["CREATE_DISCIPLINARY", "UPDATE_DISCIPLINARY", "DELETE_DISCIPLINARY", "RESOLVE_DISCIPLINARY"],
+  },
+  documents: {
+    label: "Documents",
+    icon: FileText,
+    color: "text-teal-500 bg-teal-500/10 border-teal-500/20",
+    actions: ["UPLOAD_DOCUMENT", "UPDATE_DOCUMENT", "DELETE_DOCUMENT", "TOGGLE_DOCUMENT_VISIBILITY"],
+  },
+  meetings: {
+    label: "Meetings",
+    icon: MessageSquare,
+    color: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+    actions: ["CREATE_MEETING", "UPDATE_MEETING", "DELETE_MEETING", "APPROVE_MEETING"],
+  },
+  inventory: {
+    label: "Inventory",
+    icon: Package,
+    color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+    actions: ["CREATE_INVENTORY", "UPDATE_INVENTORY", "DELETE_INVENTORY", "ASSIGN_INVENTORY", "RETURN_INVENTORY"],
+  },
+  promos: {
+    label: "Promos",
+    icon: Zap,
+    color: "text-lime-500 bg-lime-500/10 border-lime-500/20",
+    actions: ["CREATE_PROMO", "UPDATE_PROMO", "DELETE_PROMO", "TOGGLE_PROMO"],
+  },
+  admin: {
+    label: "Admin Team",
+    icon: Shield,
+    color: "text-slate-500 bg-slate-500/10 border-slate-500/20",
+    actions: ["CREATE_INVITE", "DELETE_INVITE", "DEACTIVATE_ADMIN", "REACTIVATE_ADMIN", "UPDATE_SETTINGS"],
+  },
+};
+
+// Get action category and color
+const getActionCategory = (action: string): { category: string; color: string; icon: typeof LogIn } => {
+  for (const [key, cat] of Object.entries(actionCategories)) {
+    if (cat.actions.some(a => action.includes(a) || action === a)) {
+      return { category: key, color: cat.color, icon: cat.icon };
+    }
+  }
+  return { category: "other", color: "text-muted-foreground bg-muted/10 border-muted/20", icon: History };
+};
 
 // Action icons mapping
 const actionIcons: Record<string, typeof LogIn> = {
@@ -47,18 +180,41 @@ const actionIcons: Record<string, typeof LogIn> = {
   DELETE: Trash2,
   VIEW: Eye,
   SETTINGS: Settings,
+  CREATE_MEMBER: UserPlus,
+  UPDATE_MEMBER: UserCheck,
+  DELETE_MEMBER: UserMinus,
+  BULK_UPDATE_MEMBERS: Users,
+  BULK_DELETE_MEMBERS: Users,
+  CREATE_CONTRIBUTION: DollarSign,
+  UPDATE_CONTRIBUTION: DollarSign,
+  DELETE_CONTRIBUTION: DollarSign,
+  RECORD_CONTRIBUTIONS: DollarSign,
+  CREATE_EXPENSE: Wallet,
+  UPDATE_EXPENSE: Wallet,
+  DELETE_EXPENSE: Wallet,
+  CREATE_EVENT: Ticket,
+  UPDATE_EVENT: Ticket,
+  DELETE_EVENT: Ticket,
+  ADD_GALLERY: Image,
+  DELETE_GALLERY: Image,
+  CREATE_ALBUM: Music,
+  UPDATE_ALBUM: Music,
+  DELETE_ALBUM: Music,
+  APPROVE_LEAVE: CalendarCheck,
+  DENY_LEAVE: CalendarCheck,
+  CREATE_DISCIPLINARY: AlertTriangle,
+  UPDATE_DISCIPLINARY: AlertTriangle,
+  RESOLVE_DISCIPLINARY: AlertTriangle,
 };
 
-// Action colors
-const actionColors: Record<string, string> = {
-  LOGIN: "text-green-500 bg-green-500/10",
-  LOGOUT: "text-yellow-500 bg-yellow-500/10",
-  CREATE: "text-blue-500 bg-blue-500/10",
-  UPDATE: "text-orange-500 bg-orange-500/10",
-  DELETE: "text-red-500 bg-red-500/10",
-  VIEW: "text-purple-500 bg-purple-500/10",
-  SETTINGS: "text-gray-500 bg-gray-500/10",
-};
+// Quick date presets
+const datePresets = [
+  { label: "Today", getValue: () => { const d = new Date(); return { from: d.toISOString().split("T")[0], to: d.toISOString().split("T")[0] }; } },
+  { label: "Yesterday", getValue: () => { const d = new Date(); d.setDate(d.getDate() - 1); return { from: d.toISOString().split("T")[0], to: d.toISOString().split("T")[0] }; } },
+  { label: "This Week", getValue: () => { const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - now.getDay()); return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] }; } },
+  { label: "This Month", getValue: () => { const now = new Date(); const start = new Date(now.getFullYear(), now.getMonth(), 1); return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] }; } },
+  { label: "Last 30 Days", getValue: () => { const now = new Date(); const start = new Date(); start.setDate(now.getDate() - 30); return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] }; } },
+];
 
 export function AuditLogPage() {
   const [allLogs, setAllLogs] = useState<AuditLogEntry[]>([]);
@@ -66,10 +222,13 @@ export function AuditLogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<string>("all");
   const [selectedAction, setSelectedAction] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -90,6 +249,34 @@ export function AuditLogPage() {
     return Array.from(types).sort();
   }, [allLogs]);
 
+  // Get stats by category
+  const categoryStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    for (const log of allLogs) {
+      const { category } = getActionCategory(log.action);
+      stats[category] = (stats[category] || 0) + 1;
+    }
+    return stats;
+  }, [allLogs]);
+
+  // Get today's activity count
+  const todayCount = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return allLogs.filter(log => log.timestamp.startsWith(today)).length;
+  }, [allLogs]);
+
+  // Get most active users
+  const topUsers = useMemo(() => {
+    const userCounts: Record<string, { name: string; count: number }> = {};
+    for (const log of allLogs) {
+      if (!userCounts[log.userId]) {
+        userCounts[log.userId] = { name: log.userName, count: 0 };
+      }
+      userCounts[log.userId].count++;
+    }
+    return Object.values(userCounts).sort((a, b) => b.count - a.count).slice(0, 3);
+  }, [allLogs]);
+
   // Filter logs
   const filteredLogs = useMemo(() => {
     return allLogs.filter(log => {
@@ -107,6 +294,12 @@ export function AuditLogPage() {
       // User filter
       if (selectedUser !== "all" && log.userId !== selectedUser) {
         return false;
+      }
+      
+      // Category filter
+      if (selectedCategory !== "all") {
+        const { category } = getActionCategory(log.action);
+        if (category !== selectedCategory) return false;
       }
       
       // Action filter
@@ -130,7 +323,18 @@ export function AuditLogPage() {
       
       return true;
     });
-  }, [allLogs, searchQuery, selectedUser, selectedAction, dateFrom, dateTo]);
+  }, [allLogs, searchQuery, selectedUser, selectedAction, selectedCategory, dateFrom, dateTo]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (selectedUser !== "all") count++;
+    if (selectedCategory !== "all") count++;
+    if (selectedAction !== "all") count++;
+    if (dateFrom || dateTo) count++;
+    return count;
+  }, [searchQuery, selectedUser, selectedCategory, selectedAction, dateFrom, dateTo]);
 
   // Pagination
   const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
@@ -142,7 +346,7 @@ export function AuditLogPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedUser, selectedAction, dateFrom, dateTo]);
+  }, [searchQuery, selectedUser, selectedAction, selectedCategory, dateFrom, dateTo]);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -216,24 +420,34 @@ export function AuditLogPage() {
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedUser("all");
+    setSelectedCategory("all");
     setSelectedAction("all");
     setDateFrom("");
     setDateTo("");
+    setActivePreset(null);
+  };
+
+  const applyPreset = (preset: typeof datePresets[0]) => {
+    const { from, to } = preset.getValue();
+    setDateFrom(from);
+    setDateTo(to);
+    setActivePreset(preset.label);
   };
 
   const getActionIcon = (action: string) => {
-    const Icon = actionIcons[action] || History;
-    return Icon;
-  };
-
-  const getActionColor = (action: string) => {
-    return actionColors[action] || "text-muted-foreground bg-muted";
+    // Try exact match first
+    if (actionIcons[action]) return actionIcons[action];
+    // Try prefix matching
+    for (const [key, icon] of Object.entries(actionIcons)) {
+      if (action.includes(key)) return icon;
+    }
+    return History;
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display text-2xl font-bold gold-text flex items-center gap-2">
             <History className="w-6 h-6" />
@@ -243,192 +457,358 @@ export function AuditLogPage() {
             Track all admin actions and system changes
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleCleanup}>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleCleanup}>
             <Trash2 className="w-4 h-4 mr-2" />
-            Cleanup Old
+            Cleanup
           </Button>
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            Export
           </Button>
-          <Button variant="ghost" onClick={loadData} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          <Button variant="ghost" size="sm" onClick={loadData} disabled={isLoading}>
+            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-          <p className="text-2xl font-bold text-foreground">{allLogs.length}</p>
-          <p className="text-sm text-muted-foreground">Total Entries</p>
+      {/* Enhanced Stats Dashboard */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <Activity className="w-4 h-4 text-primary" />
+            <span className="text-xl font-bold">{allLogs.length.toLocaleString()}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Total Entries</p>
         </div>
-        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-          <p className="text-2xl font-bold text-foreground">{filteredLogs.length}</p>
-          <p className="text-sm text-muted-foreground">Filtered Results</p>
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <TrendingUp className="w-4 h-4 text-green-500" />
+            <span className="text-xl font-bold text-green-500">{todayCount}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Today</p>
         </div>
-        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-          <p className="text-2xl font-bold text-foreground">
-            {allLogs.filter(l => l.action === "LOGIN").length}
-          </p>
-          <p className="text-sm text-muted-foreground">Total Logins</p>
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <Filter className="w-4 h-4 text-blue-500" />
+            <span className="text-xl font-bold text-blue-500">{filteredLogs.length.toLocaleString()}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Filtered</p>
         </div>
-        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-          <p className="text-2xl font-bold text-foreground">{admins.length}</p>
-          <p className="text-sm text-muted-foreground">Admin Users</p>
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <LogIn className="w-4 h-4 text-emerald-500" />
+            <span className="text-xl font-bold">{categoryStats.auth || 0}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Auth Events</p>
+        </div>
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <Users className="w-4 h-4 text-purple-500" />
+            <span className="text-xl font-bold">{admins.length}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Admin Users</p>
+        </div>
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <BarChart3 className="w-4 h-4 text-orange-500" />
+            <span className="text-xl font-bold">{actionTypes.length}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Action Types</p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="p-4 rounded-xl bg-secondary/30 border border-primary/10 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Filter className="w-4 h-4" />
-          Filters
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Search */}
-          <div className="lg:col-span-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by user, action, or details..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-background border-primary/20"
-              />
-            </div>
-          </div>
-
-          {/* User Filter */}
-          <div>
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
-              <SelectTrigger className="bg-background border-primary/20">
-                <User className="w-4 h-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="All Users" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Users</SelectItem>
-                {admins.map(admin => (
-                  <SelectItem key={admin.id} value={admin.id}>
-                    {admin.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Action Filter */}
-          <div>
-            <Select value={selectedAction} onValueChange={setSelectedAction}>
-              <SelectTrigger className="bg-background border-primary/20">
-                <Shield className="w-4 h-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="All Actions" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Actions</SelectItem>
-                {actionTypes.map(action => (
-                  <SelectItem key={action} value={action}>
-                    {action}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Clear Filters */}
-          <div>
-            <Button 
-              variant="ghost" 
-              className="w-full"
-              onClick={clearFilters}
+      {/* Category Quick Stats */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+        {Object.entries(actionCategories).slice(0, 8).map(([key, cat]) => {
+          const CatIcon = cat.icon;
+          const count = categoryStats[key] || 0;
+          return (
+            <button
+              key={key}
+              onClick={() => setSelectedCategory(selectedCategory === key ? "all" : key)}
+              className={cn(
+                "p-2 rounded-lg border transition-all text-center",
+                selectedCategory === key
+                  ? cat.color + " border-current"
+                  : "bg-secondary/30 border-primary/10 hover:border-primary/30"
+              )}
             >
-              Clear Filters
-            </Button>
-          </div>
-        </div>
-
-        {/* Date Range */}
-        <div className="grid grid-cols-2 gap-4 max-w-md">
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">From</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="pl-10 bg-background border-primary/20"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">To</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="pl-10 bg-background border-primary/20"
-              />
-            </div>
-          </div>
-        </div>
+              <CatIcon className={cn("w-4 h-4 mx-auto mb-1", selectedCategory === key ? "" : "text-muted-foreground")} />
+              <p className="text-xs font-medium">{count}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{cat.label}</p>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Filters Panel */}
+      <div className="rounded-xl border border-primary/10 overflow-hidden">
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className="w-full p-3 bg-secondary/30 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-primary" />
+            <span className="font-medium text-sm">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-primary/20 text-primary">
+                {activeFilterCount} active
+              </span>
+            )}
+          </div>
+          <ChevronDown className={cn("w-4 h-4 transition-transform", showFilters && "rotate-180")} />
+        </button>
+        
+        {showFilters && (
+          <div className="p-4 space-y-4 bg-secondary/10">
+            {/* Quick Date Presets */}
+            <div className="flex flex-wrap gap-2">
+              {datePresets.map(preset => (
+                <button
+                  key={preset.label}
+                  onClick={() => applyPreset(preset)}
+                  className={cn(
+                    "px-3 py-1 text-xs rounded-full border transition-colors",
+                    activePreset === preset.label
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-secondary/50 border-primary/20 hover:border-primary/50"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {activePreset && (
+                <button
+                  onClick={() => { setDateFrom(""); setDateTo(""); setActivePreset(null); }}
+                  className="px-3 py-1 text-xs rounded-full bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Search */}
+              <div className="lg:col-span-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by user, action, or details..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-background border-primary/20 h-9 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* User Filter */}
+              <Select value={selectedUser} onValueChange={setSelectedUser}>
+                <SelectTrigger className="bg-background border-primary/20 h-9">
+                  <User className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {admins.map(admin => (
+                    <SelectItem key={admin.id} value={admin.id}>
+                      {admin.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Action Filter */}
+              <Select value={selectedAction} onValueChange={setSelectedAction}>
+                <SelectTrigger className="bg-background border-primary/20 h-9">
+                  <Shield className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Actions" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">All Actions</SelectItem>
+                  {actionTypes.map(action => (
+                    <SelectItem key={action} value={action}>
+                      <span className="text-xs">{action}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date Range */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-xs text-muted-foreground mb-1 block">From</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => { setDateFrom(e.target.value); setActivePreset(null); }}
+                    className="pl-10 bg-background border-primary/20 h-9 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-xs text-muted-foreground mb-1 block">To</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => { setDateTo(e.target.value); setActivePreset(null); }}
+                    className="pl-10 bg-background border-primary/20 h-9 text-sm"
+                  />
+                </div>
+              </div>
+              {activeFilterCount > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={clearFilters}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            {/* Active Filters Display */}
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-primary/10">
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                    Search: "{searchQuery}"
+                    <button onClick={() => setSearchQuery("")}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {selectedUser !== "all" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                    User: {admins.find(a => a.id === selectedUser)?.name}
+                    <button onClick={() => setSelectedUser("all")}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {selectedCategory !== "all" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
+                    Category: {actionCategories[selectedCategory]?.label}
+                    <button onClick={() => setSelectedCategory("all")}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {selectedAction !== "all" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                    Action: {selectedAction}
+                    <button onClick={() => setSelectedAction("all")}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {(dateFrom || dateTo) && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+                    {activePreset || `${dateFrom || "..."} - ${dateTo || "..."}`}
+                    <button onClick={() => { setDateFrom(""); setDateTo(""); setActivePreset(null); }}><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Most Active Users */}
+      {topUsers.length > 0 && (
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-muted-foreground">Most Active:</span>
+          {topUsers.map((user, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                const admin = admins.find(a => a.name === user.name);
+                if (admin) setSelectedUser(admin.id);
+              }}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary/50 hover:bg-secondary transition-colors"
+            >
+              <div className={cn(
+                "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
+                idx === 0 ? "bg-yellow-500/20 text-yellow-500" :
+                idx === 1 ? "bg-slate-300/20 text-slate-300" :
+                "bg-amber-700/20 text-amber-700"
+              )}>
+                {idx + 1}
+              </div>
+              <span className="text-foreground">{user.name}</span>
+              <span className="text-muted-foreground">({user.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Log Entries */}
       <div className="space-y-2">
         {paginatedLogs.length > 0 ? (
-          paginatedLogs.map((log) => {
+          paginatedLogs.map((log, idx) => {
             const ActionIcon = getActionIcon(log.action);
-            const colorClass = getActionColor(log.action);
+            const { color: categoryColor } = getActionCategory(log.action);
             
             return (
               <div
                 key={log.id}
-                className="flex items-center gap-4 p-4 rounded-xl bg-secondary/30 border border-primary/10 hover:border-primary/20 transition-colors"
+                className={cn(
+                  "flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-primary/30",
+                  "bg-secondary/20 border-primary/10"
+                )}
               >
+                {/* Timeline indicator */}
+                <div className="hidden sm:flex flex-col items-center self-stretch">
+                  <div className={cn("w-2 h-2 rounded-full", categoryColor.split(" ")[0].replace("text-", "bg-"))} />
+                  {idx < paginatedLogs.length - 1 && (
+                    <div className="w-0.5 flex-1 bg-primary/10 mt-1" />
+                  )}
+                </div>
+
                 {/* Action Icon */}
-                <div className={`p-2 rounded-lg ${colorClass}`}>
+                <div className={cn("p-2 rounded-lg shrink-0", categoryColor)}>
                   <ActionIcon className="w-4 h-4" />
                 </div>
 
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-foreground">{log.userName}</span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>
-                      {log.action}
+                    <span className="font-medium text-sm text-foreground">{log.userName}</span>
+                    <span className={cn("px-2 py-0.5 rounded text-[10px] uppercase font-semibold tracking-wide", categoryColor)}>
+                      {log.action.replace(/_/g, " ")}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {log.details || "No details provided"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {log.userEmail}
-                  </p>
+                  {log.details && (
+                    <p className="text-sm text-muted-foreground truncate mt-0.5">
+                      {log.details}
+                    </p>
+                  )}
                 </div>
 
                 {/* Timestamp */}
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm text-foreground">{formatRelativeTime(log.timestamp)}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(log.timestamp)}</p>
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-medium text-foreground">{formatRelativeTime(log.timestamp)}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatDate(log.timestamp)}</p>
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="font-medium">No audit logs found</p>
-            <p className="text-sm">
-              {searchQuery || selectedUser !== "all" || selectedAction !== "all" || dateFrom || dateTo
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary/50 mb-4">
+              <History className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="font-medium text-foreground">No audit logs found</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {activeFilterCount > 0
                 ? "Try adjusting your filters"
                 : "Admin actions will appear here"}
             </p>
+            {activeFilterCount > 0 && (
+              <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            )}
           </div>
         )}
       </div>

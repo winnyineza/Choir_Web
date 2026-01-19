@@ -1,6 +1,7 @@
 // Contribution Service - Track member dues and special contributions
 
 import { getAllMembers } from "./dataService";
+import { createReceipt } from "./receiptService";
 
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
@@ -315,6 +316,19 @@ export function setMemberMonthlyPayment(
     };
     contributions.push(newContribution);
     localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(contributions));
+    // Auto-create receipt
+    createReceipt({
+      memberId,
+      memberName,
+      memberEmail,
+      amount,
+      category: "Monthly",
+      typeName: monthlyType.name,
+      month,
+      year,
+      paymentMethod: "cash",
+      recordedBy,
+    });
     return newContribution;
   }
 }
@@ -332,6 +346,20 @@ export function createContribution(
   
   contributions.push(newContribution);
   localStorage.setItem(CONTRIBUTIONS_KEY, JSON.stringify(contributions));
+  // Auto-create receipt for any contribution
+  createReceipt({
+    memberId: newContribution.memberId,
+    memberName: newContribution.memberName,
+    memberEmail: newContribution.memberEmail,
+    amount: newContribution.amount,
+    category: newContribution.category === "monthly" ? "Monthly" : "Special",
+    typeName: newContribution.typeName,
+    month: newContribution.month,
+    year: newContribution.year,
+    paymentMethod: newContribution.paymentMethod,
+    reference: newContribution.reference,
+    recordedBy: newContribution.recordedBy,
+  });
   return newContribution;
 }
 

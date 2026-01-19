@@ -49,11 +49,35 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
   const [stats, setStats] = useState({ total: 0, unread: 0, replied: 0, thisWeek: 0 });
 
   useEffect(() => {
-    loadSubmissions();
-  }, []);
+    const data = getAllContactSubmissions();
+    setSubmissions(data);
+    const newStats = getContactStats();
+    setStats(newStats);
+    onUnreadCountChange?.(newStats.unread);
+  }, [onUnreadCountChange]);
 
   useEffect(() => {
-    filterSubmissions();
+    let filtered = [...submissions];
+
+    // Search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (s) =>
+          s.name.toLowerCase().includes(query) ||
+          s.email.toLowerCase().includes(query) ||
+          s.subject.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by status
+    if (filter === "unread") {
+      filtered = filtered.filter((s) => !s.isRead);
+    } else if (filter === "replied") {
+      filtered = filtered.filter((s) => s.isReplied);
+    }
+
+    setFilteredSubmissions(filtered);
   }, [submissions, searchQuery, filter]);
 
   const loadSubmissions = () => {

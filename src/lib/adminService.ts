@@ -264,7 +264,7 @@ export function validateInvite(code: string): AdminInvite | null {
 }
 
 // Use invite to create account
-export function useInvite(code: string, password: string): AdminUser | null {
+export function redeemInvite(code: string, password: string): AdminUser | null {
   const invite = validateInvite(code);
   if (!invite) return null;
   
@@ -398,6 +398,7 @@ export type Permission =
   | "inventory"
   | "minutes"
   | "documents"
+  | "voice_balance"
   | "analytics"
   | "event_staff"
   | "team"
@@ -408,19 +409,19 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   super_admin: [
     "dashboard", "members", "members_edit", "events", "tickets", "attendance",
     "leave", "disciplinary", "contributions", "expenses", "treasury", "announcements", "messages",
-    "releases", "promos", "gallery", "inventory", "minutes", "documents", "analytics", "event_staff", "team", "audit", "settings"
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "analytics", "event_staff", "team", "audit", "settings"
   ],
   main_admin: [
     "dashboard", "members", "members_edit", "events", "tickets", "attendance",
     "leave", "disciplinary", "contributions", "expenses", "treasury", "announcements", "messages",
-    "releases", "promos", "gallery", "inventory", "minutes", "documents", "analytics", "event_staff"
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "analytics", "event_staff"
   ],
   finance: [
     "dashboard", "members", "tickets", "contributions", "expenses", "treasury"
   ],
   secretary: [
     "dashboard", "members", "members_edit", "events", "attendance", "leave",
-    "announcements", "messages", "releases", "promos", "gallery", "inventory", "minutes", "documents"
+    "announcements", "messages", "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance"
   ],
   disciplinary: [
     "dashboard", "members", "leave", "disciplinary"
@@ -428,7 +429,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   reviewer: [
     "dashboard", "members", "events", "tickets", "attendance", "leave", "disciplinary",
     "contributions", "expenses", "treasury", "announcements", "messages",
-    "releases", "promos", "gallery", "inventory", "minutes", "documents"
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance"
   ],
 };
 
@@ -498,6 +499,7 @@ export function getAccessibleTabs(user: AdminUser | null): string[] {
     "inventory": "inventory",
     "minutes": "minutes",
     "documents": "documents",
+    "voice-balance": "voice_balance",
     "analytics": "analytics",
     "event-staff": "event_staff",
     "team": "team",

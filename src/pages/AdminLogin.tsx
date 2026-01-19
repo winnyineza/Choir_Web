@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { validateInvite, useInvite, requestPasswordReset, validateResetToken, resetPassword } from "@/lib/adminService";
+import { validateInvite, redeemInvite, requestPasswordReset, validateResetToken, resetPassword } from "@/lib/adminService";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -80,7 +80,7 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const user = useInvite(inviteCode!, password);
+      const user = redeemInvite(inviteCode!, password);
       if (user) {
         setSignupSuccess(true);
         setTimeout(async () => {

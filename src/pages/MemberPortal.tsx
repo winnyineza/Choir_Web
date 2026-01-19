@@ -530,15 +530,15 @@ export default function MemberPortal() {
                     </div>
                     
                     {!memberInfo && (
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                         <Input
                           type="email"
                           placeholder="your.email@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="bg-secondary border-primary/20 w-64"
+                          className="bg-secondary border-primary/20 w-full sm:w-64"
                         />
-                        <Button variant="gold" onClick={handleEmailLogin}>
+                        <Button variant="gold" onClick={handleEmailLogin} className="w-full sm:w-auto">
                           <UserCheck className="w-4 h-4 mr-2" />
                           Load My Data
                         </Button>
@@ -606,7 +606,7 @@ export default function MemberPortal() {
                 )}
 
                 {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   <button
                     onClick={() => {
                       if (!memberInfo) {

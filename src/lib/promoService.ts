@@ -158,7 +158,7 @@ export function validatePromoCode(
 }
 
 // Mark promo code as used (increment usage count)
-export function usePromoCode(codeStr: string): boolean {
+export function redeemPromoCode(codeStr: string): boolean {
   const codes = getAllPromoCodes();
   const index = codes.findIndex((c) => c.code.toUpperCase() === codeStr.toUpperCase());
   

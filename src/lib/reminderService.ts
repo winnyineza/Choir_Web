@@ -47,7 +47,7 @@ export function addReminder(
   
   // Calculate reminder time
   const eventDateTime = new Date(`${eventDate}T${eventTime || "00:00"}`);
-  let reminderTime = new Date(eventDateTime);
+  const reminderTime = new Date(eventDateTime);
   
   switch (type) {
     case "1hour":

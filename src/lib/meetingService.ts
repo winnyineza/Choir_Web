@@ -231,7 +231,7 @@ export function getMeetingTypeColor(type: MeetingType): string {
 }
 
 export function exportMeetingToText(meeting: MeetingMinutes): string {
-  let text = `
+  const text = `
 ====================================
 ${meeting.title.toUpperCase()}
 ====================================

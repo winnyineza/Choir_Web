@@ -160,9 +160,10 @@ import { PromoManagement } from "@/components/admin/PromoManagement";
 import { InventoryManagement } from "@/components/admin/InventoryManagement";
 import { MeetingMinutesComponent } from "@/components/admin/MeetingMinutes";
 import { DocumentManagement } from "@/components/admin/DocumentManagement";
-import { Package, FileText as FileTextIcon, FolderOpen } from "lucide-react";
+import { VoiceBalanceTracker } from "@/components/admin/VoiceBalanceTracker";
+import { Package, FileText as FileTextIcon, FolderOpen, Mic2 } from "lucide-react";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -183,6 +184,7 @@ const sidebarItems = [
   { id: "inventory" as Tab, label: "Inventory", icon: Package },
   { id: "minutes" as Tab, label: "Minutes", icon: FileTextIcon },
   { id: "documents" as Tab, label: "Documents", icon: FolderOpen },
+  { id: "voice-balance" as Tab, label: "Voice Balance", icon: Mic2 },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
   { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard },
   { id: "team" as Tab, label: "Admin Team", icon: Shield },
@@ -2569,6 +2571,9 @@ export default function Admin() {
 
           {/* Documents */}
           {activeTab === "documents" && <DocumentManagement />}
+
+          {/* Voice Balance */}
+          {activeTab === "voice-balance" && <VoiceBalanceTracker />}
 
           {/* Promo Codes */}
           {activeTab === "promos" && <PromoManagement />}

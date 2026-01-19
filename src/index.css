@@ -166,6 +166,60 @@
     text-wrap: balance;
   }
 
+  /* Mobile-first responsive utilities */
+  .mobile-scroll-x {
+    @apply overflow-x-auto -mx-4 px-4;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-card {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+
+  .mobile-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4;
+  }
+
+  .mobile-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4;
+  }
+
+  .mobile-grid-4 {
+    @apply grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4;
+  }
+
+  .mobile-text-sm {
+    @apply text-xs sm:text-sm;
+  }
+
+  .mobile-text-base {
+    @apply text-sm sm:text-base;
+  }
+
+  .mobile-text-lg {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+
+  .mobile-text-xl {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+
+  .mobile-hide {
+    @apply hidden sm:block;
+  }
+
+  .mobile-show {
+    @apply block sm:hidden;
+  }
+
+  .mobile-stack {
+    @apply flex flex-col sm:flex-row gap-2 sm:gap-4;
+  }
+
+  .mobile-table {
+    @apply block overflow-x-auto whitespace-nowrap;
+  }
+
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }

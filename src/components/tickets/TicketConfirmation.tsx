@@ -396,26 +396,13 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
   const [ticketImageUrl, setTicketImageUrl] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Validate order object
-  if (!order || !order.id || !order.txRef) {
-    return (
-      <div className="text-center py-8">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
-          <AlertCircle className="w-8 h-8 text-red-500" />
-        </div>
-        <h3 className="font-display text-xl font-bold text-foreground mb-2">
-          Invalid Order
-        </h3>
-        <p className="text-muted-foreground mb-4">Order data is missing. Please try again.</p>
-        <Button onClick={onClose}>Close</Button>
-      </div>
-    );
-  }
-  
-  const isConfirmed = order.status === "confirmed" || order.status === "used";
-  const isPending = order.status === "pending";
+  const isValidOrder = order && order.id && order.txRef;
+  const isConfirmed = isValidOrder && (order.status === "confirmed" || order.status === "used");
+  const isPending = isValidOrder && order.status === "pending";
 
   useEffect(() => {
+    // Skip if invalid order
+    if (!isValidOrder) return;
     // QR code and image will load asynchronously - ticket info shows immediately
     const generateTicketAssets = async () => {
       try {
@@ -448,6 +435,7 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
     };
     
     generateTicketAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order]);
 
   const totalTickets = order.tickets.reduce((sum, t) => sum + t.quantity, 0);
@@ -572,6 +560,22 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
       setIsGenerating(false);
     }
   };
+
+  // Validate order object - rendered after hooks
+  if (!isValidOrder) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h3 className="font-display text-xl font-bold text-foreground mb-2">
+          Invalid Order
+        </h3>
+        <p className="text-muted-foreground mb-4">Order data is missing. Please try again.</p>
+        <Button onClick={onClose}>Close</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="text-center">

@@ -53,6 +53,7 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
+  X,
 } from "lucide-react";
 
 const typeConfig = {
@@ -101,8 +102,9 @@ export function DisciplinaryManagement() {
     date: new Date().toISOString().split("T")[0],
     expiryDate: "",
     actionTaken: "",
-    witnesses: "",
   });
+  const [selectedWitnesses, setSelectedWitnesses] = useState<string[]>([]);
+  const [showWitnessDropdown, setShowWitnessDropdown] = useState(false);
   const [resolution, setResolution] = useState("");
 
   useEffect(() => {
@@ -153,7 +155,10 @@ export function DisciplinaryManagement() {
       updateDisciplinaryRecord(selectedRecord.id, {
         ...formData,
         memberName: member.name,
-        witnesses: formData.witnesses ? formData.witnesses.split(",").map(w => w.trim()) : undefined,
+        witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
+          const w = members.find(m => m.id === id);
+          return w?.name || id;
+        }) : undefined,
       });
       if (currentUser) {
         addAuditLog(currentUser, "UPDATE_DISCIPLINARY", `Updated disciplinary record for ${member.name}`);
@@ -166,7 +171,10 @@ export function DisciplinaryManagement() {
         memberName: member.name,
         issuedBy: currentUser?.id || "",
         issuedByName: currentUser?.name || "Admin",
-        witnesses: formData.witnesses ? formData.witnesses.split(",").map(w => w.trim()) : undefined,
+        witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
+          const w = members.find(m => m.id === id);
+          return w?.name || id;
+        }) : undefined,
       });
       if (currentUser) {
         addAuditLog(currentUser, "CREATE_DISCIPLINARY", `Created disciplinary record for ${member.name}: ${formData.type}`);
@@ -233,8 +241,9 @@ export function DisciplinaryManagement() {
       date: new Date().toISOString().split("T")[0],
       expiryDate: "",
       actionTaken: "",
-      witnesses: "",
     });
+    setSelectedWitnesses([]);
+    setShowWitnessDropdown(false);
     setSelectedRecord(null);
   };
 
@@ -249,8 +258,17 @@ export function DisciplinaryManagement() {
       date: record.date.split("T")[0],
       expiryDate: record.expiryDate?.split("T")[0] || "",
       actionTaken: record.actionTaken || "",
-      witnesses: record.witnesses?.join(", ") || "",
     });
+    // Find member IDs for witnesses by name
+    if (record.witnesses && record.witnesses.length > 0) {
+      const witnessIds = record.witnesses.map(witnessName => {
+        const member = members.find(m => m.name === witnessName);
+        return member?.id || "";
+      }).filter(id => id !== "");
+      setSelectedWitnesses(witnessIds);
+    } else {
+      setSelectedWitnesses([]);
+    }
     setShowAddModal(true);
   };
 
@@ -585,13 +603,73 @@ export function DisciplinaryManagement() {
             </div>
 
             <div>
-              <Label>Witnesses (comma-separated)</Label>
-              <Input
-                value={formData.witnesses}
-                onChange={(e) => setFormData({ ...formData, witnesses: e.target.value })}
-                placeholder="John Doe, Jane Smith"
-                className="mt-1 bg-secondary"
-              />
+              <Label>Witnesses (Optional)</Label>
+              <div className="relative mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowWitnessDropdown(!showWitnessDropdown)}
+                  className="w-full flex items-center justify-between p-2 rounded-md bg-secondary border border-primary/20 text-left hover:border-primary/40 transition-colors"
+                >
+                  <span className={cn("text-sm", selectedWitnesses.length === 0 && "text-muted-foreground")}>
+                    {selectedWitnesses.length === 0 
+                      ? "Select witnesses..." 
+                      : `${selectedWitnesses.length} witness${selectedWitnesses.length > 1 ? "es" : ""} selected`}
+                  </span>
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", showWitnessDropdown && "rotate-180")} />
+                </button>
+                {showWitnessDropdown && (
+                  <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-charcoal border border-primary/20 rounded-md shadow-lg">
+                    {members
+                      .filter(m => m.status === "Active" && m.id !== formData.memberId)
+                      .map((m) => (
+                        <label
+                          key={m.id}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-secondary/50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedWitnesses.includes(m.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedWitnesses([...selectedWitnesses, m.id]);
+                              } else {
+                                setSelectedWitnesses(selectedWitnesses.filter(id => id !== m.id));
+                              }
+                            }}
+                            className="w-4 h-4 accent-primary"
+                          />
+                          <span className="text-sm">{m.name}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">{m.voice}</span>
+                        </label>
+                      ))}
+                    {members.filter(m => m.status === "Active" && m.id !== formData.memberId).length === 0 && (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No other members available</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedWitnesses.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {selectedWitnesses.map(id => {
+                    const m = members.find(mem => mem.id === id);
+                    return m ? (
+                      <span 
+                        key={id} 
+                        className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-primary/20 text-primary"
+                      >
+                        {m.name}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWitnesses(selectedWitnesses.filter(wid => wid !== id))}
+                          className="hover:text-red-400"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-4">

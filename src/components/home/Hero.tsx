@@ -109,9 +109,9 @@ export function Hero() {
             }`}
           >
             <Button variant="gold" size="lg" asChild className="min-w-[180px]">
-              <Link to="/join">
-                <Users className="w-4 h-4 mr-2" />
-                Join the Choir
+              <Link to="/events">
+                <Calendar className="w-4 h-4 mr-2" />
+                Upcoming Events
               </Link>
             </Button>
             <Link

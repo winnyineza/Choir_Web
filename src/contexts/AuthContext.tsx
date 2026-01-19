@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, 1000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionExpiry, isAuthenticated]);
 
   // Activity tracking for session extension (only if not "remember me")
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       events.forEach(event => window.removeEventListener(event, resetActivity));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, rememberMe, sessionExpiry]);
 
   // Load session on mount
