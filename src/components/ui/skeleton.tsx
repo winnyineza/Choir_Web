@@ -1,114 +1,81 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-function Skeleton({ className, ...props }: SkeletonProps) {
+function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "animate-pulse rounded-md bg-muted/50",
-        className
-      )}
+      className={cn("animate-pulse rounded-md bg-muted", className)}
       {...props}
     />
-  );
+  )
 }
 
-// Pre-built skeleton components for common patterns
-function SkeletonCard({ className }: { className?: string }) {
+// Page loading skeleton for lazy-loaded components
+function PageSkeleton() {
   return (
-    <div className={cn("space-y-3", className)}>
-      <Skeleton className="h-48 w-full rounded-xl" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-    </div>
-  );
-}
-
-function SkeletonEvent({ className }: { className?: string }) {
-  return (
-    <div className={cn("card-glass rounded-2xl p-6 space-y-4", className)}>
-      <div className="flex gap-4">
-        <Skeleton className="h-24 w-24 rounded-xl flex-shrink-0" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-1/3" />
+    <div className="space-y-6 p-6">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-10 w-32" />
+      </div>
+      
+      {/* Stats cards skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="card-glass rounded-xl p-6 space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        ))}
+      </div>
+      
+      {/* Table skeleton */}
+      <div className="card-glass rounded-xl p-6 space-y-4">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-8 w-20" />
+            </div>
+          ))}
         </div>
       </div>
-      <div className="flex gap-2">
-        <Skeleton className="h-10 flex-1" />
-        <Skeleton className="h-10 w-24" />
-      </div>
     </div>
-  );
+  )
 }
 
-function SkeletonAlbum({ className }: { className?: string }) {
+// Card skeleton for individual cards
+function CardSkeleton() {
   return (
-    <div className={cn("space-y-3", className)}>
-      <Skeleton className="aspect-square w-full rounded-2xl" />
-      <Skeleton className="h-5 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
+    <div className="card-glass rounded-xl p-6 space-y-3">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-8 w-16" />
+      <Skeleton className="h-3 w-32" />
     </div>
-  );
+  )
 }
 
-function SkeletonVideo({ className }: { className?: string }) {
+// Table row skeleton
+function TableRowSkeleton() {
   return (
-    <div className={cn("space-y-3", className)}>
-      <Skeleton className="aspect-video w-full rounded-2xl" />
-      <Skeleton className="h-5 w-3/4" />
+    <div className="flex items-center gap-4 py-3">
+      <Skeleton className="h-10 w-10 rounded-full" />
+      <Skeleton className="h-4 flex-1 max-w-[200px]" />
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-4 w-20" />
+      <Skeleton className="h-8 w-16" />
     </div>
-  );
+  )
 }
 
-function SkeletonGallery({ className }: { className?: string }) {
-  return (
-    <div className={cn("grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4", className)}>
-      {[...Array(8)].map((_, i) => (
-        <Skeleton key={i} className="aspect-square rounded-xl" />
-      ))}
-    </div>
-  );
-}
-
-function SkeletonText({ lines = 3, className }: { lines?: number; className?: string }) {
-  return (
-    <div className={cn("space-y-2", className)}>
-      {[...Array(lines)].map((_, i) => (
-        <Skeleton
-          key={i}
-          className="h-4"
-          style={{ width: `${100 - i * 15}%` }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function SkeletonAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
-  const sizeClasses = {
-    sm: "h-8 w-8",
-    md: "h-12 w-12",
-    lg: "h-16 w-16",
-  };
-
-  return <Skeleton className={cn("rounded-full", sizeClasses[size])} />;
-}
-
-function SkeletonButton({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-10 w-24 rounded-lg", className)} />;
-}
-
-export {
-  Skeleton,
-  SkeletonCard,
-  SkeletonEvent,
-  SkeletonAlbum,
-  SkeletonVideo,
-  SkeletonGallery,
-  SkeletonText,
-  SkeletonAvatar,
-  SkeletonButton,
-};
+export { Skeleton, PageSkeleton, CardSkeleton, TableRowSkeleton }

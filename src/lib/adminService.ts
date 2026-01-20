@@ -1,7 +1,10 @@
 // Admin User Management Service
 // Handles multi-user admin authentication with roles
 
+import bcrypt from "bcryptjs";
+
 const ADMIN_USERS_KEY = "choir_admin_users";
+const SALT_ROUNDS = 10;
 const ADMIN_INVITES_KEY = "choir_admin_invites";
 const AUDIT_LOG_KEY = "choir_audit_log";
 
@@ -11,13 +14,28 @@ export interface AdminUser {
   id: string;
   email: string;
   name: string;
-  password: string; // In production, this should be hashed
+  password: string; // Hashed with bcrypt
   role: AdminRole;
   createdAt: string;
   lastLogin?: string;
   createdBy?: string;
   isActive: boolean;
   memberId?: string; // Link to choir member profile (admins are also members)
+  passwordHashed?: boolean; // Track if password has been hashed (for migration)
+}
+
+// Hash a password
+export function hashPassword(password: string): string {
+  return bcrypt.hashSync(password, SALT_ROUNDS);
+}
+
+// Compare password with hash
+export function comparePassword(password: string, hash: string): boolean {
+  // If password doesn't look hashed (legacy), do direct comparison
+  if (!hash.startsWith("$2")) {
+    return password === hash;
+  }
+  return bcrypt.compareSync(password, hash);
 }
 
 export interface AdminInvite {
@@ -56,27 +74,58 @@ export interface PasswordResetToken {
 const PASSWORD_RESET_KEY = "choir_password_resets";
 
 // Default Super Admin - Change this to your email!
+// Password is hashed at runtime on first use
 const DEFAULT_SUPER_ADMIN: AdminUser = {
   id: "super-admin-001",
   email: "w.ineza@alustudent.com", // Your email
   name: "Winny Ineza",
-  password: "SuperAdmin@2024", // Change this!
+  password: "SuperAdmin@2024", // Will be hashed on first init
   role: "super_admin",
   createdAt: new Date().toISOString(),
   isActive: true,
+  passwordHashed: false,
 };
 
 // Initialize admin users with super admin if empty
 function initializeAdminUsers(): void {
   const existing = localStorage.getItem(ADMIN_USERS_KEY);
   if (!existing) {
-    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([DEFAULT_SUPER_ADMIN]));
+    // Hash the default password before storing
+    const hashedAdmin = {
+      ...DEFAULT_SUPER_ADMIN,
+      password: hashPassword(DEFAULT_SUPER_ADMIN.password),
+      passwordHashed: true,
+    };
+    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([hashedAdmin]));
   } else {
-    // Ensure super admin exists
+    // Ensure super admin exists and migrate unhashed passwords
     const users: AdminUser[] = JSON.parse(existing);
+    let needsUpdate = false;
+    
+    // Migrate unhashed passwords
+    users.forEach((user, index) => {
+      if (!user.passwordHashed && !user.password.startsWith("$2")) {
+        users[index] = {
+          ...user,
+          password: hashPassword(user.password),
+          passwordHashed: true,
+        };
+        needsUpdate = true;
+      }
+    });
+    
     const hasSuperAdmin = users.some(u => u.role === "super_admin");
     if (!hasSuperAdmin) {
-      users.push(DEFAULT_SUPER_ADMIN);
+      const hashedAdmin = {
+        ...DEFAULT_SUPER_ADMIN,
+        password: hashPassword(DEFAULT_SUPER_ADMIN.password),
+        passwordHashed: true,
+      };
+      users.push(hashedAdmin);
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
       localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(users));
     }
   }
@@ -106,7 +155,7 @@ export function authenticateAdmin(email: string, password: string): AdminUser | 
   const user = getAdminByEmail(email);
   if (!user) return null;
   if (!user.isActive) return null;
-  if (user.password !== password) return null;
+  if (!comparePassword(password, user.password)) return null;
   
   // Update last login
   updateAdminUser(user.id, { lastLogin: new Date().toISOString() });
@@ -132,9 +181,11 @@ export function createAdminUser(
   const newUser: AdminUser = {
     ...data,
     id: `admin-${Date.now()}`,
+    password: hashPassword(data.password), // Hash the password
     createdAt: new Date().toISOString(),
     createdBy,
     isActive: true,
+    passwordHashed: true,
   };
   
   users.push(newUser);
@@ -581,8 +632,11 @@ export function resetPassword(token: string, newPassword: string): boolean {
   const resetToken = validateResetToken(token);
   if (!resetToken) return false;
   
-  // Update password
-  const updated = updateAdminUser(resetToken.userId, { password: newPassword });
+  // Update password with hashed version
+  const updated = updateAdminUser(resetToken.userId, { 
+    password: hashPassword(newPassword),
+    passwordHashed: true 
+  });
   if (!updated) return false;
   
   // Mark token as used
@@ -603,9 +657,12 @@ export function resetPassword(token: string, newPassword: string): boolean {
 export function changePassword(userId: string, currentPassword: string, newPassword: string): boolean {
   const user = getAdminById(userId);
   if (!user) return false;
-  if (user.password !== currentPassword) return false;
+  if (!comparePassword(currentPassword, user.password)) return false;
   
-  const updated = updateAdminUser(userId, { password: newPassword });
+  const updated = updateAdminUser(userId, { 
+    password: hashPassword(newPassword),
+    passwordHashed: true 
+  });
   if (!updated) return false;
   
   addAuditLog(updated, "PASSWORD_CHANGE", "Password was changed");

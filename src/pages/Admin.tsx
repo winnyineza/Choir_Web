@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -110,9 +110,10 @@ import { UploadGalleryModal } from "@/components/admin/UploadGalleryModal";
 import { TicketDetailModal } from "@/components/admin/TicketDetailModal";
 import { AddAlbumModal } from "@/components/admin/AddAlbumModal";
 import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
-import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
-import { AdminTeamManagement } from "@/components/admin/AdminTeamManagement";
-import { AuditLogPage } from "@/components/admin/AuditLogPage";
+// Lazy loaded components for code splitting
+const AnalyticsDashboard = lazy(() => import("@/components/admin/AnalyticsDashboard").then(m => ({ default: m.AnalyticsDashboard })));
+const AdminTeamManagement = lazy(() => import("@/components/admin/AdminTeamManagement").then(m => ({ default: m.AdminTeamManagement })));
+const AuditLogPage = lazy(() => import("@/components/admin/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
 // Charts - used inline in dashboard, members, tickets, attendance sections
 import {
   LineChart,
@@ -138,30 +139,31 @@ import {
   exportFinancialReportToCSV,
   getBackupStats,
 } from "@/lib/exportUtils";
-import { AnnouncementManagement } from "@/components/admin/AnnouncementManagement";
-import { EventStaffManagement } from "@/components/admin/EventStaffManagement";
+const AnnouncementManagement = lazy(() => import("@/components/admin/AnnouncementManagement").then(m => ({ default: m.AnnouncementManagement })));
+const EventStaffManagement = lazy(() => import("@/components/admin/EventStaffManagement").then(m => ({ default: m.EventStaffManagement })));
 import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
-import { ContributionManagement } from "@/components/admin/ContributionManagement";
+const ContributionManagement = lazy(() => import("@/components/admin/ContributionManagement").then(m => ({ default: m.ContributionManagement })));
 import { getAllContributions } from "@/lib/contributionService";
 import { getAllExpenses } from "@/lib/expenseService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Mail, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
 import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer } from "@/lib/adminService";
-import { ContactSubmissions } from "@/components/admin/ContactSubmissions";
+const ContactSubmissions = lazy(() => import("@/components/admin/ContactSubmissions").then(m => ({ default: m.ContactSubmissions })));
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
-import { ExpenseManagement } from "@/components/admin/ExpenseManagement";
-import { Treasury } from "@/components/admin/Treasury";
-import { ExecutiveDashboard } from "@/components/admin/ExecutiveDashboard";
+const ExpenseManagement = lazy(() => import("@/components/admin/ExpenseManagement").then(m => ({ default: m.ExpenseManagement })));
+const Treasury = lazy(() => import("@/components/admin/Treasury").then(m => ({ default: m.Treasury })));
+const ExecutiveDashboard = lazy(() => import("@/components/admin/ExecutiveDashboard").then(m => ({ default: m.ExecutiveDashboard })));
 import { BirthdayAlert } from "@/components/BirthdayAlert";
-import { DisciplinaryManagement } from "@/components/admin/DisciplinaryManagement";
-import { GalleryManagement } from "@/components/admin/GalleryManagement";
-import { MusicReleasesManagement } from "@/components/admin/MusicReleasesManagement";
-import { PromoManagement } from "@/components/admin/PromoManagement";
-import { InventoryManagement } from "@/components/admin/InventoryManagement";
-import { MeetingMinutesComponent } from "@/components/admin/MeetingMinutes";
-import { DocumentManagement } from "@/components/admin/DocumentManagement";
-import { VoiceBalanceTracker } from "@/components/admin/VoiceBalanceTracker";
+const DisciplinaryManagement = lazy(() => import("@/components/admin/DisciplinaryManagement").then(m => ({ default: m.DisciplinaryManagement })));
+const GalleryManagement = lazy(() => import("@/components/admin/GalleryManagement").then(m => ({ default: m.GalleryManagement })));
+const MusicReleasesManagement = lazy(() => import("@/components/admin/MusicReleasesManagement").then(m => ({ default: m.MusicReleasesManagement })));
+const PromoManagement = lazy(() => import("@/components/admin/PromoManagement").then(m => ({ default: m.PromoManagement })));
+const InventoryManagement = lazy(() => import("@/components/admin/InventoryManagement").then(m => ({ default: m.InventoryManagement })));
+const MeetingMinutesComponent = lazy(() => import("@/components/admin/MeetingMinutes").then(m => ({ default: m.MeetingMinutesComponent })));
+const DocumentManagement = lazy(() => import("@/components/admin/DocumentManagement").then(m => ({ default: m.DocumentManagement })));
+const VoiceBalanceTracker = lazy(() => import("@/components/admin/VoiceBalanceTracker").then(m => ({ default: m.VoiceBalanceTracker })));
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2 } from "lucide-react";
+import { PageSkeleton } from "@/components/ui/skeleton";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
@@ -811,6 +813,7 @@ export default function Admin() {
             currentUserName={currentUser?.name}
           />
           
+          <Suspense fallback={<PageSkeleton />}>
           <div className="p-4 lg:p-8">
           {/* Dashboard */}
           {activeTab === "dashboard" && (
@@ -2813,6 +2816,7 @@ export default function Admin() {
             </div>
           )}
           </div>
+          </Suspense>
         </main>
       </div>
 
