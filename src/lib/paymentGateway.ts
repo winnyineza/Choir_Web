@@ -1,15 +1,10 @@
-// Payment Gateway Service - Flutterwave (MTN MoMo, Airtel) + Stripe
-// Supports: MTN Mobile Money, Airtel Money, Credit/Debit Cards
-
-import { supabase, isSupabaseConfigured } from './supabase';
+// Payment Gateway Service - Flutterwave
+// Supports: MTN Mobile Money, Airtel Money, Credit/Debit Cards (Visa, MC, Amex)
 
 // ============ CONFIGURATION ============
 
 export const FLUTTERWAVE_PUBLIC_KEY = 
   import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || "";
-
-export const STRIPE_PUBLIC_KEY = 
-  import.meta.env.VITE_STRIPE_PUBLIC_KEY || "";
 
 // ============ TYPES ============
 
@@ -33,7 +28,7 @@ export interface PaymentTransaction {
   currency: string;
   method: PaymentMethod;
   status: PaymentStatus;
-  provider: 'flutterwave' | 'stripe' | 'manual';
+  provider: 'flutterwave' | 'manual';
   providerRef?: string;
   customerName: string;
   customerEmail: string;
@@ -120,22 +115,11 @@ export function isFlutterwaveConfigured(): boolean {
   return FLUTTERWAVE_PUBLIC_KEY.startsWith('FLWPUBK');
 }
 
-export function isStripeConfigured(): boolean {
-  return STRIPE_PUBLIC_KEY.startsWith('pk_');
-}
-
 export function getAvailableMethods(): PaymentMethod[] {
-  const methods: PaymentMethod[] = [];
-  
   if (isFlutterwaveConfigured()) {
-    methods.push('mtn_momo', 'airtel_money', 'card', 'bank_transfer');
+    return ['mtn_momo', 'airtel_money', 'card', 'bank_transfer'];
   }
-  
-  if (isStripeConfigured()) {
-    if (!methods.includes('card')) methods.push('card');
-  }
-  
-  return methods;
+  return [];
 }
 
 // ============ FLUTTERWAVE INTEGRATION ============
@@ -259,79 +243,11 @@ export async function initiateFlutterwavePayment(
   });
 }
 
-// ============ STRIPE INTEGRATION ============
-
-export async function initiateStripePayment(
-  request: PaymentRequest
-): Promise<PaymentResult> {
-  if (!isStripeConfigured()) {
-    return { success: false, error: 'Stripe is not configured' };
-  }
-
-  const Stripe = (window as any).Stripe;
-  
-  if (!Stripe) {
-    return { success: false, error: 'Stripe SDK not loaded. Please refresh the page.' };
-  }
-
-  const reference = generateReference();
-  
-  // For Stripe, we need a backend to create a payment intent
-  // This is a simplified client-side approach using Stripe Checkout
-  
-  try {
-    const stripe = Stripe(STRIPE_PUBLIC_KEY);
-    
-    // Create pending transaction
-    const transaction: PaymentTransaction = {
-      id: reference,
-      reference,
-      amount: request.amount,
-      currency: request.currency || 'USD',
-      method: 'card',
-      status: 'pending',
-      provider: 'stripe',
-      customerName: request.customer.name,
-      customerEmail: request.customer.email,
-      description: request.description,
-      metadata: request.metadata,
-      createdAt: new Date().toISOString(),
-    };
-
-    await saveTransaction(transaction);
-
-    // Note: In production, you'd create a Checkout Session via your backend
-    // For now, we'll use a simplified approach
-    return {
-      success: false,
-      error: 'Stripe requires backend integration. Please use Flutterwave for now.',
-      transaction,
-    };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
 // ============ UNIFIED PAYMENT FUNCTION ============
 
 export async function initiatePayment(request: PaymentRequest): Promise<PaymentResult> {
-  // Route to appropriate provider based on method
-  switch (request.method) {
-    case 'mtn_momo':
-    case 'airtel_money':
-    case 'bank_transfer':
-      return initiateFlutterwavePayment(request);
-    
-    case 'card':
-      // Try Stripe first, fall back to Flutterwave
-      if (isStripeConfigured() && request.currency !== 'RWF') {
-        return initiateStripePayment(request);
-      }
-      return initiateFlutterwavePayment(request);
-    
-    default:
-      return { success: false, error: 'Invalid payment method' };
-  }
+  // All payments go through Flutterwave
+  return initiateFlutterwavePayment(request);
 }
 
 // ============ TRANSACTION STORAGE ============
