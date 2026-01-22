@@ -45,11 +45,25 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password, rememberMe);
-      if (success) {
+      const result = await login(email, password, rememberMe);
+      if (result.success) {
         navigate("/admin");
       } else {
-        setError("Invalid email or password");
+        // Show appropriate error message
+        let errorMessage = result.error || "Invalid email or password";
+        
+        // Add remaining attempts info if available
+        if (result.remainingAttempts !== undefined && result.remainingAttempts > 0) {
+          errorMessage += ` (${result.remainingAttempts} attempts remaining)`;
+        }
+        
+        // Show lockout info
+        if (result.isLocked && result.lockoutUntil) {
+          const lockoutTime = result.lockoutUntil.toLocaleTimeString();
+          errorMessage = `Account temporarily locked due to too many failed attempts. Try again after ${lockoutTime}`;
+        }
+        
+        setError(errorMessage);
       }
     } catch {
       setError("An error occurred. Please try again.");
@@ -84,8 +98,8 @@ export default function AdminLogin() {
       if (user) {
         setSignupSuccess(true);
         setTimeout(async () => {
-          const success = await login(user.email, password, true);
-          if (success) {
+          const result = await login(user.email, password, true);
+          if (result.success) {
             navigate("/admin");
           }
         }, 2000);
