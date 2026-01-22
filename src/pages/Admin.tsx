@@ -164,6 +164,8 @@ const DocumentManagement = lazy(() => import("@/components/admin/DocumentManagem
 const VoiceBalanceTracker = lazy(() => import("@/components/admin/VoiceBalanceTracker").then(m => ({ default: m.VoiceBalanceTracker })));
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2 } from "lucide-react";
 import { PageSkeleton } from "@/components/ui/skeleton";
+import { BackupRestore } from "@/components/admin/BackupRestore";
+import { DataSyncManager } from "@/components/admin/DataSyncManager";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
@@ -2777,6 +2779,16 @@ export default function Admin() {
                     <span>{getBackupStats().attendance} attendance sessions</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Backup & Restore Section */}
+              <div className="max-w-2xl">
+                <BackupRestore />
+              </div>
+
+              {/* Database Sync Section */}
+              <div className="max-w-2xl">
+                <DataSyncManager />
               </div>
 
               {/* Clear All Data Section */}
