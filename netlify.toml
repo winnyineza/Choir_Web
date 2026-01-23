@@ -6,10 +6,6 @@
 [functions]
   node_bundler = "esbuild"
 
-# Schedule daily reminders at 6 AM UTC (8 AM Rwanda time)
-[functions."daily-reminders"]
-  schedule = "0 6 * * *"
-
 # Handle client-side routing (React Router)
 [[redirects]]
   from = "/*"
