@@ -166,16 +166,31 @@ async function sendEmail(to: string[], subject: string, html: string): Promise<b
 }
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  console.log("Running daily reminders check...");
+  // Wrap everything in try-catch to prevent crashes
+  try {
+    console.log("Running daily reminders check...");
 
-  // Check if Resend API key is configured
-  if (!process.env.RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Email service not configured" }),
+    // Return early with status info if this is just a test/health check
+    const envStatus = {
+      hasResendKey: !!process.env.RESEND_API_KEY,
+      hasAdminEmails: !!process.env.ADMIN_NOTIFICATION_EMAILS,
+      hasSupabaseUrl: !!(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL),
+      hasSupabaseKey: !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY),
     };
-  }
+
+    // Check if Resend API key is configured
+    if (!process.env.RESEND_API_KEY) {
+      console.log("RESEND_API_KEY not configured");
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          status: "configuration_needed",
+          message: "RESEND_API_KEY not configured in Netlify environment variables",
+          envStatus 
+        }),
+      };
+    }
 
   // Get admin email from environment (comma-separated list)
   const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) || [];
@@ -310,7 +325,20 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     console.error("Error in daily reminders:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || "Unknown error" }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: error.message || "Unknown error", stack: error.stack }),
+    };
+  }
+  } catch (globalError: any) {
+    // Global catch for any uncaught errors
+    console.error("Uncaught error in daily-reminders:", globalError);
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        error: "Internal function error", 
+        message: globalError.message || "Unknown error",
+      }),
     };
   }
 };
