@@ -726,8 +726,13 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         // Sort by total overdue (highest first)
         overdueByMember.sort((a, b) => b.total - a.total);
 
+        // Get finance-specific emails (finance officers, reviewers, main admin)
+        // Use FINANCE_NOTIFICATION_EMAILS env var, fallback to admin emails
+        const financeEmails = process.env.FINANCE_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) 
+          || adminEmails;
+
         const financeEmailsSent = await sendEmail(
-          adminEmails,
+          financeEmails,
           `📊 Finance Report: ${overdueByMember.length} Members with Overdue Contributions`,
           generateFinanceOverdueEmail(overdueByMember)
         );
@@ -736,6 +741,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           results.financeReportSent = true;
           results.membersWithOverdue = overdueByMember.length;
           results.totalOverdueAmount = overdueByMember.reduce((sum, m) => sum + m.total, 0);
+          results.financeRecipients = financeEmails.length;
         }
       }
     }
