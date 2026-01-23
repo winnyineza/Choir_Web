@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Info, Users, Calendar, Music, Image, Mail, Heart, UserCircle } from "lucide-react";
+import { Menu, X, Info, Users, Calendar, Music, Image, Mail, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getBookableEvents } from "@/lib/dataService";
 import logo from "@/assets/LogoTSC.jpg";
 
-const navLinks = [
+const baseNavLinks = [
   { name: "About", href: "/about", icon: Info },
   { name: "Ministry", href: "/ministry", icon: Users },
-  { name: "Events", href: "/events", icon: Calendar },
+  { name: "Events", href: "/events", icon: Calendar, requiresEvents: true },
   { name: "Releases", href: "/releases", icon: Music },
   { name: "Gallery", href: "/gallery", icon: Image },
   { name: "Contact", href: "/contact", icon: Mail },
@@ -18,6 +19,7 @@ const navLinks = [
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasEvents, setHasEvents] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -27,6 +29,28 @@ export function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Check if there are any bookable events
+  useEffect(() => {
+    const checkEvents = () => {
+      const events = getBookableEvents();
+      setHasEvents(events.length > 0);
+    };
+    checkEvents();
+    
+    // Listen for event updates
+    window.addEventListener("storage", checkEvents);
+    window.addEventListener("eventsUpdated", checkEvents);
+    return () => {
+      window.removeEventListener("storage", checkEvents);
+      window.removeEventListener("eventsUpdated", checkEvents);
+    };
+  }, []);
+
+  // Filter nav links based on whether events exist
+  const navLinks = useMemo(() => {
+    return baseNavLinks.filter(link => !link.requiresEvents || hasEvents);
+  }, [hasEvents]);
 
   return (
     <header
@@ -80,12 +104,6 @@ export function Header() {
         {/* CTA Buttons */}
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/member-portal">
-              <UserCircle className="w-4 h-4 mr-1" />
-              Members
-            </Link>
-          </Button>
           <Button variant="gold" size="sm" asChild>
             <Link to="/donate">
               <Heart className="w-4 h-4 mr-1" />
@@ -131,21 +149,11 @@ export function Header() {
               </Link>
             );
           })}
-          <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-primary/10">
-            <Link
-              to="/member-portal"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="px-4 py-3 text-base font-medium transition-all duration-300 rounded-lg flex items-center gap-3 text-primary bg-primary/10"
-            >
-              <UserCircle className="w-5 h-5" />
-              Member Portal
-            </Link>
-            <div className="flex items-center justify-between">
-              <ThemeToggle />
-              <Button variant="gold" size="sm" asChild>
-                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
-              </Button>
-            </div>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary/10">
+            <ThemeToggle />
+            <Button variant="gold" size="sm" asChild>
+              <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Donate</Link>
+            </Button>
           </div>
         </nav>
       </div>

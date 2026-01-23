@@ -80,7 +80,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    --primary: 45 80% 45%;
+    --primary: 18 95% 55%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 95%;
@@ -89,7 +89,7 @@
     --muted: 0 0% 92%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 45 70% 50%;
+    --accent: 12 90% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 50%;
@@ -97,19 +97,19 @@
 
     --border: 0 0% 85%;
     --input: 0 0% 92%;
-    --ring: 45 80% 45%;
+    --ring: 18 95% 55%;
 
     --charcoal: 0 0% 95%;
     --charcoal-light: 0 0% 92%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 10%;
-    --sidebar-primary: 45 80% 45%;
+    --sidebar-primary: 18 95% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 95%;
     --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-border: 0 0% 85%;
-    --sidebar-ring: 45 80% 45%;
+    --sidebar-ring: 18 95% 55%;
   }
 
   .light body {
@@ -319,11 +319,11 @@
 }
 
 .light ::-webkit-scrollbar-thumb {
-  background: hsl(45 80% 50% / 0.4);
+  background: hsl(18 95% 55% / 0.4);
 }
 
 .light ::-webkit-scrollbar-thumb:hover {
-  background: hsl(45 80% 50% / 0.6);
+  background: hsl(18 95% 55% / 0.6);
 }
 
 /* Print Styles */
