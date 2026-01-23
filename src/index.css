@@ -80,16 +80,17 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    --primary: 45 80% 45%;
+    /* Darker gold for better contrast on light backgrounds */
+    --primary: 40 85% 38%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 95%;
     --secondary-foreground: 0 0% 10%;
 
     --muted: 0 0% 92%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 45 70% 50%;
+    --accent: 40 80% 35%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 50%;
@@ -97,23 +98,42 @@
 
     --border: 0 0% 85%;
     --input: 0 0% 92%;
-    --ring: 45 80% 45%;
+    --ring: 40 85% 38%;
 
     --charcoal: 0 0% 95%;
     --charcoal-light: 0 0% 92%;
 
+    /* Darker gold variants for light mode */
+    --gold: 40 85% 38%;
+    --gold-light: 42 80% 50%;
+    --gold-dark: 38 90% 30%;
+    --gold-glow: 40 90% 40%;
+
+    /* Darker gradient for light mode visibility */
+    --gradient-gold: linear-gradient(135deg, hsl(40 85% 40%), hsl(38 90% 32%));
+    --gradient-gold-shine: linear-gradient(90deg, hsl(40 85% 38%) 0%, hsl(42 80% 48%) 50%, hsl(40 85% 38%) 100%);
+
+    /* Stronger shadows for light mode */
+    --shadow-gold: 0 4px 30px hsl(40 85% 38% / 0.25);
+    --shadow-gold-lg: 0 8px 50px hsl(40 85% 38% / 0.35);
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 10%;
-    --sidebar-primary: 45 80% 45%;
+    --sidebar-primary: 40 85% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 95%;
     --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-border: 0 0% 85%;
-    --sidebar-ring: 45 80% 45%;
+    --sidebar-ring: 40 85% 38%;
   }
 
   .light body {
     background: linear-gradient(180deg, hsl(0 0% 98%), hsl(0 0% 95%));
+  }
+
+  /* Make gold text darker in light mode for better readability */
+  .light .gold-text {
+    background-image: linear-gradient(90deg, hsl(40 85% 35%) 0%, hsl(42 80% 45%) 50%, hsl(40 85% 35%) 100%);
   }
 }
 
@@ -319,11 +339,11 @@
 }
 
 .light ::-webkit-scrollbar-thumb {
-  background: hsl(45 80% 50% / 0.4);
+  background: hsl(40 85% 38% / 0.5);
 }
 
 .light ::-webkit-scrollbar-thumb:hover {
-  background: hsl(45 80% 50% / 0.6);
+  background: hsl(40 85% 38% / 0.7);
 }
 
 /* Print Styles */
