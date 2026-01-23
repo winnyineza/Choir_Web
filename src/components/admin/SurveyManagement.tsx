@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -513,6 +514,9 @@ export function SurveyManagement() {
               <ClipboardList className="w-5 h-5 text-primary" />
               {editingSurvey ? "Edit Survey" : "Create Survey"}
             </DialogTitle>
+            <DialogDescription>
+              {editingSurvey ? "Update survey details and questions." : "Create a new survey for choir members."}
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6">
@@ -542,12 +546,12 @@ export function SurveyManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Link to Event (Optional)</Label>
-                  <Select value={form.eventId} onValueChange={(v) => setForm({ ...form, eventId: v })}>
+                  <Select value={form.eventId || "none"} onValueChange={(v) => setForm({ ...form, eventId: v === "none" ? "" : v })}>
                     <SelectTrigger className="mt-1 bg-secondary border-primary/20">
                       <SelectValue placeholder="Select event..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {events.map(event => (
                         <SelectItem key={event.id} value={event.id}>{event.title}</SelectItem>
                       ))}
@@ -723,6 +727,9 @@ export function SurveyManagement() {
               <BarChart3 className="w-5 h-5 text-primary" />
               Survey Results: {selectedSurvey?.title}
             </DialogTitle>
+            <DialogDescription>
+              View response statistics and feedback analysis.
+            </DialogDescription>
           </DialogHeader>
           
           {selectedSurvey && (() => {
@@ -860,6 +867,9 @@ export function SurveyManagement() {
               <Eye className="w-5 h-5 text-primary" />
               Survey Preview
             </DialogTitle>
+            <DialogDescription>
+              Preview how the survey will appear to members.
+            </DialogDescription>
           </DialogHeader>
           
           {selectedSurvey && (
