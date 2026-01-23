@@ -162,11 +162,12 @@ const InventoryManagement = lazy(() => import("@/components/admin/InventoryManag
 const MeetingMinutesComponent = lazy(() => import("@/components/admin/MeetingMinutes").then(m => ({ default: m.MeetingMinutesComponent })));
 const DocumentManagement = lazy(() => import("@/components/admin/DocumentManagement").then(m => ({ default: m.DocumentManagement })));
 const VoiceBalanceTracker = lazy(() => import("@/components/admin/VoiceBalanceTracker").then(m => ({ default: m.VoiceBalanceTracker })));
-import { Package, FileText as FileTextIcon, FolderOpen, Mic2 } from "lucide-react";
+const SurveyManagement = lazy(() => import("@/components/admin/SurveyManagement").then(m => ({ default: m.SurveyManagement })));
+import { Package, FileText as FileTextIcon, FolderOpen, Mic2, ClipboardList } from "lucide-react";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { BackupRestore } from "@/components/admin/BackupRestore";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -188,6 +189,7 @@ const sidebarItems = [
   { id: "minutes" as Tab, label: "Minutes", icon: FileTextIcon },
   { id: "documents" as Tab, label: "Documents", icon: FolderOpen },
   { id: "voice-balance" as Tab, label: "Voice Balance", icon: Mic2 },
+  { id: "surveys" as Tab, label: "Surveys", icon: ClipboardList },
   { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
   { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard },
   { id: "team" as Tab, label: "Admin Team", icon: Shield },
@@ -2582,6 +2584,9 @@ export default function Admin() {
 
           {/* Voice Balance */}
           {activeTab === "voice-balance" && <VoiceBalanceTracker />}
+
+          {/* Surveys */}
+          {activeTab === "surveys" && <SurveyManagement />}
 
           {/* Promo Codes */}
           {activeTab === "promos" && <PromoManagement />}
