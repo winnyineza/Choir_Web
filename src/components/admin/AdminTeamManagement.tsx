@@ -280,7 +280,7 @@ export function AdminTeamManagement() {
           <p className="text-sm text-muted-foreground mb-2">Role Breakdown</p>
           <div className="flex flex-wrap gap-2">
             <span className="px-2 py-1 rounded-full text-xs bg-primary/20 text-primary">
-              {admins.filter(a => a.role === "super_admin" && a.isActive).length} Super Admin
+              {admins.filter(a => (a.role === "super_admin" || a.role === "main_admin") && a.isActive).length} Administrators
             </span>
             <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400">
               {admins.filter(a => a.role === "main_admin" && a.isActive).length} Main Admin
@@ -546,7 +546,7 @@ export function AdminTeamManagement() {
                 <SelectContent>
                   <SelectItem value="super_admin">
                     <div className="flex flex-col">
-                      <span className="font-medium">Super Admin</span>
+                      <span className="font-medium">Full Administrator</span>
                       <span className="text-xs text-muted-foreground">Full access + admin management</span>
                     </div>
                   </SelectItem>

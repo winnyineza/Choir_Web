@@ -178,52 +178,6 @@ export function getPageViewStats(): {
   };
 }
 
-// Generate some sample data for demonstration
-export function seedAnalyticsData(): void {
-  const data = getAnalytics();
-  
-  // Only seed if we have less than 50 views
-  if (data.pageViews.length >= 50) return;
-  
-  const pages = [
-    { path: "/", title: "Home" },
-    { path: "/events", title: "Events" },
-    { path: "/gallery", title: "Gallery" },
-    { path: "/contact", title: "Contact" },
-    { path: "/releases", title: "Music Releases" },
-    { path: "/member-portal", title: "Member Portal" },
-  ];
-  
-  const now = new Date();
-  
-  // Generate random page views over the last 7 days
-  for (let i = 0; i < 100; i++) {
-    const daysAgo = Math.floor(Math.random() * 7);
-    const hoursAgo = Math.floor(Math.random() * 24);
-    const minutesAgo = Math.floor(Math.random() * 60);
-    
-    const timestamp = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() - daysAgo,
-      hoursAgo,
-      minutesAgo
-    );
-    
-    const page = pages[Math.floor(Math.random() * pages.length)];
-    
-    data.pageViews.push({
-      id: `pv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      path: page.path,
-      title: page.title,
-      timestamp: timestamp.toISOString(),
-    });
-  }
-  
-  data.totalViews = data.pageViews.length;
-  saveAnalytics(data);
-}
-
 // Type for the AnalyticsDashboard component
 export interface AnalyticsSummary {
   totalPageViews: number;
@@ -233,6 +187,8 @@ export interface AnalyticsSummary {
   pageViewsByDay: { date: string; views: number }[];
   topPages: { path: string; title: string; views: number }[];
   averageSessionDuration: number;
+  recentActivity: (PageView | { name: string; category: string; timestamp: string })[];
+  eventsByCategory: { category: string; count: number }[];
 }
 
 export function getAnalyticsSummary(): AnalyticsSummary {
@@ -288,6 +244,23 @@ export function getAnalyticsSummary(): AnalyticsSummary {
     }
   }
   
+  // Get recent activity (last 20 page views)
+  const recentActivity = pageViews
+    .slice(-20)
+    .reverse();
+
+  // Group by category (using path as pseudo-category)
+  const categoryMap: Record<string, number> = {};
+  pageViews.forEach(pv => {
+    const category = pv.path === '/' ? 'home' : pv.path.replace('/', '').split('/')[0] || 'other';
+    categoryMap[category] = (categoryMap[category] || 0) + 1;
+  });
+  
+  const eventsByCategory = Object.entries(categoryMap)
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
   return {
     totalPageViews: pageViews.length,
     uniquePages: uniquePaths.size,
@@ -296,5 +269,7 @@ export function getAnalyticsSummary(): AnalyticsSummary {
     pageViewsByDay,
     topPages,
     averageSessionDuration: Math.round(avgDuration),
+    recentActivity,
+    eventsByCategory,
   };
 }

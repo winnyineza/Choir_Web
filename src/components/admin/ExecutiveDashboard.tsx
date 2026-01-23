@@ -47,7 +47,7 @@ import { getAllDonations } from "@/lib/donationService";
 import { getAllLeaveRequests } from "@/lib/leaveService";
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 import { getRecentSessions, getOverallAttendanceStats } from "@/lib/attendanceService";
-import { getPageViewStats, seedAnalyticsData } from "@/lib/analyticsService";
+import { getPageViewStats } from "@/lib/analyticsService";
 import { formatCurrency } from "@/lib/flutterwave";
 
 interface ExecutiveDashboardProps {
@@ -96,8 +96,6 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<{ member: Member; daysUntil: number; date: string }[]>([]);
 
   useEffect(() => {
-    // Seed analytics data for demo
-    seedAnalyticsData();
     loadDashboardData();
   }, []);
 

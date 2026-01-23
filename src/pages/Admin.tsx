@@ -165,7 +165,6 @@ const VoiceBalanceTracker = lazy(() => import("@/components/admin/VoiceBalanceTr
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2 } from "lucide-react";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { BackupRestore } from "@/components/admin/BackupRestore";
-import { DataSyncManager } from "@/components/admin/DataSyncManager";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "analytics" | "event-staff" | "team" | "audit" | "settings";
 
@@ -687,7 +686,10 @@ export default function Admin() {
           </div>
 
           <nav className="flex-1 p-4 space-y-1">
-            {visibleSidebarItems.map((item) => (
+            {visibleSidebarItems.map((item) => {
+              const Icon = item.icon;
+              if (!Icon) return null; // Safety check
+              return (
               <button
                 key={item.id}
                 onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
@@ -698,7 +700,7 @@ export default function Admin() {
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                <item.icon className="w-5 h-5" />
+                <Icon className="w-5 h-5" />
                 {item.label}
                 {/* Unread messages badge */}
                 {item.id === "messages" && unreadMessages > 0 && (
@@ -710,7 +712,8 @@ export default function Admin() {
                   <Shield className="w-3 h-3 ml-auto text-primary" />
                 )}
               </button>
-            ))}
+              );
+            })}
           </nav>
 
           <div className="p-4 border-t border-primary/10 space-y-2">
@@ -727,7 +730,7 @@ export default function Admin() {
                   ? "bg-primary/20 text-primary" 
                   : "bg-secondary text-muted-foreground"
               }`}>
-                {currentUser?.role === "super_admin" ? "Super Admin" : "Admin"}
+                {getRoleLabel(currentUser?.role || "reviewer")}
               </span>
             </div>
             
@@ -771,7 +774,7 @@ export default function Admin() {
                 {currentUser?.name || "Admin"}
               </span>
               <span className="text-xs text-muted-foreground">
-                {currentUser?.role === "super_admin" ? "Super Admin" : "Admin"}
+                {getRoleLabel(currentUser?.role || "reviewer")}
               </span>
             </div>
             <div className="relative group">
@@ -849,7 +852,7 @@ export default function Admin() {
                         onChange={(e) => setPreviewRole(e.target.value || null)}
                         className="px-3 py-1.5 text-sm rounded-lg bg-secondary border border-primary/20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                       >
-                        <option value="">My Role (Super Admin)</option>
+                        <option value="">My Role (Administrator)</option>
                         <option value="main_admin">Main Admin</option>
                         <option value="finance">Finance</option>
                         <option value="secretary">Secretary</option>
@@ -2784,45 +2787,6 @@ export default function Admin() {
               {/* Backup & Restore Section */}
               <div className="max-w-2xl">
                 <BackupRestore />
-              </div>
-
-              {/* Database Sync Section */}
-              <div className="max-w-2xl">
-                <DataSyncManager />
-              </div>
-
-              {/* Clear All Data Section */}
-              <div className="card-glass rounded-2xl p-6 max-w-2xl border border-destructive/20">
-                <h3 className="font-semibold text-destructive mb-2">Reset All Data</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  This will permanently delete all data including members, events, gallery items, releases, promo codes, and ticket orders. This action cannot be undone.
-                </p>
-                <Button
-                  variant="outline"
-                  className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to delete ALL data? This cannot be undone.")) {
-                      // Clear all localStorage keys
-                      localStorage.removeItem("serenades_members");
-                      localStorage.removeItem("serenades_events");
-                      localStorage.removeItem("serenades_gallery");
-                      localStorage.removeItem("serenades_donations");
-                      localStorage.removeItem("serenades_settings");
-                      localStorage.removeItem("sop_albums");
-                      localStorage.removeItem("sop_music_videos");
-                      localStorage.removeItem("sop_promo_codes");
-                      localStorage.removeItem("sop_ticket_orders");
-                      loadData();
-                      toast({
-                        title: "All Data Cleared",
-                        description: "All data has been permanently deleted.",
-                      });
-                    }
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Clear All Data
-                </Button>
               </div>
 
             </div>

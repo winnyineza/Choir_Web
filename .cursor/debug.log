@@ -1,0 +1,7 @@
+
+{"location":"main.tsx:init","message":"App starting","data":{"timestamp":"2026-01-23T07:24:00.659Z"},"timestamp":1769153040659,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"main.tsx:render","message":"Starting React render","data":{},"timestamp":1769153040659,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"main.tsx:mounted","message":"App mounted successfully","data":{},"timestamp":1769153041661,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"main.tsx:console.error","message":"Console error intercepted","data":{"args":["ReferenceError: debugLog is not defined"]},"timestamp":1769153149461,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"main.tsx:console.error","message":"Console error intercepted","data":{"args":["[hmr] Failed to reload /src/main.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)"]},"timestamp":1769153149463,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"main.tsx:console.error","message":"Console error intercepted","data":{"args":["Warning: You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it."]},"timestamp":1769153181297,"sessionId":"debug-session","hypothesisId":"B"}

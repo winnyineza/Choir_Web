@@ -283,7 +283,7 @@ export default function AdminLogin() {
                 <div className="flex items-center justify-center gap-2 mt-2">
                   <Shield className="w-4 h-4 text-primary" />
                   <span className="text-xs text-primary font-medium">
-                    {invite.role === "super_admin" ? "Super Admin" : "Admin"} Access
+                    {invite.role === "super_admin" ? "Full Administrator" : "Admin"} Access
                   </span>
                 </div>
               </div>

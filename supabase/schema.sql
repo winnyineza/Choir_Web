@@ -401,7 +401,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Apply update trigger to relevant tables
+-- Apply update trigger to relevant tables (drop first to allow re-running)
+DROP TRIGGER IF EXISTS update_members_updated_at ON members;
+DROP TRIGGER IF EXISTS update_events_updated_at ON events;
+DROP TRIGGER IF EXISTS update_admin_users_updated_at ON admin_users;
+DROP TRIGGER IF EXISTS update_leave_requests_updated_at ON leave_requests;
+DROP TRIGGER IF EXISTS update_disciplinary_records_updated_at ON disciplinary_records;
+DROP TRIGGER IF EXISTS update_inventory_updated_at ON inventory;
+DROP TRIGGER IF EXISTS update_documents_updated_at ON documents;
+DROP TRIGGER IF EXISTS update_meeting_minutes_updated_at ON meeting_minutes;
+DROP TRIGGER IF EXISTS update_auditions_updated_at ON auditions;
+
 CREATE TRIGGER update_members_updated_at BEFORE UPDATE ON members FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_admin_users_updated_at BEFORE UPDATE ON admin_users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
@@ -451,19 +461,15 @@ $$ LANGUAGE plpgsql;
 
 -- =============================================
 -- INSERT DEFAULT SUPER ADMIN
--- Password: ChangeMe123! (you should change this immediately)
--- Password hash generated with bcrypt, cost 10
 -- =============================================
 INSERT INTO admin_users (email, name, password_hash, role, is_active)
 VALUES (
-  'admin@theserenades.com',
-  'Super Admin',
-  '$2a$10$rKN3hXXKKmZMhXV.xQQXYuVvqKzVvl8/N1c8dBq1vJYmVdRqLqL2i',
+  'w.ineza@alustudent.com',
+  'Winny Ineza',
+  '$2b$10$POMQ.J5wyCbe417P61akfeAlH/20L/RVvghsc.EG8AGljdOoGJP7S',
   'super_admin',
   true
 ) ON CONFLICT (email) DO NOTHING;
-
--- Note: Default password is 'ChangeMe123!' - CHANGE THIS AFTER FIRST LOGIN!
 
 COMMENT ON TABLE members IS 'Choir members information';
 COMMENT ON TABLE events IS 'Choir events and concerts';

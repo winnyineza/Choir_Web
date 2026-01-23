@@ -792,16 +792,16 @@ function downloadCSV(headers: string[], rows: any[][], filename: string): void {
 // Get backup statistics
 export function getBackupStats() {
   return {
-    members: getAllMembers().length,
-    events: getAllEvents().length,
-    gallery: getAllGalleryItems().length,
-    orders: getAllOrders().length,
-    leaveRequests: getAllLeaveRequests().length,
-    attendance: getAllSessions().length,
-    albums: getAllAlbums().length,
-    musicVideos: getAllMusicVideos().length,
-    promoCodes: getAllPromoCodes().length,
-    donations: getAllDonations().length,
+    members: (getAllMembers() || []).length,
+    events: (getAllEvents() || []).length,
+    gallery: (getAllGalleryItems() || []).length,
+    orders: (getAllOrders() || []).length,
+    leaveRequests: (getAllLeaveRequests() || []).length,
+    attendance: (getAllSessions() || []).length,
+    albums: (getAllAlbums() || []).length,
+    musicVideos: (getAllMusicVideos() || []).length,
+    promoCodes: (getAllPromoCodes() || []).length,
+    donations: (getAllDonations() || []).length,
   };
 }
 

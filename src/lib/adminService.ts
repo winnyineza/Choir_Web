@@ -73,36 +73,25 @@ export interface PasswordResetToken {
 
 const PASSWORD_RESET_KEY = "choir_password_resets";
 
-// Default Super Admin - Change this to your email!
-// Password is hashed at runtime on first use
-const DEFAULT_SUPER_ADMIN: AdminUser = {
-  id: "super-admin-001",
-  email: "w.ineza@alustudent.com", // Your email
-  name: "Winny Ineza",
-  password: "SuperAdmin@2024", // Will be hashed on first init
-  role: "super_admin",
-  createdAt: new Date().toISOString(),
-  isActive: true,
-  passwordHashed: false,
-};
-
-// Initialize admin users with super admin if empty
+// Initialize admin users - no default admin, use Supabase for auth
 function initializeAdminUsers(): void {
   const existing = localStorage.getItem(ADMIN_USERS_KEY);
   if (!existing) {
-    // Hash the default password before storing
-    const hashedAdmin = {
-      ...DEFAULT_SUPER_ADMIN,
-      password: hashPassword(DEFAULT_SUPER_ADMIN.password),
-      passwordHashed: true,
-    };
-    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([hashedAdmin]));
+    // Start with empty admin list - Supabase is the source of truth
+    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([]));
   } else {
-    // Ensure super admin exists and migrate unhashed passwords
-    const users: AdminUser[] = JSON.parse(existing);
+    // Parse existing users
+    let users: AdminUser[] = JSON.parse(existing);
     let needsUpdate = false;
     
-    // Migrate unhashed passwords
+    // Remove old hardcoded super-admin-001 if it exists (cleanup)
+    const oldHardcodedIndex = users.findIndex(u => u.id === "super-admin-001");
+    if (oldHardcodedIndex !== -1) {
+      users.splice(oldHardcodedIndex, 1);
+      needsUpdate = true;
+    }
+    
+    // Migrate unhashed passwords for any remaining users
     users.forEach((user, index) => {
       if (!user.passwordHashed && !user.password.startsWith("$2")) {
         users[index] = {
@@ -113,17 +102,6 @@ function initializeAdminUsers(): void {
         needsUpdate = true;
       }
     });
-    
-    const hasSuperAdmin = users.some(u => u.role === "super_admin");
-    if (!hasSuperAdmin) {
-      const hashedAdmin = {
-        ...DEFAULT_SUPER_ADMIN,
-        password: hashPassword(DEFAULT_SUPER_ADMIN.password),
-        passwordHashed: true,
-      };
-      users.push(hashedAdmin);
-      needsUpdate = true;
-    }
     
     if (needsUpdate) {
       localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(users));
@@ -361,7 +339,7 @@ export function getAuditLog(limit: number = 100): AuditLogEntry[] {
 
 // Add audit log entry
 export function addAuditLog(
-  user: AdminUser,
+  user: { id: string; email: string; name: string },
   action: string,
   details: string
 ): void {
@@ -416,11 +394,11 @@ export function canAccessSettings(user: AdminUser | null): boolean {
 
 export function getRoleLabel(role: AdminRole): string {
   switch (role) {
-    case "super_admin": return "Super Admin";
-    case "main_admin": return "Main Admin";
-    case "finance": return "Finance";
+    case "super_admin": return "Administrator";
+    case "main_admin": return "Administrator";
+    case "finance": return "Finance Officer";
     case "secretary": return "Secretary";
-    case "disciplinary": return "Disciplinary";
+    case "disciplinary": return "Disciplinary Officer";
     case "reviewer": return "Reviewer";
     default: return role;
   }
