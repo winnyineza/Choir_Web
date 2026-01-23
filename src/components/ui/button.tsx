@@ -9,15 +9,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[0_0_30px_hsl(45_80%_50%_/_0.4)]",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[var(--shadow-gold)]",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border-2 border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:border-primary",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-primary/10 hover:text-primary",
         link: "text-primary underline-offset-4 hover:underline",
-        gold: "bg-gradient-to-r from-gold to-gold-dark text-primary-foreground font-semibold hover:shadow-[0_0_40px_hsl(45_80%_50%_/_0.5)] hover:scale-105 transition-all duration-300",
+        gold: "bg-[var(--gradient-gold)] text-primary-foreground font-semibold hover:shadow-[var(--shadow-gold-lg)] hover:scale-105 transition-all duration-300",
         "gold-outline": "border-2 border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300",
-        hero: "bg-gradient-to-r from-gold to-gold-dark text-primary-foreground font-bold text-lg px-8 py-4 hover:shadow-[0_0_50px_hsl(45_80%_50%_/_0.6)] hover:scale-105 transition-all duration-300",
+        hero: "bg-[var(--gradient-gold)] text-primary-foreground font-bold text-lg px-8 py-4 hover:shadow-[var(--shadow-gold-lg)] hover:scale-105 transition-all duration-300",
         "hero-outline": "border-2 border-primary/70 bg-transparent text-foreground font-semibold text-lg px-8 py-4 hover:bg-primary/10 hover:border-primary transition-all duration-300",
       },
       size: {

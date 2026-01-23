@@ -83,7 +83,7 @@ export function AboutPreview() {
               }`}
               style={{ transitionDelay: `${300 + index * 100}ms` }}
             >
-              <div className="w-14 h-14 rounded-xl bg-gold-gradient flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[0_0_30px_hsl(45_80%_50%_/_0.3)] transition-all duration-300">
+              <div className="w-14 h-14 rounded-xl bg-[var(--gradient-gold)] flex items-center justify-center mb-6 group-hover:scale-110 group-hover:shadow-[var(--shadow-gold)] transition-all duration-300">
                 <feature.icon className="w-7 h-7 text-primary-foreground" />
               </div>
               <h3 className="font-display text-xl font-semibold text-foreground mb-3">

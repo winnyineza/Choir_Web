@@ -102,6 +102,20 @@
     --charcoal: 0 0% 95%;
     --charcoal-light: 0 0% 92%;
 
+    /* Override gold colors with orange for light mode */
+    --gold: 18 95% 55%;
+    --gold-light: 20 90% 65%;
+    --gold-dark: 15 100% 45%;
+    --gold-glow: 18 100% 55%;
+
+    /* Override gradients for light mode */
+    --gradient-gold: linear-gradient(135deg, hsl(18 95% 55%), hsl(12 90% 45%));
+    --gradient-gold-shine: linear-gradient(90deg, hsl(18 95% 55%) 0%, hsl(20 90% 65%) 50%, hsl(18 95% 55%) 100%);
+
+    /* Override shadows for light mode */
+    --shadow-gold: 0 4px 30px hsl(18 95% 55% / 0.2);
+    --shadow-gold-lg: 0 8px 50px hsl(18 95% 55% / 0.3);
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 10%;
     --sidebar-primary: 18 95% 55%;
@@ -114,6 +128,23 @@
 
   .light body {
     background: linear-gradient(180deg, hsl(0 0% 98%), hsl(0 0% 95%));
+  }
+
+  /* Override section patterns in light mode to use orange */
+  .light .section-pattern {
+    background-image: 
+      radial-gradient(ellipse at 20% 50%, hsl(18 95% 55% / 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, hsl(18 95% 55% / 0.05) 0%, transparent 50%);
+  }
+
+  /* Override gold text gradient in light mode */
+  .light .gold-text {
+    background-image: linear-gradient(90deg, hsl(18 95% 55%) 0%, hsl(20 90% 65%) 50%, hsl(18 95% 55%) 100%);
+  }
+
+  /* Override pulse animation in light mode */
+  .light .animate-pulse-gold {
+    animation: pulse-orange 2s ease-in-out infinite;
   }
 }
 
@@ -269,6 +300,11 @@
   50% { box-shadow: 0 0 40px hsl(45 80% 50% / 0.6); }
 }
 
+@keyframes pulse-orange {
+  0%, 100% { box-shadow: 0 0 20px hsl(18 95% 55% / 0.3); }
+  50% { box-shadow: 0 0 40px hsl(18 95% 55% / 0.6); }
+}
+
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(40px); }
   to { opacity: 1; transform: translateY(0); }
@@ -313,17 +349,18 @@
   background: hsl(45 80% 50% / 0.5);
 }
 
-/* Light mode scrollbar */
+/* Light mode scrollbar - orange */
 .light ::-webkit-scrollbar-track {
   background: hsl(0 0% 95%);
 }
 
 .light ::-webkit-scrollbar-thumb {
-  background: hsl(18 95% 55% / 0.4);
+  background: hsl(18 95% 55% / 0.5);
+  border-radius: 4px;
 }
 
 .light ::-webkit-scrollbar-thumb:hover {
-  background: hsl(18 95% 55% / 0.6);
+  background: hsl(18 95% 55% / 0.7);
 }
 
 /* Print Styles */

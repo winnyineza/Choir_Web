@@ -37,7 +37,7 @@ export function EventsPreview() {
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(circle at 2px 2px, hsl(45 80% 50% / 0.1) 1px, transparent 0)",
+          backgroundImage: "radial-gradient(circle at 2px 2px, hsl(var(--primary) / 0.1) 1px, transparent 0)",
           backgroundSize: "40px 40px"
         }} />
       </div>
