@@ -282,9 +282,9 @@ const handler: Handler = async (event, context) => {
   }
 };
 
-// Schedule: Run every day at 8:00 AM UTC
-// Adjust the time for your timezone (e.g., "0 6 * * *" for 6 AM UTC = 8 AM CAT)
-export const scheduledHandler = schedule("0 6 * * *", handler);
+// Schedule: Run every day at 6:00 AM UTC (8 AM CAT/Rwanda time)
+// The schedule wrapper makes this run automatically
+const scheduledHandler = schedule("0 6 * * *", handler);
 
-// Also export for manual testing
-export { handler };
+// Export both - handler for manual testing, scheduledHandler for scheduled runs
+export { handler, scheduledHandler };
