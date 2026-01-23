@@ -53,6 +53,10 @@ import {
   Settings,
   Pencil,
   Save,
+  ClipboardList,
+  Star,
+  CheckSquare,
+  MessageSquare,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
@@ -90,6 +94,13 @@ import {
 } from "@/lib/contributionService";
 import { formatCurrency } from "@/lib/flutterwave";
 import { cn } from "@/lib/utils";
+import {
+  getActiveSurveysForMembers,
+  hasRespondedToSurvey,
+  submitSurveyResponse,
+  type Survey,
+  type SurveyQuestion,
+} from "@/lib/surveyService";
 import { exportMemberStatement } from "@/lib/exportUtils";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
@@ -139,6 +150,13 @@ export default function MemberPortal() {
     altPhone: "",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Surveys
+  const [activeSurveys, setActiveSurveys] = useState<Survey[]>([]);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+  const [surveyAnswers, setSurveyAnswers] = useState<Record<string, string | number | string[]>>({});
+  const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
 
   // Load announcements when PIN is verified
@@ -164,6 +182,8 @@ export default function MemberPortal() {
       if (memberInfo.emergencyContact) {
         setEditEmergencyContact(memberInfo.emergencyContact);
       }
+      // Load active surveys
+      setActiveSurveys(getActiveSurveysForMembers());
     }
   }, [memberInfo]);
 
@@ -194,6 +214,56 @@ export default function MemberPortal() {
       });
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  // Handle survey open
+  const handleOpenSurvey = (survey: Survey) => {
+    setSelectedSurvey(survey);
+    setSurveyAnswers({});
+    setShowSurveyModal(true);
+  };
+
+  // Handle survey submit
+  const handleSubmitSurvey = async () => {
+    if (!selectedSurvey || !memberInfo) return;
+    
+    // Check if all required questions are answered
+    const unanswered = selectedSurvey.questions.filter(q => !surveyAnswers[q.id]);
+    if (unanswered.length > 0) {
+      toast({
+        title: "Please answer all questions",
+        description: `${unanswered.length} question(s) remaining.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmittingSurvey(true);
+    try {
+      submitSurveyResponse({
+        surveyId: selectedSurvey.id,
+        memberId: memberInfo.id,
+        answers: surveyAnswers,
+      });
+      
+      toast({
+        title: "Survey Submitted!",
+        description: "Thank you for your feedback.",
+      });
+      setShowSurveyModal(false);
+      setSelectedSurvey(null);
+      setSurveyAnswers({});
+      // Refresh surveys list
+      setActiveSurveys(getActiveSurveysForMembers());
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit survey. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingSurvey(false);
     }
   };
 
@@ -938,6 +1008,55 @@ export default function MemberPortal() {
                           {getStatusBadge(request.status, request)}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active Surveys (if logged in and there are surveys) */}
+                {memberInfo && activeSurveys.length > 0 && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <ClipboardList className="w-5 h-5 text-primary" />
+                      Surveys
+                    </h2>
+                    <div className="space-y-3">
+                      {activeSurveys.map(survey => {
+                        const hasResponded = hasRespondedToSurvey(survey.id, memberInfo.id);
+                        return (
+                          <div 
+                            key={survey.id} 
+                            className={cn(
+                              "p-4 rounded-xl border transition-all",
+                              hasResponded 
+                                ? "bg-green-500/10 border-green-500/30" 
+                                : "bg-primary/10 border-primary/30 hover:bg-primary/20 cursor-pointer"
+                            )}
+                            onClick={() => !hasResponded && handleOpenSurvey(survey)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <h3 className="font-medium text-foreground">{survey.title}</h3>
+                                {survey.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{survey.description}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  {survey.questions.length} question{survey.questions.length !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              {hasResponded ? (
+                                <div className="flex items-center gap-1 text-green-500">
+                                  <CheckCircle className="w-5 h-5" />
+                                  <span className="text-xs">Completed</span>
+                                </div>
+                              ) : (
+                                <Button variant="gold" size="sm">
+                                  Take Survey
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1798,6 +1917,149 @@ export default function MemberPortal() {
                     <div className="pt-4">
                       <NotificationSettings />
                     </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Survey Response Modal */}
+                <Dialog open={showSurveyModal} onOpenChange={(open) => { setShowSurveyModal(open); if (!open) setSelectedSurvey(null); }}>
+                  <DialogContent className="max-w-lg bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <ClipboardList className="w-5 h-5 text-primary" />
+                        {selectedSurvey?.title}
+                      </DialogTitle>
+                      {selectedSurvey?.description && (
+                        <DialogDescription>{selectedSurvey.description}</DialogDescription>
+                      )}
+                    </DialogHeader>
+                    
+                    {selectedSurvey && (
+                      <div className="space-y-6 pt-4">
+                        {selectedSurvey.questions.map((question, index) => (
+                          <div key={question.id} className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs text-muted-foreground font-medium mt-1">Q{index + 1}</span>
+                              {question.type === 'text' && <MessageSquare className="w-4 h-4 text-primary mt-1" />}
+                              {question.type === 'rating' && <Star className="w-4 h-4 text-primary mt-1" />}
+                              {question.type === 'multi' && <CheckSquare className="w-4 h-4 text-primary mt-1" />}
+                              <p className="font-medium text-foreground">{question.prompt}</p>
+                            </div>
+                            
+                            {/* Text answer */}
+                            {question.type === 'text' && (
+                              <Textarea
+                                value={(surveyAnswers[question.id] as string) || ""}
+                                onChange={(e) => setSurveyAnswers({ ...surveyAnswers, [question.id]: e.target.value })}
+                                placeholder="Type your answer..."
+                                className="bg-secondary border-primary/20"
+                                rows={3}
+                              />
+                            )}
+                            
+                            {/* Rating (1-5) */}
+                            {question.type === 'rating' && (
+                              <div className="flex gap-2">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                  <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setSurveyAnswers({ ...surveyAnswers, [question.id]: n })}
+                                    className={cn(
+                                      "w-12 h-12 rounded-lg border-2 flex items-center justify-center text-lg font-semibold transition-all",
+                                      surveyAnswers[question.id] === n
+                                        ? "bg-primary border-primary text-primary-foreground"
+                                        : "bg-secondary border-primary/20 hover:border-primary/50 text-foreground"
+                                    )}
+                                  >
+                                    {n}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Multiple choice */}
+                            {question.type === 'multi' && question.options && (
+                              <div className="space-y-2">
+                                {question.options.map((option, optIdx) => {
+                                  const selected = Array.isArray(surveyAnswers[question.id])
+                                    ? (surveyAnswers[question.id] as string[]).includes(option)
+                                    : surveyAnswers[question.id] === option;
+                                  
+                                  return (
+                                    <button
+                                      key={optIdx}
+                                      type="button"
+                                      onClick={() => {
+                                        const current = surveyAnswers[question.id];
+                                        if (Array.isArray(current)) {
+                                          // Multi-select mode
+                                          if (current.includes(option)) {
+                                            setSurveyAnswers({
+                                              ...surveyAnswers,
+                                              [question.id]: current.filter(o => o !== option)
+                                            });
+                                          } else {
+                                            setSurveyAnswers({
+                                              ...surveyAnswers,
+                                              [question.id]: [...current, option]
+                                            });
+                                          }
+                                        } else {
+                                          // Single select or first selection
+                                          setSurveyAnswers({ ...surveyAnswers, [question.id]: option });
+                                        }
+                                      }}
+                                      className={cn(
+                                        "w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all",
+                                        selected
+                                          ? "bg-primary/20 border-primary"
+                                          : "bg-secondary border-primary/20 hover:border-primary/50"
+                                      )}
+                                    >
+                                      <div className={cn(
+                                        "w-5 h-5 rounded border-2 flex items-center justify-center",
+                                        selected ? "bg-primary border-primary" : "border-muted-foreground"
+                                      )}>
+                                        {selected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                                      </div>
+                                      <span className="text-sm text-foreground">{option}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        <div className="flex gap-2 pt-4">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => { setShowSurveyModal(false); setSelectedSurvey(null); }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="gold"
+                            className="flex-1"
+                            onClick={handleSubmitSurvey}
+                            disabled={isSubmittingSurvey}
+                          >
+                            {isSubmittingSurvey ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Submitting...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-4 h-4 mr-2" />
+                                Submit Survey
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>
