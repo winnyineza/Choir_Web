@@ -6,11 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import {
   Lock,
   Mail,
@@ -41,10 +50,13 @@ import {
   Printer,
   Phone,
   User,
+  Settings,
+  Pencil,
+  Save,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
-import { getAllMembers, type Member, type EmergencyContact } from "@/lib/dataService";
+import { getAllMembers, updateMember, type Member, type EmergencyContact } from "@/lib/dataService";
 import { BirthdayAlert } from "@/components/BirthdayAlert";
 import {
   verifyPortalPin,
@@ -115,6 +127,18 @@ export default function MemberPortal() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [myContributions, setMyContributions] = useState<Contribution[]>([]);
   const [contributionStatus, setContributionStatus] = useState<MemberContributionStatus | null>(null);
+
+  // Profile editing
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmergencyContact, setEditEmergencyContact] = useState<EmergencyContact>({
+    name: "",
+    relationship: "Spouse",
+    phone: "",
+    altPhone: "",
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
 
   // Load announcements when PIN is verified
@@ -132,6 +156,46 @@ export default function MemberPortal() {
       setContributionStatus(getMemberContributionStatus(memberInfo.id, memberInfo.name, memberInfo.email));
     }
   }, [memberInfo]);
+
+  // Populate edit form when member info is loaded
+  useEffect(() => {
+    if (memberInfo) {
+      setEditPhone(memberInfo.phone || "");
+      if (memberInfo.emergencyContact) {
+        setEditEmergencyContact(memberInfo.emergencyContact);
+      }
+    }
+  }, [memberInfo]);
+
+  // Handle profile save
+  const handleSaveProfile = async () => {
+    if (!memberInfo) return;
+    
+    setIsSavingProfile(true);
+    try {
+      const updatedMember = updateMember(memberInfo.id, {
+        phone: editPhone,
+        emergencyContact: editEmergencyContact.name ? editEmergencyContact : undefined,
+      });
+      
+      if (updatedMember) {
+        setMemberInfo(updatedMember);
+        toast({
+          title: "Profile Updated",
+          description: "Your information has been saved successfully.",
+        });
+        setShowProfileEdit(false);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // PIN input handling
   const handlePinChange = (index: number, value: string) => {
@@ -680,6 +744,50 @@ export default function MemberPortal() {
                   </button>
                 </div>
 
+                {/* Profile & Settings (if logged in but no emergency contact) */}
+                {memberInfo && !memberInfo.emergencyContact && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5 text-primary" />
+                      My Profile
+                    </h2>
+                    <div className="bg-secondary/30 rounded-xl p-4 mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{memberInfo.name}</p>
+                          <p className="text-sm text-muted-foreground">{memberInfo.voice} • {memberInfo.status}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{memberInfo.phone || "No phone added"}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-yellow-500/80 mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      Please add your emergency contact information.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="gold"
+                        size="sm"
+                        onClick={() => setShowProfileEdit(true)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSettings(true)}
+                      >
+                        <Settings className="w-3 h-3 mr-1" />
+                        Settings
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Emergency Contact (if logged in and has one) */}
                 {memberInfo && memberInfo.emergencyContact && (
                   <div className="card-glass rounded-2xl p-6">
@@ -710,9 +818,24 @@ export default function MemberPortal() {
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-3">
-                      Contact your choir administrator if this information needs to be updated.
-                    </p>
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowProfileEdit(true)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSettings(true)}
+                      >
+                        <Settings className="w-3 h-3 mr-1" />
+                        Settings
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -1539,6 +1662,142 @@ export default function MemberPortal() {
                         </Button>
                       </div>
                     )}
+                  </DialogContent>
+                </Dialog>
+
+                {/* Profile Edit Modal */}
+                <Dialog open={showProfileEdit} onOpenChange={setShowProfileEdit}>
+                  <DialogContent className="max-w-md bg-background border-primary/20">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Pencil className="w-5 h-5 text-primary" />
+                        Edit Profile
+                      </DialogTitle>
+                      <DialogDescription>
+                        Update your phone number and emergency contact information.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-6 pt-4">
+                      {/* Phone Number */}
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          placeholder="e.g., 078 123 4567"
+                          className="bg-secondary border-primary/20"
+                        />
+                      </div>
+
+                      {/* Emergency Contact */}
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Emergency Contact</Label>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <Label htmlFor="ec-name" className="text-sm">Contact Name</Label>
+                            <Input
+                              id="ec-name"
+                              value={editEmergencyContact.name}
+                              onChange={(e) => setEditEmergencyContact({ ...editEmergencyContact, name: e.target.value })}
+                              placeholder="Full name"
+                              className="bg-secondary border-primary/20"
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="ec-relationship" className="text-sm">Relationship</Label>
+                            <Select
+                              value={editEmergencyContact.relationship}
+                              onValueChange={(v) => setEditEmergencyContact({ ...editEmergencyContact, relationship: v as EmergencyContact["relationship"] })}
+                            >
+                              <SelectTrigger className="bg-secondary border-primary/20">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Spouse">Spouse</SelectItem>
+                                <SelectItem value="Parent">Parent</SelectItem>
+                                <SelectItem value="Sibling">Sibling</SelectItem>
+                                <SelectItem value="Child">Child</SelectItem>
+                                <SelectItem value="Friend">Friend</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="ec-phone" className="text-sm">Phone</Label>
+                            <Input
+                              id="ec-phone"
+                              type="tel"
+                              value={editEmergencyContact.phone}
+                              onChange={(e) => setEditEmergencyContact({ ...editEmergencyContact, phone: e.target.value })}
+                              placeholder="Primary phone"
+                              className="bg-secondary border-primary/20"
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="ec-alt-phone" className="text-sm">Alternative Phone (Optional)</Label>
+                            <Input
+                              id="ec-alt-phone"
+                              type="tel"
+                              value={editEmergencyContact.altPhone || ""}
+                              onChange={(e) => setEditEmergencyContact({ ...editEmergencyContact, altPhone: e.target.value })}
+                              placeholder="Backup phone"
+                              className="bg-secondary border-primary/20"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setShowProfileEdit(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="gold"
+                          className="flex-1"
+                          onClick={handleSaveProfile}
+                          disabled={isSavingProfile}
+                        >
+                          {isSavingProfile ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Settings Modal */}
+                <Dialog open={showSettings} onOpenChange={setShowSettings}>
+                  <DialogContent className="max-w-lg bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Settings className="w-5 h-5 text-primary" />
+                        Settings
+                      </DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="pt-4">
+                      <NotificationSettings />
+                    </div>
                   </DialogContent>
                 </Dialog>
               </div>

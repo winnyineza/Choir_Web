@@ -444,7 +444,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   main_admin: [
     "dashboard", "members", "members_edit", "events", "tickets", "attendance",
     "leave", "disciplinary", "contributions", "expenses", "treasury", "announcements", "messages",
-    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "surveys", "analytics", "event_staff"
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "surveys", "analytics", "event_staff", "settings"
   ],
   finance: [
     "dashboard", "members", "tickets", "contributions", "expenses", "treasury"
@@ -530,6 +530,7 @@ export function getAccessibleTabs(user: AdminUser | null): string[] {
     "minutes": "minutes",
     "documents": "documents",
     "voice-balance": "voice_balance",
+    "surveys": "surveys",
     "analytics": "analytics",
     "event-staff": "event_staff",
     "team": "team",
