@@ -23,7 +23,20 @@ interface Event {
   location?: string;
 }
 
-// Helper to get upcoming birthdays
+// Helper to get TODAY's birthdays (for sending wishes)
+function getTodayBirthdays(members: Member[]): Member[] {
+  const today = new Date();
+  const todayMonth = today.getMonth();
+  const todayDate = today.getDate();
+
+  return members.filter(member => {
+    if (!member.date_of_birth) return false;
+    const dob = new Date(member.date_of_birth);
+    return dob.getMonth() === todayMonth && dob.getDate() === todayDate;
+  });
+}
+
+// Helper to get upcoming birthdays (for admin reminders)
 function getUpcomingBirthdays(members: Member[], daysAhead: number = 7): Member[] {
   const today = new Date();
   const upcoming: Member[] = [];
@@ -40,7 +53,8 @@ function getUpcomingBirthdays(members: Member[], daysAhead: number = 7): Member[
     
     const daysUntil = Math.ceil((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (daysUntil >= 0 && daysUntil <= daysAhead) {
+    // Exclude today (those get birthday wishes instead)
+    if (daysUntil > 0 && daysUntil <= daysAhead) {
       upcoming.push(member);
     }
   });
@@ -60,8 +74,8 @@ function getTomorrowEvents(events: Event[]): Event[] {
   });
 }
 
-// Generate birthday reminder email HTML
-function generateBirthdayEmail(birthdays: Member[]): string {
+// Generate birthday reminder email HTML (for admins - upcoming birthdays)
+function generateBirthdayReminderEmail(birthdays: Member[]): string {
   const birthdayList = birthdays.map(m => {
     const dob = new Date(m.date_of_birth!);
     return `<li><strong>${m.name}</strong> - ${dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</li>`;
@@ -88,6 +102,57 @@ function generateBirthdayEmail(birthdays: Member[]): string {
         <p>Don't forget to wish them a happy birthday!</p>
         <div class="footer">
           <p>Serenades of Praise Choir Management System</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// Generate birthday wish email (sent to ALL members on someone's birthday)
+function generateBirthdayWishEmail(birthdayMembers: Member[]): string {
+  const names = birthdayMembers.map(m => m.name);
+  const nameList = names.length === 1 
+    ? names[0] 
+    : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  
+  const isPlural = birthdayMembers.length > 1;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a 0%, #2a2020 100%); border-radius: 16px; padding: 40px; text-align: center; }
+        .cake { font-size: 80px; margin-bottom: 20px; }
+        h1 { color: #d4a537; margin-bottom: 10px; font-size: 28px; }
+        .names { color: #fff; font-size: 24px; font-weight: bold; margin: 20px 0; }
+        .message { color: #ccc; font-size: 16px; line-height: 1.6; margin: 20px 0; }
+        .wish-box { background: #d4a537; color: #000; padding: 15px 30px; border-radius: 8px; display: inline-block; margin: 20px 0; font-weight: bold; }
+        .footer { margin-top: 30px; color: #888; font-size: 12px; }
+        .confetti { font-size: 24px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="cake">🎂</div>
+        <h1>Happy Birthday!</h1>
+        <div class="confetti">🎉 🎈 🎊 🎁 🎉</div>
+        <div class="names">${nameList}</div>
+        <p class="message">
+          Today we celebrate ${isPlural ? 'our beloved choir members' : 'our beloved choir member'}!<br><br>
+          May God bless you with joy, peace, and many more years of beautiful music. 
+          Your voice${isPlural ? 's are' : ' is'} a blessing to our choir family!
+        </p>
+        <div class="wish-box">
+          🎵 Voices United in Celebration 🎵
+        </div>
+        <p class="message" style="font-style: italic;">
+          "This is the day the LORD has made; let us rejoice and be glad in it." - Psalm 118:24
+        </p>
+        <div class="footer">
+          <p>With love from the Serenades of Praise Family ❤️</p>
         </div>
       </div>
     </body>
@@ -208,11 +273,18 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    const results = {
-      birthdaysSent: false,
+    const results: Record<string, any> = {
+      // Birthday wishes (sent to ALL members on the day)
+      birthdayWishesSent: false,
+      todayBirthdayCount: 0,
+      wishRecipients: 0,
+      // Birthday reminders (sent to admins for upcoming)
+      birthdayRemindersSent: false,
+      upcomingBirthdayCount: 0,
+      // Event reminders
       eventsSent: false,
-      birthdayCount: 0,
       eventCount: 0,
+      // Config
       adminEmails: adminEmails.length,
     };
 
@@ -270,21 +342,51 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    // Check for upcoming birthdays
+    // ===== TODAY'S BIRTHDAYS - Send wishes to ALL members =====
+    const todayBirthdays = getTodayBirthdays(members);
+    
+    if (todayBirthdays.length > 0) {
+      console.log(`🎂 TODAY's birthdays: ${todayBirthdays.map(m => m.name).join(', ')}`);
+      
+      // Get all member emails (everyone gets the birthday wish!)
+      const allMemberEmails = members.map(m => m.email).filter(Boolean);
+      
+      if (allMemberEmails.length > 0) {
+        const names = todayBirthdays.map(m => m.name);
+        const nameList = names.length === 1 
+          ? names[0] 
+          : names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];
+        
+        const sent = await sendEmail(
+          allMemberEmails,
+          `🎂 Happy Birthday ${nameList}! 🎉`,
+          generateBirthdayWishEmail(todayBirthdays)
+        );
+
+        if (sent) {
+          results.birthdayWishesSent = true;
+          results.todayBirthdayCount = todayBirthdays.length;
+          results.wishRecipients = allMemberEmails.length;
+          console.log(`Birthday wishes sent to ${allMemberEmails.length} members`);
+        }
+      }
+    }
+
+    // ===== UPCOMING BIRTHDAYS - Send reminder to admins =====
     const upcomingBirthdays = getUpcomingBirthdays(members, 7);
     
     if (upcomingBirthdays.length > 0) {
-      console.log(`Found ${upcomingBirthdays.length} upcoming birthdays`);
+      console.log(`Found ${upcomingBirthdays.length} upcoming birthdays (next 7 days)`);
       
       const sent = await sendEmail(
         adminEmails,
         `🎂 ${upcomingBirthdays.length} Upcoming Birthday${upcomingBirthdays.length > 1 ? 's' : ''} This Week`,
-        generateBirthdayEmail(upcomingBirthdays)
+        generateBirthdayReminderEmail(upcomingBirthdays)
       );
 
       if (sent) {
-        results.birthdaysSent = true;
-        results.birthdayCount = upcomingBirthdays.length;
+        results.birthdayRemindersSent = true;
+        results.upcomingBirthdayCount = upcomingBirthdays.length;
       }
     }
 
@@ -325,10 +427,13 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         status: "success",
         message: "Daily reminders check completed",
         results,
-        membersFound: members.length,
-        eventsFound: events.length,
-        upcomingBirthdays: upcomingBirthdays.length,
-        tomorrowEvents: tomorrowEvents.length,
+        data: {
+          membersFound: members.length,
+          eventsFound: events.length,
+          todayBirthdays: todayBirthdays.map(m => m.name),
+          upcomingBirthdays: upcomingBirthdays.map(m => m.name),
+          tomorrowEvents: tomorrowEvents.map(e => e.title),
+        },
         timestamp: new Date().toISOString(),
       }),
     };
