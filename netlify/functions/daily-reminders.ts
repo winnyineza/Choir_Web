@@ -1,16 +1,14 @@
-import { Handler, schedule } from "@netlify/functions";
-import { Resend } from "resend";
+// Netlify Scheduled Function for daily email reminders
+// Schedule: Runs daily at 6 AM UTC (8 AM Rwanda time)
+// Configure in netlify.toml or via Netlify UI
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// This function runs daily at 8 AM UTC (adjust as needed)
-// Cron: "0 8 * * *" = At 08:00 every day
+import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 
 interface Member {
   id: string;
   name: string;
   email: string;
-  dateOfBirth?: string;
+  date_of_birth?: string;
 }
 
 interface Event {
@@ -27,12 +25,11 @@ function getUpcomingBirthdays(members: Member[], daysAhead: number = 7): Member[
   const upcoming: Member[] = [];
 
   members.forEach(member => {
-    if (!member.dateOfBirth) return;
+    if (!member.date_of_birth) return;
     
-    const dob = new Date(member.dateOfBirth);
+    const dob = new Date(member.date_of_birth);
     const thisYearBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
     
-    // If birthday already passed this year, check next year
     if (thisYearBirthday < today) {
       thisYearBirthday.setFullYear(today.getFullYear() + 1);
     }
@@ -62,7 +59,7 @@ function getTomorrowEvents(events: Event[]): Event[] {
 // Generate birthday reminder email HTML
 function generateBirthdayEmail(birthdays: Member[]): string {
   const birthdayList = birthdays.map(m => {
-    const dob = new Date(m.dateOfBirth!);
+    const dob = new Date(m.date_of_birth!);
     return `<li><strong>${m.name}</strong> - ${dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</li>`;
   }).join('');
 
@@ -131,8 +128,44 @@ function generateEventReminderEmail(events: Event[]): string {
   `;
 }
 
-// Main handler
-const handler: Handler = async (event, context) => {
+// Send email via Resend API
+async function sendEmail(to: string[], subject: string, html: string): Promise<boolean> {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  
+  if (!RESEND_API_KEY) {
+    console.error("RESEND_API_KEY not configured");
+    return false;
+  }
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Serenades of Praise <noreply@theserenades.com>",
+        to: to,
+        subject: subject,
+        html: html,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Resend API error:", errorData);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error sending email:", error);
+    return false;
+  }
+}
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   console.log("Running daily reminders check...");
 
   // Check if Resend API key is configured
@@ -145,27 +178,34 @@ const handler: Handler = async (event, context) => {
   }
 
   // Get admin email from environment (comma-separated list)
-  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()) || [];
+  const adminEmails = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) || [];
   
   if (adminEmails.length === 0) {
-    console.log("No admin notification emails configured. Skipping.");
+    console.log("No admin notification emails configured.");
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: "No admin emails configured" }),
+      body: JSON.stringify({ message: "No admin emails configured. Add ADMIN_NOTIFICATION_EMAILS env variable." }),
     };
   }
 
+  const results = {
+    birthdaysSent: false,
+    eventsSent: false,
+    birthdayCount: 0,
+    eventCount: 0,
+    adminEmails: adminEmails.length,
+  };
+
   try {
-    // In a real setup, you'd fetch this from Supabase
-    // For now, we'll use environment variables or Supabase client
-    const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    // Fetch data from Supabase
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
     let members: Member[] = [];
     let events: Event[] = [];
 
     if (SUPABASE_URL && SUPABASE_KEY) {
-      // Fetch from Supabase
+      // Fetch members
       const membersRes = await fetch(`${SUPABASE_URL}/rest/v1/members?select=id,name,email,date_of_birth`, {
         headers: {
           'apikey': SUPABASE_KEY,
@@ -174,15 +214,13 @@ const handler: Handler = async (event, context) => {
       });
       
       if (membersRes.ok) {
-        const data = await membersRes.json();
-        members = data.map((m: any) => ({
-          id: m.id,
-          name: m.name,
-          email: m.email,
-          dateOfBirth: m.date_of_birth,
-        }));
+        members = await membersRes.json();
+        console.log(`Fetched ${members.length} members`);
+      } else {
+        console.error("Failed to fetch members:", await membersRes.text());
       }
 
+      // Fetch events
       const eventsRes = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,date,time,location`, {
         headers: {
           'apikey': SUPABASE_KEY,
@@ -192,15 +230,20 @@ const handler: Handler = async (event, context) => {
       
       if (eventsRes.ok) {
         events = await eventsRes.json();
+        console.log(`Fetched ${events.length} events`);
+      } else {
+        console.error("Failed to fetch events:", await eventsRes.text());
       }
+    } else {
+      console.log("Supabase not configured. No data to check.");
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ 
+          message: "Supabase not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+          results 
+        }),
+      };
     }
-
-    const results = {
-      birthdaysSent: false,
-      eventsSent: false,
-      birthdayCount: 0,
-      eventCount: 0,
-    };
 
     // Check for upcoming birthdays
     const upcomingBirthdays = getUpcomingBirthdays(members, 7);
@@ -208,16 +251,13 @@ const handler: Handler = async (event, context) => {
     if (upcomingBirthdays.length > 0) {
       console.log(`Found ${upcomingBirthdays.length} upcoming birthdays`);
       
-      const { error } = await resend.emails.send({
-        from: "Choir App <onboarding@resend.dev>",
-        to: adminEmails,
-        subject: `🎂 ${upcomingBirthdays.length} Upcoming Birthday${upcomingBirthdays.length > 1 ? 's' : ''} This Week`,
-        html: generateBirthdayEmail(upcomingBirthdays),
-      });
+      const sent = await sendEmail(
+        adminEmails,
+        `🎂 ${upcomingBirthdays.length} Upcoming Birthday${upcomingBirthdays.length > 1 ? 's' : ''} This Week`,
+        generateBirthdayEmail(upcomingBirthdays)
+      );
 
-      if (error) {
-        console.error("Error sending birthday reminder:", error);
-      } else {
+      if (sent) {
         results.birthdaysSent = true;
         results.birthdayCount = upcomingBirthdays.length;
         console.log("Birthday reminder sent successfully");
@@ -230,35 +270,27 @@ const handler: Handler = async (event, context) => {
     if (tomorrowEvents.length > 0) {
       console.log(`Found ${tomorrowEvents.length} events tomorrow`);
 
-      // Send to admins
-      const { error: adminError } = await resend.emails.send({
-        from: "Choir App <onboarding@resend.dev>",
-        to: adminEmails,
-        subject: `📅 Reminder: ${tomorrowEvents.length} Event${tomorrowEvents.length > 1 ? 's' : ''} Tomorrow`,
-        html: generateEventReminderEmail(tomorrowEvents),
-      });
+      const sent = await sendEmail(
+        adminEmails,
+        `📅 Reminder: ${tomorrowEvents.length} Event${tomorrowEvents.length > 1 ? 's' : ''} Tomorrow`,
+        generateEventReminderEmail(tomorrowEvents)
+      );
 
-      if (adminError) {
-        console.error("Error sending event reminder to admins:", adminError);
-      } else {
+      if (sent) {
         results.eventsSent = true;
         results.eventCount = tomorrowEvents.length;
-        console.log("Event reminder sent to admins successfully");
+        console.log("Event reminder sent successfully");
       }
 
-      // Optionally, send to all members
-      const memberEmails = members.map(m => m.email).filter(Boolean);
-      if (memberEmails.length > 0 && process.env.SEND_MEMBER_REMINDERS === 'true') {
-        const { error: memberError } = await resend.emails.send({
-          from: "Choir App <onboarding@resend.dev>",
-          to: memberEmails,
-          subject: `📅 Reminder: ${tomorrowEvents[0].title} Tomorrow`,
-          html: generateEventReminderEmail(tomorrowEvents),
-        });
-
-        if (memberError) {
-          console.error("Error sending event reminder to members:", memberError);
-        } else {
+      // Optionally send to all members
+      if (process.env.SEND_MEMBER_REMINDERS === 'true') {
+        const memberEmails = members.map(m => m.email).filter(Boolean);
+        if (memberEmails.length > 0) {
+          await sendEmail(
+            memberEmails,
+            `📅 Reminder: ${tomorrowEvents[0].title} Tomorrow`,
+            generateEventReminderEmail(tomorrowEvents)
+          );
           console.log(`Event reminder sent to ${memberEmails.length} members`);
         }
       }
@@ -266,6 +298,7 @@ const handler: Handler = async (event, context) => {
 
     return {
       statusCode: 200,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: "Daily reminders check completed",
         results,
@@ -273,18 +306,17 @@ const handler: Handler = async (event, context) => {
       }),
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in daily reminders:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      body: JSON.stringify({ error: error.message || "Unknown error" }),
     };
   }
 };
 
-// Schedule: Run every day at 6:00 AM UTC (8 AM CAT/Rwanda time)
-// The schedule wrapper makes this run automatically
-const scheduledHandler = schedule("0 6 * * *", handler);
+export { handler };
 
-// Export both - handler for manual testing, scheduledHandler for scheduled runs
-export { handler, scheduledHandler };
+// Note: To enable scheduled execution, configure in netlify.toml:
+// [functions."daily-reminders"]
+// schedule = "0 6 * * *"
