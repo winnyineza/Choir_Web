@@ -4,30 +4,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Heart, CreditCard, Phone, Send, CheckCircle, Loader2 } from "lucide-react";
+import { Heart, CreditCard, Phone, Send, CheckCircle, Loader2, Zap, Copy } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { FlutterwavePayment } from "@/components/FlutterwavePayment";
 
 export default function Support() {
   useDocumentTitle("Support Our Ministry");
+  const [paymentMode, setPaymentMode] = useState<"online" | "manual">("online");
   const [supportMethod, setSupportMethod] = useState<"bank" | "momo" | null>(null);
   const [amount, setAmount] = useState("");
   const [momoStep, setMomoStep] = useState<"amount" | "instructions">("amount");
   const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
   const [messageSubmitted, setMessageSubmitted] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleMoMoProceed = () => {
-    if (!amount || parseInt(amount) < 100) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid amount (minimum 100 RWF).",
-        variant: "destructive",
-      });
-      return;
-    }
-    setMomoStep("instructions");
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    toast({
+      title: "Copied!",
+      description: `${label} copied to clipboard.`,
+    });
+    setTimeout(() => setCopied(null), 2000);
   };
 
   const handleMessageSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -81,222 +82,221 @@ export default function Support() {
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
-              <h2 className="font-display text-3xl font-bold text-center mb-12">
+              <h2 className="font-display text-3xl font-bold text-center mb-8">
                 Choose How to <span className="gold-text">Give</span>
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                {/* Bank Transfer */}
-                <button
-                  onClick={() => {
-                    setSupportMethod("bank");
-                    setMomoStep("amount");
-                  }}
-                  className={`card-glass rounded-3xl p-8 text-left transition-all duration-300 ${
-                    supportMethod === "bank" ? "border-primary/50 gold-glow" : "hover:border-primary/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="w-14 h-14 rounded-xl bg-gold-gradient flex items-center justify-center">
-                      <CreditCard className="w-7 h-7 text-primary-foreground" />
-                    </div>
-                    {supportMethod === "bank" && (
-                      <CheckCircle className="w-6 h-6 text-primary" />
-                    )}
-                  </div>
-                  <h3 className="font-display text-xl font-bold text-foreground mb-2">
-                    Equity Bank Transfer
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Direct bank transfer for larger contributions. Ideal for organizations and corporate sponsors.
-                  </p>
-                </button>
-
-                {/* MTN MoMo */}
-                <button
-                  onClick={() => {
-                    setSupportMethod("momo");
-                    setMomoStep("amount");
-                  }}
-                  className={`card-glass rounded-3xl p-8 text-left transition-all duration-300 ${
-                    supportMethod === "momo" ? "border-primary/50 gold-glow" : "hover:border-primary/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="w-14 h-14 rounded-xl bg-gold-gradient flex items-center justify-center">
-                      <Phone className="w-7 h-7 text-primary-foreground" />
-                    </div>
-                    {supportMethod === "momo" && (
-                      <CheckCircle className="w-6 h-6 text-primary" />
-                    )}
-                  </div>
-                  <h3 className="font-display text-xl font-bold text-foreground mb-2">
-                    MTN Mobile Money
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Quick and easy mobile money support. Instant and secure transactions.
-                  </p>
-                </button>
+              {/* Payment Mode Toggle */}
+              <div className="flex justify-center mb-10">
+                <div className="inline-flex bg-secondary rounded-xl p-1">
+                  <button
+                    onClick={() => setPaymentMode("online")}
+                    className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                      paymentMode === "online"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                    Pay Online
+                  </button>
+                  <button
+                    onClick={() => setPaymentMode("manual")}
+                    className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                      paymentMode === "manual"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Phone className="w-4 h-4" />
+                    Manual Transfer
+                  </button>
+                </div>
               </div>
 
-              {/* Bank Details */}
-              {supportMethod === "bank" && (
+              {/* Online Payment (Flutterwave) */}
+              {paymentMode === "online" && (
                 <div className="card-glass rounded-3xl p-8 mb-8 animate-fade-in-up">
-                  <h3 className="font-display text-xl font-bold text-foreground mb-6">Bank Transfer</h3>
-                  <div className="space-y-6">
-                    <div>
-                      <Label htmlFor="bankEmail">Your Email Address</Label>
-                      <Input
-                        id="bankEmail"
-                        type="email"
-                        placeholder="your@email.com"
-                        className="mt-1 bg-secondary border-primary/20"
-                        required
-                      />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Bank account details will be sent to this email
-                      </p>
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 rounded-full bg-primary/20 mx-auto mb-4 flex items-center justify-center">
+                      <Zap className="w-8 h-8 text-primary" />
                     </div>
-                    <div>
-                      <Label htmlFor="bankAmount">Amount (RWF)</Label>
-                      <Input
-                        id="bankAmount"
-                        type="number"
-                        placeholder="Enter amount"
-                        className="mt-1 bg-secondary border-primary/20"
-                        min="1000"
-                      />
+                    <h3 className="font-display text-xl font-bold text-foreground mb-2">
+                      Quick & Secure Payment
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      Pay instantly with MTN MoMo or Card
+                    </p>
+                  </div>
+                  <FlutterwavePayment />
+                </div>
+              )}
+
+              {/* Manual Payment Options */}
+              {paymentMode === "manual" && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    {/* Bank Transfer Card */}
+                    <div className="card-glass rounded-2xl p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                          <CreditCard className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-display text-xl font-semibold">Bank Transfer</h3>
+                          <p className="text-sm text-muted-foreground">Equity Bank Rwanda</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 bg-secondary/50 rounded-xl p-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Bank Name</span>
+                          <span className="font-medium">Equity Bank Rwanda</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Account Name</span>
+                          <span className="font-medium">Serenades of Praise</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Account Number</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">4024212955253</span>
+                            <button
+                              onClick={() => handleCopy("4024212955253", "Account number")}
+                              className="p-1 hover:bg-primary/20 rounded transition-colors"
+                            >
+                              {copied === "Account number" ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Copy className="w-4 h-4 text-primary" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Swift Code</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">EABORWRW</span>
+                            <button
+                              onClick={() => handleCopy("EABORWRW", "Swift code")}
+                              className="p-1 hover:bg-primary/20 rounded transition-colors"
+                            >
+                              {copied === "Swift code" ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Copy className="w-4 h-4 text-primary" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <Button 
-                      variant="gold" 
-                      className="w-full"
+
+                    {/* Mobile Money Card */}
+                    <div className="card-glass rounded-2xl p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                          <Phone className="w-6 h-6 text-yellow-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-display text-xl font-semibold">Mobile Money</h3>
+                          <p className="text-sm text-muted-foreground">MTN MoMo / Airtel Money</p>
+                        </div>
+                      </div>
+
+                      {/* MTN MoMo */}
+                      <div className="bg-secondary/50 rounded-xl p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center">
+                            <span className="text-white font-bold text-xs">MTN</span>
+                          </div>
+                          <span className="font-semibold">MTN Mobile Money</span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Dial</span>
+                            <span className="font-mono font-medium">*182*8*1#</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Send to</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-medium">0780623144</span>
+                              <button
+                                onClick={() => handleCopy("0780623144", "MTN number")}
+                                className="p-1 hover:bg-primary/20 rounded transition-colors"
+                              >
+                                {copied === "MTN number" ? (
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
+                                ) : (
+                                  <Copy className="w-4 h-4 text-primary" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Airtel Money */}
+                      <div className="bg-secondary/50 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                            <span className="text-white font-bold text-xs">A</span>
+                          </div>
+                          <span className="font-semibold">Airtel Money</span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Dial</span>
+                            <span className="font-mono font-medium">*182*8*1#</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Send to</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-medium">0730623144</span>
+                              <button
+                                onClick={() => handleCopy("0730623144", "Airtel number")}
+                                className="p-1 hover:bg-primary/20 rounded transition-colors"
+                              >
+                                {copied === "Airtel number" ? (
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
+                                ) : (
+                                  <Copy className="w-4 h-4 text-primary" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notify Us Form */}
+                  <div className="card-glass rounded-2xl p-6">
+                    <h4 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-primary" />
+                      Let Us Know About Your Donation
+                    </h4>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      After making a manual transfer, please notify us so we can acknowledge your gift.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input placeholder="Your Name" className="bg-secondary border-primary/20" />
+                      <Input type="email" placeholder="Your Email" className="bg-secondary border-primary/20" />
+                    </div>
+                    <Button
+                      variant="gold"
+                      className="mt-4"
                       onClick={() => {
                         toast({
-                          title: "Request Submitted!",
-                          description: "Bank account details will be sent to your email shortly.",
+                          title: "Thank You! 🙏",
+                          description: "We've received your notification. God bless you!",
                         });
                       }}
                     >
-                      Get Bank Details
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      You'll receive our Equity Bank account details via email within minutes.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* MoMo Flow */}
-              {supportMethod === "momo" && momoStep === "amount" && (
-                <div className="card-glass rounded-3xl p-8 mb-8 animate-fade-in-up">
-                  <h3 className="font-display text-xl font-bold text-foreground mb-6">Select Amount</h3>
-                  <div className="space-y-6">
-                    <div>
-                      <Label htmlFor="amount">Amount (RWF)</Label>
-                      <Input
-                        id="amount"
-                        type="number"
-                        placeholder="Enter amount"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="mt-1 bg-secondary border-primary/20 text-lg"
-                        min="100"
-                      />
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {[1000, 5000, 10000, 25000, 50000].map((preset) => (
-                        <button
-                          key={preset}
-                          onClick={() => setAmount(preset.toString())}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            amount === preset.toString()
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-secondary text-muted-foreground hover:bg-primary/20"
-                          }`}
-                        >
-                          {preset.toLocaleString()} RWF
-                        </button>
-                      ))}
-                    </div>
-                    <Button variant="gold" size="lg" className="w-full" onClick={handleMoMoProceed}>
-                      Continue
+                      I've Made a Donation
                     </Button>
                   </div>
-                </div>
-              )}
-
-              {/* MoMo Email Collection */}
-              {supportMethod === "momo" && momoStep === "instructions" && (
-                <div className="card-glass rounded-3xl p-8 mb-8 animate-fade-in-up">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 rounded-full bg-[#FFCC00]/20 mx-auto mb-4 flex items-center justify-center">
-                      <Phone className="w-8 h-8 text-[#FFCC00]" />
-                    </div>
-                    <h3 className="font-display text-xl font-bold text-foreground">
-                      Donate {parseInt(amount).toLocaleString()} RWF
-                    </h3>
-                    <p className="text-muted-foreground text-sm mt-2">
-                      Almost there! Enter your email to receive payment instructions.
-                    </p>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div>
-                      <Label htmlFor="momoEmail">Your Email Address</Label>
-                      <Input
-                        id="momoEmail"
-                        type="email"
-                        placeholder="your@email.com"
-                        className="mt-1 bg-secondary border-primary/20"
-                        required
-                      />
-                      <p className="text-xs text-muted-foreground mt-2">
-                        MoMo payment instructions will be sent to this email
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="momoName">Your Name (optional)</Label>
-                      <Input
-                        id="momoName"
-                        placeholder="For acknowledgment purposes"
-                        className="mt-1 bg-secondary border-primary/20"
-                      />
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Donation Amount</span>
-                        <span className="font-semibold gold-text">{parseInt(amount).toLocaleString()} RWF</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Payment instructions including the MoMo number will be sent to your email for security.
-                      </p>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => setMomoStep("amount")}
-                      >
-                        Change Amount
-                      </Button>
-                      <Button
-                        variant="gold"
-                        className="flex-1"
-                        onClick={() => {
-                          toast({
-                            title: "Instructions Sent! 📧",
-                            description: "Check your email for MoMo payment instructions. God bless you!",
-                          });
-                        }}
-                      >
-                        Send Instructions
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                </>
               )}
             </div>
           </div>
