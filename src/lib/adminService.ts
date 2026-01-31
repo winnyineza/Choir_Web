@@ -73,12 +73,22 @@ export interface PasswordResetToken {
 
 const PASSWORD_RESET_KEY = "choir_password_resets";
 
-// Initialize admin users - no default admin, use Supabase for auth
+// Initialize admin users - seed super admin for local development
 function initializeAdminUsers(): void {
   const existing = localStorage.getItem(ADMIN_USERS_KEY);
   if (!existing) {
-    // Start with empty admin list - Supabase is the source of truth
-    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([]));
+    // Seed with default super admin for local development
+    const defaultSuperAdmin: AdminUser = {
+      id: "super-admin-winny",
+      email: "w.ineza@alustudent.com",
+      name: "Winny Ineza",
+      password: hashPassword("Igiraneza1234@ALU"),
+      passwordHashed: true,
+      role: "super_admin",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([defaultSuperAdmin]));
   } else {
     // Parse existing users
     let users: AdminUser[] = JSON.parse(existing);
@@ -88,6 +98,23 @@ function initializeAdminUsers(): void {
     const oldHardcodedIndex = users.findIndex(u => u.id === "super-admin-001");
     if (oldHardcodedIndex !== -1) {
       users.splice(oldHardcodedIndex, 1);
+      needsUpdate = true;
+    }
+    
+    // Ensure super admin exists (add if missing)
+    const superAdminExists = users.some(u => u.email.toLowerCase() === "w.ineza@alustudent.com");
+    if (!superAdminExists) {
+      const defaultSuperAdmin: AdminUser = {
+        id: "super-admin-winny",
+        email: "w.ineza@alustudent.com",
+        name: "Winny Ineza",
+        password: hashPassword("Igiraneza1234@ALU"),
+        passwordHashed: true,
+        role: "super_admin",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+      users.push(defaultSuperAdmin);
       needsUpdate = true;
     }
     
