@@ -37,7 +37,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "dashboard", "members", "members_edit", "events", "tickets", "attendance",
     "leave", "contributions", "expenses", "treasury", "announcements",
     "messages", "releases", "promos", "gallery", "inventory", "minutes", "documents",
-    "voice_balance", "analytics", "event_staff", "team", "audit"
+    "voice_balance", "analytics", "team", "audit"
   ],
   finance: [
     "dashboard", "members", "contributions", "expenses", "treasury", "analytics"
