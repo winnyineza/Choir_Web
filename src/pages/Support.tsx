@@ -4,18 +4,49 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Heart, CreditCard, Phone, Send, CheckCircle, Loader2, Zap, Copy } from "lucide-react";
+import { 
+  Heart, CreditCard, Phone, Send, CheckCircle, Loader2, Zap, Copy,
+  Music, Users, Globe, Mic2, Shield, Lock
+} from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { FlutterwavePayment } from "@/components/FlutterwavePayment";
 
+const impactAreas = [
+  {
+    icon: Music,
+    title: "Music Production",
+    description: "Recording albums & spreading the gospel through music",
+    color: "text-purple-500",
+    bg: "bg-purple-500/20",
+  },
+  {
+    icon: Users,
+    title: "Community Outreach",
+    description: "Ministry trips & community service programs",
+    color: "text-blue-500",
+    bg: "bg-blue-500/20",
+  },
+  {
+    icon: Globe,
+    title: "Digital Ministry",
+    description: "Expanding online presence to reach more souls",
+    color: "text-green-500",
+    bg: "bg-green-500/20",
+  },
+  {
+    icon: Mic2,
+    title: "Equipment & Training",
+    description: "Instruments, sound systems & vocal training",
+    color: "text-orange-500",
+    bg: "bg-orange-500/20",
+  },
+];
+
 export default function Support() {
   useDocumentTitle("Support Our Ministry");
   const [paymentMode, setPaymentMode] = useState<"online" | "manual">("online");
-  const [supportMethod, setSupportMethod] = useState<"bank" | "momo" | null>(null);
-  const [amount, setAmount] = useState("");
-  const [momoStep, setMomoStep] = useState<"amount" | "instructions">("amount");
   const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
   const [messageSubmitted, setMessageSubmitted] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -35,7 +66,6 @@ export default function Support() {
     e.preventDefault();
     setIsSubmittingMessage(true);
 
-    // Simulate submission
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     setIsSubmittingMessage(false);
@@ -46,7 +76,6 @@ export default function Support() {
       description: "Thank you for your encouraging words. God bless you!",
     });
 
-    // Reset after delay
     setTimeout(() => {
       setMessageSubmitted(false);
       (e.target as HTMLFormElement).reset();
@@ -57,43 +86,65 @@ export default function Support() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-20 overflow-hidden">
+        {/* Hero Section */}
+        <section className="relative pt-32 pb-16 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-gold-gradient opacity-5" />
-          </div>
+          <div className="absolute top-20 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+          
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <div className="w-20 h-20 rounded-full bg-gold-gradient mx-auto mb-8 flex items-center justify-center animate-pulse-gold">
-                <Heart className="w-10 h-10 text-primary-foreground" />
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
+                <Heart className="w-4 h-4" />
+                Partner With Us
               </div>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
                 Support Our <span className="gold-text">Ministry</span>
               </h1>
-              <p className="text-xl text-muted-foreground">
-                Your generosity enables us to spread the gospel through music, reaching more hearts across Rwanda and beyond.
+              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+                Your generosity enables us to spread the gospel through music, 
+                reaching more hearts across Rwanda and beyond.
               </p>
             </div>
           </div>
         </section>
 
-        {/* Support Options */}
+        {/* Impact Areas */}
+        <section className="py-12 bg-charcoal/50">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {impactAreas.map((area, index) => (
+                <div
+                  key={index}
+                  className="card-glass rounded-2xl p-4 md:p-6 text-center hover:border-primary/30 transition-all group"
+                >
+                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full ${area.bg} flex items-center justify-center mx-auto mb-3 md:mb-4 group-hover:scale-110 transition-transform`}>
+                    <area.icon className={`w-6 h-6 md:w-7 md:h-7 ${area.color}`} />
+                  </div>
+                  <h3 className="font-display text-sm md:text-base font-semibold mb-1 md:mb-2">{area.title}</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">{area.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Payment Section */}
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
-              <h2 className="font-display text-3xl font-bold text-center mb-8">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-8">
                 Choose How to <span className="gold-text">Give</span>
               </h2>
 
               {/* Payment Mode Toggle */}
-              <div className="flex justify-center mb-10">
-                <div className="inline-flex bg-secondary rounded-xl p-1">
+              <div className="flex justify-center mb-8">
+                <div className="inline-flex bg-secondary rounded-xl p-1 w-full max-w-md">
                   <button
                     onClick={() => setPaymentMode("online")}
-                    className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm sm:text-base ${
                       paymentMode === "online"
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-lg"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -102,9 +153,9 @@ export default function Support() {
                   </button>
                   <button
                     onClick={() => setPaymentMode("manual")}
-                    className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm sm:text-base ${
                       paymentMode === "manual"
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-lg"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -114,12 +165,12 @@ export default function Support() {
                 </div>
               </div>
 
-              {/* Online Payment (Flutterwave) */}
+              {/* Online Payment */}
               {paymentMode === "online" && (
-                <div className="card-glass rounded-3xl p-8 mb-8 animate-fade-in-up">
+                <div className="card-glass rounded-3xl p-6 sm:p-8 animate-fade-in-up">
                   <div className="text-center mb-6">
-                    <div className="w-16 h-16 rounded-full bg-primary/20 mx-auto mb-4 flex items-center justify-center">
-                      <Zap className="w-8 h-8 text-primary" />
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600 mx-auto mb-4 flex items-center justify-center shadow-lg">
+                      <Zap className="w-8 h-8 text-black" />
                     </div>
                     <h3 className="font-display text-xl font-bold text-foreground mb-2">
                       Quick & Secure Payment
@@ -128,42 +179,55 @@ export default function Support() {
                       Pay instantly with MTN MoMo or Card
                     </p>
                   </div>
+                  
                   <FlutterwavePayment />
+                  
+                  {/* Trust Badges */}
+                  <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-primary/10">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Shield className="w-4 h-4 text-green-500" />
+                      <span>Secure</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Lock className="w-4 h-4 text-green-500" />
+                      <span>Encrypted</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>Verified</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Manual Payment Options */}
+              {/* Manual Payment */}
               {paymentMode === "manual" && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    {/* Bank Transfer Card */}
+                <div className="space-y-6 animate-fade-in-up">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Bank Transfer */}
                     <div className="card-glass rounded-2xl p-6">
-                      <div className="flex items-center gap-3 mb-6">
+                      <div className="flex items-center gap-3 mb-5">
                         <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
                           <CreditCard className="w-6 h-6 text-blue-500" />
                         </div>
                         <div>
-                          <h3 className="font-display text-xl font-semibold">Bank Transfer</h3>
+                          <h3 className="font-display text-lg font-semibold">Bank Transfer</h3>
                           <p className="text-sm text-muted-foreground">Equity Bank Rwanda</p>
                         </div>
                       </div>
 
-                      <div className="space-y-4 bg-secondary/50 rounded-xl p-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Bank Name</span>
-                          <span className="font-medium">Equity Bank Rwanda</span>
-                        </div>
+                      <div className="space-y-3 bg-secondary/50 rounded-xl p-4 text-sm">
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Account Name</span>
                           <span className="font-medium">Serenades of Praise</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Account Number</span>
+                          <span className="text-muted-foreground">Account No.</span>
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-medium">4024212955253</span>
                             <button
                               onClick={() => handleCopy("4024212955253", "Account number")}
-                              className="p-1 hover:bg-primary/20 rounded transition-colors"
+                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
                             >
                               {copied === "Account number" ? (
                                 <CheckCircle className="w-4 h-4 text-green-500" />
@@ -179,7 +243,7 @@ export default function Support() {
                             <span className="font-mono font-medium">EABORWRW</span>
                             <button
                               onClick={() => handleCopy("EABORWRW", "Swift code")}
-                              className="p-1 hover:bg-primary/20 rounded transition-colors"
+                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
                             >
                               {copied === "Swift code" ? (
                                 <CheckCircle className="w-4 h-4 text-green-500" />
@@ -192,130 +256,133 @@ export default function Support() {
                       </div>
                     </div>
 
-                    {/* Mobile Money Card */}
+                    {/* Mobile Money */}
                     <div className="card-glass rounded-2xl p-6">
-                      <div className="flex items-center gap-3 mb-6">
+                      <div className="flex items-center gap-3 mb-5">
                         <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
                           <Phone className="w-6 h-6 text-yellow-500" />
                         </div>
                         <div>
-                          <h3 className="font-display text-xl font-semibold">Mobile Money</h3>
-                          <p className="text-sm text-muted-foreground">MTN MoMo / Airtel Money</p>
+                          <h3 className="font-display text-lg font-semibold">Mobile Money</h3>
+                          <p className="text-sm text-muted-foreground">MTN MoMo / Airtel</p>
                         </div>
                       </div>
 
-                      {/* MTN MoMo */}
-                      <div className="bg-secondary/50 rounded-xl p-4 mb-4">
+                      {/* MTN */}
+                      <div className="bg-secondary/50 rounded-xl p-4 mb-3">
                         <div className="flex items-center gap-2 mb-3">
-                          <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center">
-                            <span className="text-white font-bold text-xs">MTN</span>
+                          <div className="w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center">
+                            <span className="text-white font-bold text-[10px]">MTN</span>
                           </div>
-                          <span className="font-semibold">MTN Mobile Money</span>
+                          <span className="font-semibold text-sm">MTN MoMo</span>
                         </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Dial</span>
-                            <span className="font-mono font-medium">*182*8*1#</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Send to</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-medium">0780623144</span>
-                              <button
-                                onClick={() => handleCopy("0780623144", "MTN number")}
-                                className="p-1 hover:bg-primary/20 rounded transition-colors"
-                              >
-                                {copied === "MTN number" ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <Copy className="w-4 h-4 text-primary" />
-                                )}
-                              </button>
-                            </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Number</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">0780 623 144</span>
+                            <button
+                              onClick={() => handleCopy("0780623144", "MTN number")}
+                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
+                            >
+                              {copied === "MTN number" ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Copy className="w-4 h-4 text-primary" />
+                              )}
+                            </button>
                           </div>
                         </div>
                       </div>
 
-                      {/* Airtel Money */}
+                      {/* Airtel */}
                       <div className="bg-secondary/50 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-3">
-                          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-                            <span className="text-white font-bold text-xs">A</span>
+                          <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
+                            <span className="text-white font-bold text-[10px]">A</span>
                           </div>
-                          <span className="font-semibold">Airtel Money</span>
+                          <span className="font-semibold text-sm">Airtel Money</span>
                         </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Dial</span>
-                            <span className="font-mono font-medium">*182*8*1#</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Send to</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-medium">0730623144</span>
-                              <button
-                                onClick={() => handleCopy("0730623144", "Airtel number")}
-                                className="p-1 hover:bg-primary/20 rounded transition-colors"
-                              >
-                                {copied === "Airtel number" ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <Copy className="w-4 h-4 text-primary" />
-                                )}
-                              </button>
-                            </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Number</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">0730 623 144</span>
+                            <button
+                              onClick={() => handleCopy("0730623144", "Airtel number")}
+                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
+                            >
+                              {copied === "Airtel number" ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Copy className="w-4 h-4 text-primary" />
+                              )}
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Notify Us Form */}
+                  {/* Notify Form */}
                   <div className="card-glass rounded-2xl p-6">
-                    <h4 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Heart className="w-5 h-5 text-primary" />
-                      Let Us Know About Your Donation
-                    </h4>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      After making a manual transfer, please notify us so we can acknowledge your gift.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Input placeholder="Your Name" className="bg-secondary border-primary/20" />
-                      <Input type="email" placeholder="Your Email" className="bg-secondary border-primary/20" />
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Heart className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-display font-semibold">Notify Us</h4>
+                        <p className="text-xs text-muted-foreground">So we can acknowledge your gift</p>
+                      </div>
                     </div>
-                    <Button
-                      variant="gold"
-                      className="mt-4"
-                      onClick={() => {
-                        toast({
-                          title: "Thank You! 🙏",
-                          description: "We've received your notification. God bless you!",
-                        });
-                      }}
-                    >
-                      I've Made a Donation
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Input placeholder="Your Name" className="bg-secondary border-primary/20" />
+                      <Input type="email" placeholder="Email" className="bg-secondary border-primary/20" />
+                      <Button
+                        variant="gold"
+                        className="whitespace-nowrap"
+                        onClick={() => {
+                          toast({
+                            title: "Thank You! 🙏",
+                            description: "We've received your notification. God bless you!",
+                          });
+                        }}
+                      >
+                        I've Donated
+                      </Button>
+                    </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
         </section>
 
+        {/* Bible Verse */}
+        <section className="py-12 bg-charcoal/50">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <blockquote className="font-display text-xl sm:text-2xl md:text-3xl italic text-foreground mb-4">
+                "Each of you should give what you have decided in your heart to give, 
+                not reluctantly or under compulsion, for God loves a cheerful giver."
+              </blockquote>
+              <cite className="text-primary font-semibold">— 2 Corinthians 9:7</cite>
+            </div>
+          </div>
+        </section>
+
         {/* Leave a Message */}
-        <section className="py-16 bg-charcoal">
+        <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-2xl mx-auto">
-              <div className="text-center mb-10">
-                <h2 className="font-display text-3xl font-bold mb-4">
-                  Leave a <span className="gold-text">Supportive Message</span>
+              <div className="text-center mb-8">
+                <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3">
+                  Leave a <span className="gold-text">Message</span>
                 </h2>
                 <p className="text-muted-foreground">
-                  Share your words of encouragement with our choir family.
+                  Share words of encouragement with our choir family
                 </p>
               </div>
 
-              <div className="card-glass rounded-3xl p-8">
+              <div className="card-glass rounded-3xl p-6 sm:p-8">
                 {messageSubmitted ? (
                   <div className="text-center py-8">
                     <div className="w-16 h-16 rounded-full bg-green-500/20 mx-auto mb-4 flex items-center justify-center">
@@ -329,15 +396,15 @@ export default function Support() {
                     </p>
                   </div>
                 ) : (
-                  <form onSubmit={handleMessageSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <form onSubmit={handleMessageSubmit} className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="name">Your Name</Label>
                         <Input
                           id="name"
                           placeholder="Enter your name"
                           required
-                          className="mt-1 bg-secondary border-primary/20"
+                          className="mt-1.5 bg-secondary border-primary/20"
                           disabled={isSubmittingMessage}
                         />
                       </div>
@@ -347,7 +414,7 @@ export default function Support() {
                           id="email"
                           type="email"
                           placeholder="your@email.com"
-                          className="mt-1 bg-secondary border-primary/20"
+                          className="mt-1.5 bg-secondary border-primary/20"
                           disabled={isSubmittingMessage}
                         />
                       </div>
@@ -356,8 +423,8 @@ export default function Support() {
                       <Label htmlFor="message">Your Message</Label>
                       <Textarea
                         id="message"
-                        placeholder="Write your supporting message..."
-                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="Write your message of support..."
+                        className="mt-1.5 bg-secondary border-primary/20"
                         rows={4}
                         required
                         disabled={isSubmittingMessage}
