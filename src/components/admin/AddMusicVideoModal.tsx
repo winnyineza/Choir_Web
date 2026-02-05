@@ -208,12 +208,12 @@ export function AddMusicVideoModal({
           {albums.length > 0 && (
             <div>
               <Label htmlFor="albumId">Link to Album (Optional)</Label>
-              <Select value={albumId} onValueChange={setAlbumId}>
+              <Select value={albumId || "none"} onValueChange={(v) => setAlbumId(v === "none" ? "" : v)}>
                 <SelectTrigger className="mt-1 bg-secondary border-primary/20">
                   <SelectValue placeholder="Select an album" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No album</SelectItem>
+                  <SelectItem value="none">No album</SelectItem>
                   {albums.map((album) => (
                     <SelectItem key={album.id} value={album.id}>
                       {album.title} ({album.year})

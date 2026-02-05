@@ -459,14 +459,14 @@ export function PromoManagement() {
             <div>
               <Label>Limit to Event (Optional)</Label>
               <Select
-                value={formData.eventId}
-                onValueChange={(v) => setFormData({ ...formData, eventId: v })}
+                value={formData.eventId || "all"}
+                onValueChange={(v) => setFormData({ ...formData, eventId: v === "all" ? "" : v })}
               >
                 <SelectTrigger className="mt-1 bg-secondary">
                   <SelectValue placeholder="All Events" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Events</SelectItem>
+                  <SelectItem value="all">All Events</SelectItem>
                   {events.map((event) => (
                     <SelectItem key={event.id} value={event.id}>{event.title}</SelectItem>
                   ))}
