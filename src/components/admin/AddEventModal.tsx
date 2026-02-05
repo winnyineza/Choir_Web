@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -172,6 +173,9 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
           <DialogTitle className="font-display text-xl gold-text">
             {editEvent ? "Edit Event" : "Create New Event"}
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            {editEvent ? "Update event details and tickets" : "Create a new event with ticket options"}
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">

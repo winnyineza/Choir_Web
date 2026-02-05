@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -171,6 +172,9 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
           <DialogTitle className="font-display text-xl gold-text">
             {editMember ? "Edit Member" : "Add New Member"}
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            {editMember ? "Update member information" : "Add a new choir member"}
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">

@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { addAlbum, updateAlbum, type Album } from "@/lib/releaseService";
@@ -120,6 +121,9 @@ export function AddAlbumModal({ isOpen, onClose, onSuccess, editAlbum }: AddAlbu
             <Disc3 className="w-5 h-5" />
             {editAlbum ? "Edit Album" : "Add New Album"}
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            {editAlbum ? "Update album details" : "Add a new album to the catalog"}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
