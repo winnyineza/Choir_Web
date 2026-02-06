@@ -41,8 +41,8 @@ export function LivestreamModal({ event, isOpen, onClose }: LivestreamModalProps
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-      } catch (err) {
-        console.log('Share cancelled');
+      } catch {
+        // Share cancelled by user
       }
     } else {
       await navigator.clipboard.writeText(shareData.url);

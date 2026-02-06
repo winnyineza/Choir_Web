@@ -106,7 +106,6 @@ export function FlutterwavePayment({ onSuccess, onClose }: FlutterwavePaymentPro
 
     handleFlutterPayment({
       callback: (response) => {
-        console.log("Payment response:", response);
         setIsProcessing(false);
         
         if (response.status === "successful") {
