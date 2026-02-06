@@ -1657,6 +1657,9 @@ export default function MemberPortal() {
                         <FileText className="w-5 h-5 text-primary" />
                         Payment Receipt
                       </DialogTitle>
+                      <DialogDescription className="text-muted-foreground text-sm">
+                        View and download your payment receipt
+                      </DialogDescription>
                     </DialogHeader>
                     
                     {selectedReceipt && (
@@ -1912,6 +1915,9 @@ export default function MemberPortal() {
                         <Settings className="w-5 h-5 text-primary" />
                         Settings
                       </DialogTitle>
+                      <DialogDescription className="text-muted-foreground text-sm">
+                        Manage your notification preferences
+                      </DialogDescription>
                     </DialogHeader>
                     
                     <div className="pt-4">

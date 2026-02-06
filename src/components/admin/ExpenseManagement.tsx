@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -431,6 +432,9 @@ export function ExpenseManagement() {
               <Receipt className="w-5 h-5 text-primary" />
               {editingExpense ? "Edit Expense" : "Add Expense"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {editingExpense ? "Update expense details" : "Record a new expense"}
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">

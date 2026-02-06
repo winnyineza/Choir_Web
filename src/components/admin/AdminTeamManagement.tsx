@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -476,6 +477,9 @@ export function AdminTeamManagement() {
             <DialogTitle className="font-display text-xl gold-text">
               Invite New Admin
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Send an invitation to add a new administrator
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 mt-4">

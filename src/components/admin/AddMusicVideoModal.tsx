@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -156,6 +157,9 @@ export function AddMusicVideoModal({
             <Video className="w-5 h-5" />
             {editVideo ? "Edit Music Video" : "Add Music Video"}
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            {editVideo ? "Update music video details" : "Add a new music video to the catalog"}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">

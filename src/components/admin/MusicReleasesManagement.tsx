@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -501,6 +502,9 @@ export function MusicReleasesManagement() {
             <DialogTitle className="font-display gold-text">
               {selectedAlbum ? "Edit Album" : "Add Album"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedAlbum ? "Update album details" : "Add a new album to the catalog"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
@@ -592,6 +596,9 @@ export function MusicReleasesManagement() {
             <DialogTitle className="font-display gold-text">
               {selectedVideo ? "Edit Music Video" : "Add Music Video"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedVideo ? "Update music video details" : "Add a new music video"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">

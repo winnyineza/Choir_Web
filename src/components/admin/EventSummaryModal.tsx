@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -142,6 +143,9 @@ Generated: ${new Date().toLocaleString()}
             <BarChart3 className="w-5 h-5 text-primary" />
             Event Summary
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            View detailed event statistics and ticket sales
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

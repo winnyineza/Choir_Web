@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -372,6 +373,9 @@ export function PromoManagement() {
             <DialogTitle className="font-display gold-text">
               {selectedPromo ? "Edit Promo Code" : "Create Promo Code"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedPromo ? "Update promotional code settings" : "Create a new discount code for events"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">

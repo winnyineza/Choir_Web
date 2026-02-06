@@ -65,7 +65,7 @@ export function ConfirmDialog({
   variant = "danger",
   isLoading = false,
 }: ConfirmDialogProps) {
-  const config = variantConfig[variant];
+  const config = variantConfig[variant] || variantConfig.danger;
   const Icon = config.icon;
 
   const handleConfirm = () => {

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -469,6 +470,9 @@ export function DocumentManagement() {
             <DialogTitle className="font-display gold-text">
               {selectedDocument ? "Edit Document" : "Upload Document"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedDocument ? "Update document details" : "Upload a new document to the library"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">

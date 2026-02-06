@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -343,6 +344,9 @@ export function EventStaffManagement() {
             <DialogTitle className="font-display">
               {editingStaff ? "Edit Staff Member" : "Add Staff Member"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {editingStaff ? "Update staff member details" : "Add a new staff member for events"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div>
@@ -439,6 +443,9 @@ export function EventStaffManagement() {
             <DialogTitle className="font-display">
               Assign Events to {assigningStaff?.name}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Select events to assign this staff member to
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             {events.length === 0 ? (

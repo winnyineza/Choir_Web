@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -162,6 +163,9 @@ export function GlobalSearch({ open, onOpenChange, onResultClick }: GlobalSearch
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
         <DialogHeader className="p-4 pb-0">
           <DialogTitle className="sr-only">Global Search</DialogTitle>
+          <DialogDescription className="sr-only">
+            Search for members, events, contributions, and documents
+          </DialogDescription>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -141,13 +142,13 @@ export function AnnouncementManagement() {
     if (editingAnnouncement) {
       updateAnnouncement(editingAnnouncement.id, data);
       if (currentUser) {
-        addAuditLog(currentUser, "UPDATE_ANNOUNCEMENT", `Updated announcement: ${form.title}`);
+        addAuditLog(currentUser, "UPDATE_ANNOUNCEMENT", `Updated announcement: ${data.title}`);
       }
       toast({ title: "Announcement Updated", description: "The announcement has been updated" });
     } else {
       createAnnouncement(data);
       if (currentUser) {
-        addAuditLog(currentUser, "CREATE_ANNOUNCEMENT", `Created announcement: ${form.title}`);
+        addAuditLog(currentUser, "CREATE_ANNOUNCEMENT", `Created announcement: ${data.title}`);
       }
       toast({ title: "Announcement Created", description: "The announcement is now live" });
     }
@@ -353,6 +354,9 @@ export function AnnouncementManagement() {
             <DialogTitle className="font-display text-xl gold-text">
               {editingAnnouncement ? "Edit Announcement" : "New Announcement"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {editingAnnouncement ? "Update the announcement details" : "Create a new announcement for members or public"}
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 pt-4">

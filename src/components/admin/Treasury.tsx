@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -939,6 +940,9 @@ export function Treasury({ onRefresh }: TreasuryProps) {
               <Heart className="w-5 h-5 text-pink-500" />
               {editingDonation ? "Edit Donation" : "Record Donation"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {editingDonation ? "Update donation details" : "Record a new donation"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

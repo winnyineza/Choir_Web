@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -401,6 +402,9 @@ export function TicketPurchaseModal({
                 {step === "select" ? "Get Tickets" : "Complete Payment"}
               </DialogTitle>
             </div>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {step === "select" ? "Select your tickets and proceed to payment" : "Complete your secure payment"}
+            </DialogDescription>
           </DialogHeader>
         )}
 

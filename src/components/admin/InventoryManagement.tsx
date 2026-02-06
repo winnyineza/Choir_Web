@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -474,6 +475,9 @@ export function InventoryManagement() {
             <DialogTitle className="font-display gold-text">
               {selectedItem ? "Edit Item" : "Add Inventory Item"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedItem ? "Update inventory item details" : "Add a new item to inventory"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
@@ -612,6 +616,9 @@ export function InventoryManagement() {
         <DialogContent className="sm:max-w-md bg-charcoal border-primary/20">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Assign Item</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Assign this inventory item to a member
+            </DialogDescription>
           </DialogHeader>
 
           {selectedItem && (

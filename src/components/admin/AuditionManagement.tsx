@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addAuditLog, type AdminUser } from "@/lib/adminService";
 import { createAudition, deleteAudition, getAllAuditions, updateAudition, type Audition, type AuditionStatus } from "@/lib/auditionService";
@@ -189,6 +189,9 @@ export function AuditionManagement() {
         <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Audition" : "New Audition"}</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {editing ? "Update audition details" : "Schedule a new audition for a candidate"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>

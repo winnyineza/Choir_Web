@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -502,6 +503,9 @@ export function DisciplinaryManagement() {
             <DialogTitle className="font-display gold-text">
               {selectedRecord ? "Edit Record" : "New Disciplinary Record"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedRecord ? "Update disciplinary record details" : "Create a new disciplinary record for a member"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
@@ -689,6 +693,9 @@ export function DisciplinaryManagement() {
         <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Record Details</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              View disciplinary record details and history
+            </DialogDescription>
           </DialogHeader>
 
           {selectedRecord && (
@@ -768,6 +775,9 @@ export function DisciplinaryManagement() {
         <DialogContent className="sm:max-w-md bg-charcoal border-primary/20">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Resolve Record</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Add resolution notes to close this record
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">

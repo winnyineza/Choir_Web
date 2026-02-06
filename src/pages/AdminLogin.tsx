@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateInvite, redeemInvite, requestPasswordReset, validateResetToken, resetPassword } from "@/lib/adminService";
 import { PasswordStrength } from "@/components/ui/password-strength";
+import { validateEmail, validatePassword, checkRateLimit, LOGIN_RATE_LIMIT, sanitizeString } from "@/lib/validation";
 import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -42,10 +43,34 @@ export default function AdminLogin() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.errors[0]);
+      return;
+    }
+
+    // Check password is not empty
+    if (!password.trim()) {
+      setError("Password is required");
+      return;
+    }
+
+    // Client-side rate limiting (additional layer)
+    const rateLimitKey = `login_${emailValidation.sanitizedValue}`;
+    const rateCheck = checkRateLimit(rateLimitKey, LOGIN_RATE_LIMIT);
+    if (!rateCheck.allowed) {
+      const minutesRemaining = Math.ceil(rateCheck.resetIn / 60000);
+      setError(`Too many login attempts. Please wait ${minutesRemaining} minute(s) before trying again.`);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const result = await login(email, password, rememberMe);
+      const sanitizedEmail = sanitizeString(emailValidation.sanitizedValue || email);
+      const result = await login(sanitizedEmail, password, rememberMe);
       if (result.success) {
         navigate("/admin");
       } else {
@@ -81,8 +106,10 @@ export default function AdminLogin() {
       return;
     }
     
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.errors.join(". "));
       return;
     }
     

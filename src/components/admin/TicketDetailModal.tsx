@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -150,6 +151,9 @@ This is regarding your ticket order (${order.txRef}) for *${order.eventTitle}*.
             <Receipt className="w-5 h-5" />
             Order Details
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            View ticket order details and status
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">

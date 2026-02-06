@@ -5,6 +5,37 @@ import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "tickets@serenadesofpraise.com";
 
+// Email validation
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+// Rate limiting
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 20; // max ticket emails per hour per IP
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || entry.resetTime < now) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+// Sanitize string for HTML
+function sanitize(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 interface TicketEmailRequest {
   to: string;
   customerName: string;
@@ -23,11 +54,33 @@ interface TicketEmailRequest {
 }
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+  const headers = {
+    "Access-Control-Allow-Origin": process.env.URL || "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+  };
+
+  // Handle preflight
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers, body: "" };
+  }
+
   // Only allow POST
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
+      headers,
       body: JSON.stringify({ error: "Method not allowed" }),
+    };
+  }
+
+  // Rate limiting
+  const clientIp = event.headers["x-forwarded-for"]?.split(",")[0] || "unknown";
+  if (!checkRateLimit(clientIp)) {
+    return {
+      statusCode: 429,
+      headers,
+      body: JSON.stringify({ error: "Too many requests" }),
     };
   }
 
@@ -36,6 +89,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     console.error("RESEND_API_KEY not configured");
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ error: "Email service not configured" }),
     };
   }
@@ -47,16 +101,43 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     if (!data.to || !data.eventTitle || !data.txRef) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: "Missing required fields" }),
       };
     }
 
-    // Format tickets list
+    // Validate email
+    if (!EMAIL_REGEX.test(data.to)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "Invalid email address" }),
+      };
+    }
+
+    // Validate total is positive
+    if (typeof data.total !== "number" || data.total < 0) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "Invalid total amount" }),
+      };
+    }
+
+    // Sanitize user inputs
+    const safeEventTitle = sanitize(data.eventTitle);
+    const safeEventDate = sanitize(data.eventDate);
+    const safeEventTime = sanitize(data.eventTime);
+    const safeEventLocation = sanitize(data.eventLocation);
+    const safeTxRef = sanitize(data.txRef);
+    const safeCustomerName = sanitize(data.customerName);
+
+    // Format tickets list (sanitize tier names)
     const ticketsList = data.tickets
-      .map(t => `${t.quantity}x ${t.tierName} - ${formatCurrency(t.priceEach * t.quantity)}`)
+      .map(t => `${t.quantity}x ${sanitize(t.tierName)} - ${formatCurrency(t.priceEach * t.quantity)}`)
       .join("<br>");
 
-    // Create email HTML
+    // Create email HTML with sanitized values
     const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -93,19 +174,19 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           <tr>
             <td style="padding: 0 30px 30px;">
               <div style="background-color: #252525; border-radius: 12px; padding: 20px; border-left: 4px solid #d4a537;">
-                <h3 style="margin: 0 0 15px; color: #d4a537; font-size: 18px;">${data.eventTitle}</h3>
+                <h3 style="margin: 0 0 15px; color: #d4a537; font-size: 18px;">${safeEventTitle}</h3>
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="padding: 8px 0; color: #888; font-size: 14px;">📅 Date</td>
-                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${data.eventDate}</td>
+                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${safeEventDate}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #888; font-size: 14px;">🕐 Time</td>
-                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${data.eventTime || "TBA"}</td>
+                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${safeEventTime || "TBA"}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #888; font-size: 14px;">📍 Location</td>
-                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${data.eventLocation}</td>
+                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${safeEventLocation}</td>
                   </tr>
                 </table>
               </div>
@@ -122,7 +203,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="color: #888; font-size: 14px;">Reference</td>
-                      <td style="color: #d4a537; font-size: 14px; text-align: right; font-family: monospace;">${data.txRef}</td>
+                      <td style="color: #d4a537; font-size: 14px; text-align: right; font-family: monospace;">${safeTxRef}</td>
                     </tr>
                     <tr>
                       <td style="padding-top: 10px; color: #fff; font-size: 16px; font-weight: bold;">Total Paid</td>
@@ -153,7 +234,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
                   <li>Present this email or screenshot at the entrance</li>
                   <li>Arrive 30 minutes before the event starts</li>
                   <li>This ticket is non-transferable</li>
-                  <li>Keep your reference number safe: <strong>${data.txRef}</strong></li>
+                  <li>Keep your reference number safe: <strong>${safeTxRef}</strong></li>
                 </ul>
               </div>
             </td>
@@ -198,6 +279,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       console.error("Resend API error:", errorData);
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({ error: "Failed to send email", details: errorData }),
       };
     }
@@ -206,12 +288,14 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify({ success: true, messageId: result.id }),
     };
   } catch (error) {
     console.error("Error sending ticket email:", error);
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ error: "Internal server error" }),
     };
   }

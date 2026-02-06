@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -492,6 +493,9 @@ export function MeetingMinutesComponent() {
             <DialogTitle className="font-display gold-text">
               {selectedMeeting ? "Edit Meeting Minutes" : "New Meeting Minutes"}
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {selectedMeeting ? "Update meeting minutes details" : "Record new meeting minutes"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
@@ -698,6 +702,9 @@ export function MeetingMinutesComponent() {
         <DialogContent className="sm:max-w-2xl bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Meeting Minutes</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              View meeting minutes details
+            </DialogDescription>
           </DialogHeader>
 
           {selectedMeeting && (

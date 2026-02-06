@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -454,6 +455,9 @@ export function GalleryManagement() {
         <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Add to Gallery</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Upload a new image to the gallery
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">

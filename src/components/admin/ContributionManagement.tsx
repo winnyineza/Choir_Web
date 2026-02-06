@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -1298,6 +1299,9 @@ export function ContributionManagement() {
               <Wallet className="w-5 h-5 text-primary" />
               Record Contribution
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Record a new contribution payment from a member
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1450,6 +1454,9 @@ export function ContributionManagement() {
               <Target className="w-5 h-5 text-primary" />
               {editingType ? "Edit" : "Add"} Contribution Type
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {editingType ? "Update contribution type details" : "Create a new contribution type"}
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1546,6 +1553,9 @@ export function ContributionManagement() {
               <FileText className="w-5 h-5 text-primary" />
               Contributions Report
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              View and export contribution reports
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1761,6 +1771,9 @@ export function ContributionManagement() {
               <History className="w-5 h-5 text-primary" />
               Payment Audit Trail
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              View detailed payment history and audit logs
+            </DialogDescription>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto space-y-4">
@@ -1856,6 +1869,9 @@ export function ContributionManagement() {
               <TrendingUp className="w-5 h-5 text-primary" />
               Annual Financial Summary
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              View annual financial performance summary
+            </DialogDescription>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto space-y-6">
@@ -2025,6 +2041,9 @@ export function ContributionManagement() {
               <Calendar className="w-5 h-5 text-primary" />
               Record Monthly Dues
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Record monthly dues payment from a member
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6">
@@ -2184,6 +2203,9 @@ export function ContributionManagement() {
               <DollarSign className="w-5 h-5 text-primary" />
               Record Payment
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Record a payment for the selected contribution
+            </DialogDescription>
           </DialogHeader>
           
           {cellPayment && (
@@ -2317,6 +2339,9 @@ export function ContributionManagement() {
               <Target className="w-5 h-5 text-purple-500" />
               Record Payment
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Record a payment for the special contribution
+            </DialogDescription>
           </DialogHeader>
           
           {specialCellPayment && (

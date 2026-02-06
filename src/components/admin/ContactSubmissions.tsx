@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -361,6 +362,9 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
               <Mail className="w-5 h-5 text-primary" />
               Message Details
             </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              View and respond to contact form submission
+            </DialogDescription>
           </DialogHeader>
 
           {selectedSubmission && (

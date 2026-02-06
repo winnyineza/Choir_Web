@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -261,6 +262,9 @@ export function UploadGalleryModal({ isOpen, onClose, onSuccess }: UploadGallery
           <DialogTitle className="font-display text-xl gold-text">
             Upload to Gallery
           </DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
+            Upload a new image to the gallery
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
