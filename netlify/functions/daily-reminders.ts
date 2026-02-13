@@ -317,52 +317,201 @@ function generateBirthdayReminderEmail(birthdays: Member[]): string {
   `;
 }
 
-// Generate birthday wish email (sent to ALL members on someone's birthday)
-function generateBirthdayWishEmail(birthdayMembers: Member[]): string {
+// Birthday Bible verses - rotates based on day of year
+const BIRTHDAY_VERSES = [
+  { text: "The LORD bless you and keep you; the LORD make his face shine on you and be gracious to you; the LORD turn his face toward you and give you peace.", ref: "Numbers 6:24-26" },
+  { text: "For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" },
+  { text: "The LORD your God is with you, the Mighty Warrior who saves. He will take great delight in you; in his love he will no longer rebuke you, but will rejoice over you with singing.", ref: "Zephaniah 3:17" },
+  { text: "May he give you the desire of your heart and make all your plans succeed.", ref: "Psalm 20:4" },
+  { text: "This is the day the LORD has made; let us rejoice and be glad in it.", ref: "Psalm 118:24" },
+  { text: "Every good and perfect gift is from above, coming down from the Father of the heavenly lights, who does not change like shifting shadows.", ref: "James 1:17" },
+  { text: "Delight yourself in the LORD, and he will give you the desires of your heart.", ref: "Psalm 37:4" },
+  { text: "I praise you because I am fearfully and wonderfully made; your works are wonderful, I know that full well.", ref: "Psalm 139:14" },
+  { text: "The LORD is my strength and my shield; my heart trusts in him, and he helps me. My heart leaps for joy, and with my song I praise him.", ref: "Psalm 28:7" },
+  { text: "He has made everything beautiful in its time. He has also set eternity in the human heart.", ref: "Ecclesiastes 3:11" },
+  { text: "But those who hope in the LORD will renew their strength. They will soar on wings like eagles; they will run and not grow weary, they will walk and not be faint.", ref: "Isaiah 40:31" },
+  { text: "Sing to the LORD a new song, for he has done marvelous things.", ref: "Psalm 98:1" },
+];
+
+function getTodayVerse(): { text: string; ref: string } {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+  return BIRTHDAY_VERSES[dayOfYear % BIRTHDAY_VERSES.length];
+}
+
+// Generate PERSONAL birthday blessing (sent to the birthday member)
+function generatePersonalBirthdayEmail(member: Member): string {
+  const firstName = member.name.split(' ')[0];
+  const verse = getTodayVerse();
+  const dob = new Date(member.date_of_birth!);
+  const age = new Date().getFullYear() - dob.getFullYear();
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1a1a1a 0%, #2a1f1a 100%); border-radius: 16px; overflow: hidden;">
+              <!-- Golden Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 40px; text-align: center;">
+                  <div style="font-size: 60px; margin-bottom: 10px;">🎂</div>
+                  <h1 style="margin: 0; color: #000; font-size: 28px; font-weight: bold;">Happy Birthday, ${firstName}!</h1>
+                  <p style="margin: 10px 0 0; color: #000; font-size: 16px;">Celebrating you today</p>
+                </td>
+              </tr>
+              
+              <!-- Personal Blessing -->
+              <tr>
+                <td style="padding: 30px; text-align: center;">
+                  <div style="font-size: 24px; margin-bottom: 15px;">🎉 🎈 🎊 🎁 🎉</div>
+                  <h2 style="margin: 0 0 15px; color: #d4a537; font-size: 22px;">Dear ${firstName},</h2>
+                  <p style="color: #ccc; font-size: 16px; line-height: 1.8; margin: 0 0 20px;">
+                    On this beautiful day, the entire Serenades of Praise family 
+                    sends you our warmest birthday blessings! Your voice is a 
+                    gift from God, and your presence in our choir brings joy to 
+                    everyone around you.
+                  </p>
+                  <p style="color: #ccc; font-size: 16px; line-height: 1.8; margin: 0 0 20px;">
+                    May this new year of your life be filled with God's abundant 
+                    grace, beautiful melodies, and endless blessings. May you 
+                    continue to grow in faith and use your talents to glorify 
+                    His name.
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Bible Verse -->
+              <tr>
+                <td style="padding: 0 30px 30px;">
+                  <div style="background: linear-gradient(135deg, #d4a53720 0%, #b8860b15 100%); border-radius: 12px; padding: 25px; border: 1px solid #d4a53740; text-align: center;">
+                    <div style="font-size: 30px; margin-bottom: 10px;">📖</div>
+                    <p style="color: #fff; font-size: 16px; line-height: 1.8; font-style: italic; margin: 0 0 12px;">
+                      "${verse.text}"
+                    </p>
+                    <p style="color: #d4a537; font-size: 14px; font-weight: bold; margin: 0;">
+                      — ${verse.ref}
+                    </p>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Birthday Prayer -->
+              <tr>
+                <td style="padding: 0 30px 30px; text-align: center;">
+                  <div style="background-color: #252525; border-radius: 12px; padding: 25px;">
+                    <p style="color: #d4a537; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px;">A Birthday Prayer for You</p>
+                    <p style="color: #ccc; font-size: 15px; line-height: 1.8; font-style: italic; margin: 0;">
+                      Heavenly Father, we thank You for the gift of ${firstName}'s life. 
+                      Bless ${firstName} with good health, joy, and peace in this new year. 
+                      May Your love surround them, Your wisdom guide them, 
+                      and Your grace sustain them. In Jesus' name, Amen.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Celebration Banner -->
+              <tr>
+                <td style="padding: 0 30px 30px; text-align: center;">
+                  <div style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); border-radius: 8px; padding: 15px 30px; display: inline-block;">
+                    <span style="color: #000; font-weight: bold; font-size: 16px;">🎵 Voices United in Celebrating You 🎵</span>
+                  </div>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 20px 30px; background-color: #151515; text-align: center;">
+                  <p style="margin: 0 0 8px; color: #d4a537; font-size: 14px; font-weight: bold;">With love from your Serenades of Praise Family ❤️</p>
+                  <p style="margin: 0; color: #666; font-size: 11px;">Kacyiru SDA Church, Kigali, Rwanda</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// Generate birthday NOTIFICATION email (sent to ALL other members)
+function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
   const names = birthdayMembers.map(m => m.name);
   const nameList = names.length === 1 
     ? names[0] 
     : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   
   const isPlural = birthdayMembers.length > 1;
+  const verse = getTodayVerse();
+
+  const memberCards = birthdayMembers.map(m => {
+    const firstName = m.name.split(' ')[0];
+    return `
+      <div style="background-color: #252525; border-radius: 12px; padding: 20px; margin-bottom: 12px; text-align: center; border: 1px solid #d4a53730;">
+        <div style="font-size: 40px; margin-bottom: 8px;">🎂</div>
+        <p style="color: #d4a537; font-size: 20px; font-weight: bold; margin: 0 0 4px;">${m.name}</p>
+        <p style="color: #888; font-size: 13px; margin: 0;">Send ${firstName} a birthday wish today!</p>
+      </div>
+    `;
+  }).join('');
 
   return `
     <!DOCTYPE html>
     <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; margin: 0; }
-        .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a 0%, #2a2020 100%); border-radius: 16px; padding: 40px; text-align: center; }
-        .cake { font-size: 80px; margin-bottom: 20px; }
-        h1 { color: #d4a537; margin-bottom: 10px; font-size: 28px; }
-        .names { color: #fff; font-size: 24px; font-weight: bold; margin: 20px 0; }
-        .message { color: #ccc; font-size: 16px; line-height: 1.6; margin: 20px 0; }
-        .wish-box { background: #d4a537; color: #000; padding: 15px 30px; border-radius: 8px; display: inline-block; margin: 20px 0; font-weight: bold; }
-        .footer { margin-top: 30px; color: #888; font-size: 12px; }
-        .confetti { font-size: 24px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="cake">🎂</div>
-        <h1>Happy Birthday!</h1>
-        <div class="confetti">🎉 🎈 🎊 🎁 🎉</div>
-        <div class="names">${nameList}</div>
-        <p class="message">
-          Today we celebrate ${isPlural ? 'our beloved choir members' : 'our beloved choir member'}!<br><br>
-          May God bless you with joy, peace, and many more years of beautiful music. 
-          Your voice${isPlural ? 's are' : ' is'} a blessing to our choir family!
-        </p>
-        <div class="wish-box">
-          🎵 Voices United in Celebration 🎵
-        </div>
-        <p class="message" style="font-style: italic;">
-          "This is the day the LORD has made; let us rejoice and be glad in it." - Psalm 118:24
-        </p>
-        <div class="footer">
-          <p>With love from the Serenades of Praise Family ❤️</p>
-        </div>
-      </div>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
+                  <div style="font-size: 40px; margin-bottom: 8px;">🎉</div>
+                  <h1 style="margin: 0; color: #000; font-size: 22px; font-weight: bold;">Birthday Celebration!</h1>
+                  <p style="margin: 8px 0 0; color: #000; font-size: 14px;">Let's celebrate ${isPlural ? 'our choir members' : 'our choir member'} today</p>
+                </td>
+              </tr>
+              
+              <!-- Birthday Members -->
+              <tr>
+                <td style="padding: 30px;">
+                  <p style="color: #ccc; font-size: 15px; line-height: 1.6; text-align: center; margin: 0 0 20px;">
+                    Today is a special day! ${isPlural ? 'Some of our' : 'One of our'} beloved choir 
+                    ${isPlural ? 'members are' : 'member is'} celebrating ${isPlural ? 'their' : 'a'} birthday. 
+                    Let's shower ${isPlural ? 'them' : 'them'} with love and blessings!
+                  </p>
+                  ${memberCards}
+                </td>
+              </tr>
+
+              <!-- Bible Verse -->
+              <tr>
+                <td style="padding: 0 30px 30px;">
+                  <div style="background: #d4a53715; border-radius: 12px; padding: 20px; border: 1px solid #d4a53730; text-align: center;">
+                    <p style="color: #fff; font-size: 14px; font-style: italic; line-height: 1.6; margin: 0 0 8px;">
+                      "${verse.text}"
+                    </p>
+                    <p style="color: #d4a537; font-size: 13px; font-weight: bold; margin: 0;">— ${verse.ref}</p>
+                  </div>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 20px 30px; background-color: #151515; text-align: center;">
+                  <p style="margin: 0 0 8px; color: #888; font-size: 12px;">With love from the Serenades of Praise Family</p>
+                  <p style="margin: 0; color: #666; font-size: 11px;">Kacyiru SDA Church, Kigali, Rwanda</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
   `;
@@ -569,32 +718,50 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    // ===== TODAY'S BIRTHDAYS - Send wishes to ALL members =====
+    // ===== TODAY'S BIRTHDAYS =====
     const todayBirthdays = getTodayBirthdays(members);
     
     if (todayBirthdays.length > 0) {
       console.log(`🎂 TODAY's birthdays: ${todayBirthdays.map(m => m.name).join(', ')}`);
       
-      // Get all member emails (everyone gets the birthday wish!)
-      const allMemberEmails = members.map(m => m.email).filter(Boolean);
+      const names = todayBirthdays.map(m => m.name);
+      const nameList = names.length === 1 
+        ? names[0] 
+        : names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];
+
+      // 1. Send PERSONAL birthday blessing to each birthday member
+      for (const birthdayMember of todayBirthdays) {
+        if (birthdayMember.email) {
+          const personalSent = await sendEmail(
+            [birthdayMember.email],
+            `🎂 Happy Birthday, ${birthdayMember.name.split(' ')[0]}! From Your Serenades Family`,
+            generatePersonalBirthdayEmail(birthdayMember)
+          );
+          if (personalSent) {
+            console.log(`Personal birthday blessing sent to ${birthdayMember.name}`);
+          }
+        }
+      }
+
+      // 2. Send birthday NOTIFICATION to all OTHER members
+      const birthdayMemberEmails = todayBirthdays.map(m => m.email?.toLowerCase()).filter(Boolean);
+      const otherMemberEmails = members
+        .map(m => m.email)
+        .filter(Boolean)
+        .filter(email => !birthdayMemberEmails.includes(email.toLowerCase()));
       
-      if (allMemberEmails.length > 0) {
-        const names = todayBirthdays.map(m => m.name);
-        const nameList = names.length === 1 
-          ? names[0] 
-          : names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];
-        
-        const sent = await sendEmail(
-          allMemberEmails,
-          `🎂 Happy Birthday ${nameList}! 🎉`,
-          generateBirthdayWishEmail(todayBirthdays)
+      if (otherMemberEmails.length > 0) {
+        const notifSent = await sendEmail(
+          otherMemberEmails,
+          `🎂 Happy Birthday ${nameList}! Let's Celebrate!`,
+          generateBirthdayNotificationEmail(todayBirthdays)
         );
 
-        if (sent) {
+        if (notifSent) {
           results.birthdayWishesSent = true;
           results.todayBirthdayCount = todayBirthdays.length;
-          results.wishRecipients = allMemberEmails.length;
-          console.log(`Birthday wishes sent to ${allMemberEmails.length} members`);
+          results.wishRecipients = otherMemberEmails.length + todayBirthdays.length;
+          console.log(`Birthday notification sent to ${otherMemberEmails.length} other members`);
         }
       }
     }
