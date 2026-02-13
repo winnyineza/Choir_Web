@@ -1,0 +1,20 @@
+name: Daily Reminders
+
+on:
+  schedule:
+    # Runs every day at 6:00 AM UTC (8:00 AM Rwanda time)
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Daily Reminders
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://serenadesofpraise.netlify.app/.netlify/functions/daily-reminders")
+          echo "Response code: $response"
+          if [ "$response" -ne 200 ]; then
+            echo "Warning: Function returned $response"
+          fi
