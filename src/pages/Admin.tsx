@@ -37,6 +37,9 @@ import {
   UserCheck,
   IdCard,
   Megaphone,
+  Mail,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -58,6 +61,7 @@ import {
 } from "@/lib/dataService";
 import { formatCurrency } from "@/lib/flutterwave";
 import { exportOrdersToCSV } from "@/lib/exportUtils";
+import { sendMemberInvite, sendBulkInvites } from "@/lib/memberInviteService";
 import {
   getAllPromoCodes,
   createPromoCode,
@@ -507,6 +511,55 @@ export default function Admin() {
     }
   };
 
+
+  // Send portal invite to a member
+  const [sendingInviteId, setSendingInviteId] = useState<string | null>(null);
+  
+  const handleSendInvite = async (member: Member) => {
+    setSendingInviteId(member.id);
+    try {
+      const result = await sendMemberInvite(member);
+      if (result.success) {
+        toast({ title: "Invite Sent", description: result.message });
+        if (currentUser) {
+          addAuditLog(currentUser, "SEND_MEMBER_INVITE", `Sent portal invite to: ${member.name} (${member.email})`);
+        }
+      } else {
+        toast({ title: "Invite Failed", description: result.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to send invite", variant: "destructive" });
+    } finally {
+      setSendingInviteId(null);
+    }
+  };
+
+  const handleBulkSendInvites = async () => {
+    const selectedMembersList = members.filter(m => selectedMembers.includes(m.id) && m.email);
+    if (selectedMembersList.length === 0) {
+      toast({ title: "No Members Selected", description: "Select members with email addresses to send invites.", variant: "destructive" });
+      return;
+    }
+    
+    if (!confirm(`Send portal invite to ${selectedMembersList.length} member(s)?`)) return;
+    
+    setSendingInviteId("bulk");
+    try {
+      const result = await sendBulkInvites(selectedMembersList);
+      toast({ 
+        title: "Invites Sent", 
+        description: `${result.sent} sent, ${result.failed} failed out of ${result.total} members.` 
+      });
+      if (currentUser) {
+        addAuditLog(currentUser, "BULK_SEND_INVITES", `Sent ${result.sent} portal invites (${result.failed} failed)`);
+      }
+      setSelectedMembers([]);
+    } catch {
+      toast({ title: "Error", description: "Failed to send invites", variant: "destructive" });
+    } finally {
+      setSendingInviteId(null);
+    }
+  };
 
   // Delete actions
   const handleDeleteMember = (id: string, name: string) => {
@@ -1260,6 +1313,19 @@ export default function Admin() {
                       <Clock className="w-4 h-4 mr-1 text-yellow-500" />
                       Set Pending
                     </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleBulkSendInvites}
+                      disabled={sendingInviteId === "bulk"}
+                    >
+                      {sendingInviteId === "bulk" ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-1 text-primary" />
+                      )}
+                      Send Invites
+                    </Button>
                     <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
                       <Trash2 className="w-4 h-4 mr-1" />
                       Delete
@@ -1334,6 +1400,19 @@ export default function Admin() {
                             </span>
                           </td>
                           <td className="p-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Send Portal Invite"
+                              onClick={() => handleSendInvite(member)}
+                              disabled={sendingInviteId === member.id || !member.email}
+                            >
+                              {sendingInviteId === member.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4 text-primary" />
+                              )}
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"

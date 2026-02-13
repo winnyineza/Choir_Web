@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { addMember, updateMember, type Member, type EmergencyContact } from "@/lib/dataService";
-import { Loader2, Cake, Upload, User, X, Phone, ChevronDown, ChevronUp } from "lucide-react";
+import { addMember, updateMember, getAllMembers, type Member, type EmergencyContact } from "@/lib/dataService";
+import { sendMemberInvite } from "@/lib/memberInviteService";
+import { Loader2, Cake, Upload, User, X, Phone, ChevronDown, ChevronUp, Mail } from "lucide-react";
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [photo, setPhoto] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sendInvite, setSendInvite] = useState(true);
   const [showEmergencyContact, setShowEmergencyContact] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState<EmergencyContact>({
     name: "",
@@ -73,6 +76,7 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
     setStatus("Pending");
     setDateOfBirth("");
     setPhoto("");
+    setSendInvite(true);
     setShowEmergencyContact(false);
     setEmergencyContact({
       name: "",
@@ -145,10 +149,38 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
         });
       } else {
         addMember(memberData);
-        toast({
-          title: "Member Added",
-          description: `${name} has been added to the choir.`,
-        });
+        
+        // Send welcome invite email if checkbox is checked
+        if (sendInvite && email) {
+          // Find the newly added member to get their ID
+          const members = getAllMembers();
+          const newMember = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+          
+          if (newMember) {
+            const inviteResult = await sendMemberInvite(newMember);
+            if (inviteResult.success) {
+              toast({
+                title: "Member Added & Invited",
+                description: `${name} has been added and a welcome email was sent to ${email}.`,
+              });
+            } else {
+              toast({
+                title: "Member Added",
+                description: `${name} was added but the invite email failed: ${inviteResult.message}`,
+              });
+            }
+          } else {
+            toast({
+              title: "Member Added",
+              description: `${name} has been added to the choir.`,
+            });
+          }
+        } else {
+          toast({
+            title: "Member Added",
+            description: `${name} has been added to the choir.`,
+          });
+        }
       }
       
       onSuccess();
@@ -376,6 +408,21 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
             )}
           </div>
 
+          {/* Send Invite Checkbox - only for new members */}
+          {!editMember && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <Checkbox
+                id="sendInvite"
+                checked={sendInvite}
+                onCheckedChange={(checked) => setSendInvite(checked === true)}
+              />
+              <Label htmlFor="sendInvite" className="flex items-center gap-2 cursor-pointer text-sm">
+                <Mail className="w-4 h-4 text-primary" />
+                Send welcome email with portal access
+              </Label>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-4">
             <Button
               type="button"
@@ -395,10 +442,12 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
+                  {sendInvite && !editMember ? "Adding & Sending..." : "Saving..."}
                 </>
               ) : editMember ? (
                 "Update Member"
+              ) : sendInvite ? (
+                "Add & Send Invite"
               ) : (
                 "Add Member"
               )}
