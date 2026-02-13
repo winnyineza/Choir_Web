@@ -1,9 +1,9 @@
 import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import nodemailer from "nodemailer";
 
-// Resend API for sending emails
-// Get your API key from: https://resend.com/api-keys
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || "tickets@serenadesofpraise.com";
+// Gmail SMTP for sending emails
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
 // Email validation
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -84,13 +84,13 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     };
   }
 
-  // Check API key
-  if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
+  // Check Gmail credentials
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    console.error("Gmail credentials not configured");
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: "Email service not configured" }),
+      body: JSON.stringify({ error: "Email service not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD." }),
     };
   }
 
@@ -259,44 +259,30 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 </html>
     `;
 
-    // Send email via Resend
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `Serenades of Praise <${FROM_EMAIL}>`,
-        to: [data.to],
-        subject: `🎵 Your Ticket for ${data.eventTitle} - Confirmed!`,
-        html: emailHtml,
-      }),
+    // Send email via Gmail SMTP
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Resend API error:", errorData);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: "Failed to send email", details: errorData }),
-      };
-    }
-
-    const result = await response.json();
+    const info = await transporter.sendMail({
+      from: `"Serenades of Praise" <${GMAIL_USER}>`,
+      to: data.to,
+      subject: `Your Ticket for ${safeEventTitle} - Confirmed!`,
+      html: emailHtml,
+    });
     
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, messageId: result.id }),
+      body: JSON.stringify({ success: true, messageId: info.messageId }),
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending ticket email:", error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: "Internal server error" }),
+      body: JSON.stringify({ error: error.message || "Internal server error" }),
     };
   }
 };

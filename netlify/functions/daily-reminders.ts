@@ -1,12 +1,14 @@
 // Netlify Function for daily email reminders
 // Can be triggered manually or scheduled via Netlify UI
 // Environment variables needed:
-// - RESEND_API_KEY
+// - GMAIL_USER
+// - GMAIL_APP_PASSWORD
 // - ADMIN_NOTIFICATION_EMAILS (comma-separated)
 // - SUPABASE_URL or VITE_SUPABASE_URL
 // - SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY
 
 import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import nodemailer from "nodemailer";
 
 interface Member {
   id: string;
@@ -403,35 +405,28 @@ function generateEventReminderEmail(events: Event[]): string {
   `;
 }
 
-// Send email via Resend API
+// Send email via Gmail SMTP
 async function sendEmail(to: string[], subject: string, html: string): Promise<boolean> {
-  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const GMAIL_USER = process.env.GMAIL_USER;
+  const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
   
-  if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    console.error("Gmail credentials not configured");
     return false;
   }
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "Serenades of Praise <onboarding@resend.dev>",
-        to: to,
-        subject: subject,
-        html: html,
-      }),
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Resend API error:", errorData);
-      return false;
-    }
+    await transporter.sendMail({
+      from: `"Serenades of Praise" <${GMAIL_USER}>`,
+      to: to.join(", "),
+      subject: subject,
+      html: html,
+    });
 
     return true;
   } catch (error) {
@@ -445,20 +440,21 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     console.log("Running daily reminders check...");
 
     const envStatus = {
-      hasResendKey: !!process.env.RESEND_API_KEY,
+      hasGmailUser: !!process.env.GMAIL_USER,
+      hasGmailPassword: !!process.env.GMAIL_APP_PASSWORD,
       hasAdminEmails: !!process.env.ADMIN_NOTIFICATION_EMAILS,
       hasSupabaseUrl: !!(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL),
       hasSupabaseKey: !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY),
     };
 
-    // Check if Resend API key is configured
-    if (!process.env.RESEND_API_KEY) {
+    // Check if Gmail credentials are configured
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           status: "configuration_needed",
-          message: "RESEND_API_KEY not configured",
+          message: "GMAIL_USER and GMAIL_APP_PASSWORD not configured",
           envStatus 
         }),
       };

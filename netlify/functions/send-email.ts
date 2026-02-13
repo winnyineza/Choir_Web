@@ -1,7 +1,8 @@
-// Netlify Function to send emails via Resend
-// Environment variable needed: RESEND_API_KEY
+// Netlify Function to send emails via Gmail SMTP
+// Environment variables needed: GMAIL_USER, GMAIL_APP_PASSWORD
 
 import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import nodemailer from "nodemailer";
 
 interface EmailRequest {
   to: Array<{ email: string; name: string }>;
@@ -14,7 +15,7 @@ const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-
 
 // Simple in-memory rate limiting (resets on cold start)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_MAX = 50; // max emails per window
+const RATE_LIMIT_MAX = 50;
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 
 function checkRateLimit(ip: string): boolean {
@@ -34,7 +35,7 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-// Sanitize HTML to prevent XSS (basic)
+// Sanitize HTML to prevent XSS
 function sanitizeHtml(html: string): string {
   return html
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
@@ -42,8 +43,22 @@ function sanitizeHtml(html: string): string {
     .replace(/on\w+\s*=/gi, "");
 }
 
-const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  // CORS headers
+// Create Gmail SMTP transporter
+function createTransporter() {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  
+  if (!user || !pass) {
+    throw new Error("Gmail credentials not configured");
+  }
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
+}
+
+const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) => {
   const headers = {
     "Access-Control-Allow-Origin": process.env.URL || "*",
     "Access-Control-Allow-Headers": "Content-Type",
@@ -75,15 +90,13 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     };
   }
 
-  // Check for API key
-  const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  
-  if (!RESEND_API_KEY) {
-    console.error("RESEND_API_KEY not configured");
+  // Check for Gmail credentials
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    console.error("Gmail credentials not configured");
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: "Email service not configured" }),
+      body: JSON.stringify({ error: "Email service not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD." }),
     };
   }
 
@@ -130,39 +143,23 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     // Sanitize HTML content
     const sanitizedHtml = sanitizeHtml(body.html);
 
-    // Send via Resend API
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "Serenades of Praise <noreply@theserenades.com>",
-        to: body.to.map(r => r.email),
-        subject: body.subject,
-        html: sanitizedHtml,
-      }),
+    // Send via Gmail SMTP
+    const transporter = createTransporter();
+    const toAddresses = body.to.map(r => `${r.name} <${r.email}>`).join(", ");
+
+    const info = await transporter.sendMail({
+      from: `"Serenades of Praise" <${process.env.GMAIL_USER}>`,
+      to: toAddresses,
+      subject: body.subject,
+      html: sanitizedHtml,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Resend API error:", errorData);
-      return {
-        statusCode: response.status,
-        headers,
-        body: JSON.stringify({ error: errorData.message || "Failed to send email" }),
-      };
-    }
-
-    const result = await response.json();
-    
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         success: true, 
-        id: result.id,
+        id: info.messageId,
         message: `Email sent to ${body.to.length} recipient(s)` 
       }),
     };
