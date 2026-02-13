@@ -1,0 +1,1586 @@
+// Supabase Sync Layer
+// Provides bidirectional sync between localStorage and Supabase
+// - On app load: pulls data from Supabase into localStorage
+// - On writes: pushes changes to Supabase in the background
+// This keeps existing synchronous service functions working unchanged.
+
+import { supabase, isSupabaseConfigured } from './supabase';
+
+// ============ TYPES ============
+
+interface TableConfig {
+  table: string;
+  toDb: (item: any) => any;
+  fromDb: (row: any) => any;
+  orderBy?: string;
+  orderAsc?: boolean;
+}
+
+// ============ UTILITY ============
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// ============ TABLE MAPPINGS ============
+// Maps localStorage keys to Supabase table configs
+
+const SYNC_CONFIG: Record<string, TableConfig> = {
+  // --- Announcements ---
+  choir_announcements: {
+    table: 'announcements',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (a: any) => ({
+      id: a.id,
+      title: a.title,
+      content: a.content,
+      type: a.type || 'general',
+      priority: a.priority || 'normal',
+      audience: a.audience || 'all',
+      is_pinned: a.isPinned ?? false,
+      is_active: a.isActive ?? true,
+      start_date: a.startDate || null,
+      end_date: a.endDate || null,
+      created_by: a.createdBy || null,
+      created_at: a.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      type: r.type || 'general',
+      priority: r.priority || 'normal',
+      audience: r.audience || 'all',
+      isPinned: r.is_pinned ?? false,
+      isActive: r.is_active ?? true,
+      startDate: r.start_date || '',
+      endDate: r.end_date || '',
+      createdBy: r.created_by || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Expenses ---
+  choir_expenses: {
+    table: 'expenses',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (e: any) => ({
+      id: e.id,
+      title: e.description || e.title,
+      amount: e.amount,
+      category: e.category,
+      date: e.date,
+      description: e.description,
+      vendor: e.vendor || null,
+      receipt_number: e.receiptNumber || null,
+      receipt_url: e.receiptUrl || null,
+      recorded_by: e.recordedBy || null,
+      status: e.approvedBy ? 'approved' : 'pending',
+      notes: e.notes || null,
+      created_at: e.createdAt || new Date().toISOString(),
+      updated_at: e.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      date: r.date,
+      category: r.category,
+      description: r.description || r.title,
+      amount: Number(r.amount),
+      vendor: r.vendor || '',
+      receiptNumber: r.receipt_number || '',
+      approvedBy: r.status === 'approved' ? r.recorded_by : '',
+      recordedBy: r.recorded_by || '',
+      notes: r.notes || '',
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Leave Requests ---
+  choir_leave_requests: {
+    table: 'leave_requests',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (l: any) => ({
+      id: l.id,
+      member_id: l.memberId,
+      member_name: l.memberName || null,
+      member_email: l.memberEmail || null,
+      start_date: l.startDate,
+      end_date: l.endDate,
+      reason: l.reason,
+      status: l.status || 'pending',
+      votes: l.votes || [],
+      approval_count: l.approvalCount || 0,
+      denial_count: l.denialCount || 0,
+      admin_notes: l.adminNotes || null,
+      reviewed_by: l.reviewedBy || null,
+      reviewed_at: l.reviewedAt || null,
+      created_at: l.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id,
+      memberName: r.member_name || '',
+      memberEmail: r.member_email || '',
+      startDate: r.start_date,
+      endDate: r.end_date,
+      reason: r.reason,
+      status: r.status || 'pending',
+      votes: r.votes || [],
+      approvalCount: r.approval_count || 0,
+      denialCount: r.denial_count || 0,
+      adminNotes: r.admin_notes || '',
+      reviewedBy: r.reviewed_by || '',
+      reviewedAt: r.reviewed_at || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Contact Submissions ---
+  choir_contact_submissions: {
+    table: 'contact_submissions',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (c: any) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      subject: c.subject || null,
+      message: c.message,
+      is_read: c.isRead ?? false,
+      responded: c.repliedAt ? true : false,
+      responded_at: c.repliedAt || null,
+      notes: c.notes || null,
+      created_at: c.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      subject: r.subject || '',
+      message: r.message,
+      isRead: r.is_read ?? false,
+      repliedAt: r.responded_at || r.replied_at || '',
+      notes: r.notes || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Documents ---
+  choir_documents: {
+    table: 'documents',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (d: any) => ({
+      id: d.id,
+      title: d.title,
+      description: d.description || null,
+      category: d.category,
+      file_name: d.fileName || null,
+      file_type: d.fileType || null,
+      file_size: d.fileSize || null,
+      file_url: d.fileData || d.fileUrl || '',
+      file_data: d.fileData || null,
+      is_public: d.isPublic ?? false,
+      download_count: d.downloadCount || 0,
+      tags: d.tags || [],
+      uploaded_by: d.uploadedBy || null,
+      visibility: d.isPublic ? 'public' : 'admins',
+      created_at: d.uploadedAt || d.createdAt || new Date().toISOString(),
+      updated_at: d.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description || '',
+      category: r.category,
+      fileName: r.file_name || '',
+      fileType: r.file_type || '',
+      fileSize: r.file_size || 0,
+      fileData: r.file_data || r.file_url || '',
+      fileUrl: r.file_url || '',
+      isPublic: r.is_public ?? r.visibility === 'public',
+      downloadCount: r.download_count || 0,
+      tags: r.tags || [],
+      uploadedBy: r.uploaded_by || '',
+      uploadedAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Document Folders ---
+  choir_document_folders: {
+    table: 'document_folders',
+    orderBy: 'created_at',
+    toDb: (f: any) => ({
+      id: f.id,
+      name: f.name,
+      description: f.description || null,
+      parent_id: f.parentId || null,
+      created_at: f.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description || '',
+      parentId: r.parent_id || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Inventory ---
+  choir_inventory: {
+    table: 'inventory',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (i: any) => ({
+      id: i.id,
+      name: i.name,
+      category: i.category,
+      quantity: i.quantity || 1,
+      available: i.available ?? i.quantity ?? 1,
+      condition: i.condition || 'good',
+      location: i.location || null,
+      description: i.description || null,
+      purchase_date: i.purchaseDate || null,
+      purchase_price: i.purchasePrice || null,
+      serial_number: i.serialNumber || null,
+      notes: i.notes || null,
+      last_checked: i.lastChecked || null,
+      created_at: i.createdAt || new Date().toISOString(),
+      updated_at: i.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      category: r.category,
+      quantity: r.quantity || 1,
+      available: r.available ?? r.quantity ?? 1,
+      condition: r.condition || 'good',
+      location: r.location || '',
+      description: r.description || '',
+      purchaseDate: r.purchase_date || '',
+      purchasePrice: r.purchase_price ? Number(r.purchase_price) : undefined,
+      serialNumber: r.serial_number || '',
+      notes: r.notes || '',
+      lastChecked: r.last_checked || '',
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Inventory Assignments ---
+  choir_inventory_assignments: {
+    table: 'inventory_assignments',
+    orderBy: 'assigned_at',
+    orderAsc: false,
+    toDb: (a: any) => ({
+      id: a.id,
+      item_id: a.itemId,
+      member_id: a.memberId,
+      member_name: a.memberName || null,
+      quantity: a.quantity || 1,
+      assigned_at: a.assignedAt || new Date().toISOString(),
+      returned_at: a.returnedAt || null,
+      notes: a.notes || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      itemId: r.item_id,
+      memberId: r.member_id,
+      memberName: r.member_name || '',
+      quantity: r.quantity || 1,
+      assignedAt: r.assigned_at,
+      returnedAt: r.returned_at || undefined,
+      notes: r.notes || '',
+    }),
+  },
+
+  // --- Disciplinary Records ---
+  choir_disciplinary_records: {
+    table: 'disciplinary_records',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (d: any) => ({
+      id: d.id,
+      member_id: d.memberId,
+      member_name: d.memberName || null,
+      type: d.type || null,
+      severity: d.severity || 'minor',
+      incident_date: d.date,
+      description: d.description || d.reason,
+      category: d.type || d.category || 'other',
+      action_taken: d.actionTaken || null,
+      status: d.status || 'open',
+      expiry_date: d.expiryDate || null,
+      issued_by: d.issuedBy || null,
+      issued_by_name: d.issuedByName || null,
+      witnesses: d.witnesses || [],
+      resolution_date: d.resolvedAt ? new Date(d.resolvedAt).toISOString().split('T')[0] : null,
+      resolution_notes: d.resolution || null,
+      resolved_by: d.resolvedBy || null,
+      appeal_date: d.appealDate || null,
+      appeal_reason: d.appealReason || null,
+      appeal_decision: d.appealDecision || null,
+      attachments: d.attachments || [],
+      recorded_by: d.issuedBy || null,
+      created_at: d.createdAt || new Date().toISOString(),
+      updated_at: d.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id,
+      memberName: r.member_name || '',
+      type: r.type || r.category || '',
+      severity: r.severity || 'minor',
+      reason: r.description,
+      description: r.description,
+      date: r.incident_date,
+      expiryDate: r.expiry_date || '',
+      status: r.status || 'open',
+      actionTaken: r.action_taken || '',
+      issuedBy: r.issued_by || r.recorded_by || '',
+      issuedByName: r.issued_by_name || '',
+      witnesses: r.witnesses || [],
+      resolution: r.resolution_notes || '',
+      resolvedAt: r.resolution_date || '',
+      resolvedBy: r.resolved_by || '',
+      appealDate: r.appeal_date || '',
+      appealReason: r.appeal_reason || '',
+      appealDecision: r.appeal_decision || '',
+      attachments: r.attachments || [],
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Ticket Orders ---
+  sop_ticket_orders: {
+    table: 'ticket_orders',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (o: any) => ({
+      id: o.id,
+      tx_ref: o.txRef || null,
+      event_title: o.eventTitle || null,
+      event_date: o.eventDate || null,
+      event_location: o.eventLocation || null,
+      event_image: o.eventImage || null,
+      tickets: o.tickets || [],
+      subtotal: o.subtotal || 0,
+      service_fee: o.serviceFee || 0,
+      discount: o.discount || 0,
+      total_amount: o.total || 0,
+      promo_code: o.promoCode || null,
+      customer_name: o.customer?.name || '',
+      customer_email: o.customer?.email || '',
+      customer_phone: o.customer?.phone || '',
+      status: o.status || 'pending',
+      payment_method: o.paymentMethod || null,
+      payment_reference: o.transactionId || null,
+      qr_code_data: o.qrCodeData || null,
+      confirmed_at: o.confirmedAt || null,
+      created_at: o.createdAt || new Date().toISOString(),
+      // ticket_id and quantity not directly stored per-order in this flat model
+      ticket_id: null,
+      quantity: 0,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      txRef: r.tx_ref || '',
+      eventId: r.event_id || '',
+      eventTitle: r.event_title || '',
+      eventDate: r.event_date || '',
+      eventLocation: r.event_location || '',
+      eventImage: r.event_image || '',
+      tickets: r.tickets || [],
+      subtotal: Number(r.subtotal) || 0,
+      serviceFee: Number(r.service_fee) || 0,
+      discount: Number(r.discount) || 0,
+      total: Number(r.total_amount) || 0,
+      promoCode: r.promo_code || '',
+      customer: {
+        name: r.customer_name || '',
+        email: r.customer_email || '',
+        phone: r.customer_phone || '',
+      },
+      status: r.status || 'pending',
+      paymentMethod: r.payment_method || '',
+      transactionId: r.payment_reference || '',
+      qrCodeData: r.qr_code_data || '',
+      createdAt: r.created_at,
+      confirmedAt: r.confirmed_at || '',
+    }),
+  },
+
+  // --- Surveys ---
+  serenades_surveys: {
+    table: 'surveys',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (s: any) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description || null,
+      event_id: s.eventId || null,
+      questions: s.questions || [],
+      status: s.status || 'draft',
+      created_at: s.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description || '',
+      eventId: r.event_id || '',
+      questions: r.questions || [],
+      status: r.status || 'draft',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Survey Responses ---
+  serenades_survey_responses: {
+    table: 'survey_responses',
+    orderBy: 'submitted_at',
+    orderAsc: false,
+    toDb: (r: any) => ({
+      id: r.id,
+      survey_id: r.surveyId,
+      member_id: r.memberId,
+      answers: r.answers || {},
+      submitted_at: r.submittedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      surveyId: r.survey_id,
+      memberId: r.member_id,
+      answers: r.answers || {},
+      submittedAt: r.submitted_at,
+    }),
+  },
+
+  // --- Meeting Minutes ---
+  choir_meeting_minutes: {
+    table: 'meeting_minutes',
+    orderBy: 'date',
+    orderAsc: false,
+    toDb: (m: any) => ({
+      id: m.id,
+      title: m.title,
+      type: m.type || 'regular',
+      date: m.date,
+      start_time: m.startTime || null,
+      end_time: m.endTime || null,
+      location: m.location || null,
+      attendees: m.attendees || [],
+      absentees: m.absentees || [],
+      chairperson: m.chairperson || null,
+      secretary: m.secretary || null,
+      agenda: typeof m.agenda === 'string' ? m.agenda : JSON.stringify(m.agenda || []),
+      minutes: typeof m.agenda === 'object' ? JSON.stringify(m.agenda) : (m.minutes || ''),
+      action_items: m.actionItems || m.agenda || [],
+      opening_prayer: m.openingPrayer || null,
+      closing_prayer: m.closingPrayer || null,
+      next_meeting_date: m.nextMeetingDate || null,
+      notes: m.notes || null,
+      status: m.status || 'draft',
+      recorded_by: m.recordedBy || null,
+      approved_by: m.approvedBy || null,
+      approved_at: m.approvedAt || null,
+      created_at: m.createdAt || new Date().toISOString(),
+      updated_at: m.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      type: r.type || 'regular',
+      date: r.date,
+      startTime: r.start_time || '',
+      endTime: r.end_time || '',
+      location: r.location || '',
+      attendees: r.attendees || [],
+      absentees: r.absentees || [],
+      chairperson: r.chairperson || '',
+      secretary: r.secretary || '',
+      agenda: (() => {
+        try {
+          return typeof r.action_items === 'object' ? r.action_items :
+                 typeof r.agenda === 'string' ? JSON.parse(r.agenda) : r.agenda || [];
+        } catch { return []; }
+      })(),
+      openingPrayer: r.opening_prayer || '',
+      closingPrayer: r.closing_prayer || '',
+      nextMeetingDate: r.next_meeting_date || '',
+      notes: r.notes || '',
+      status: r.status || 'draft',
+      recordedBy: r.recorded_by || '',
+      approvedBy: r.approved_by || '',
+      approvedAt: r.approved_at || '',
+      attachments: [],
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Promo Codes ---
+  sop_promo_codes: {
+    table: 'promo_codes',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (p: any) => ({
+      id: p.id,
+      code: p.code,
+      discount_type: p.discountType || 'percentage',
+      discount_value: p.discountValue || 0,
+      min_purchase: p.minPurchase || 0,
+      max_uses: p.maxUses || null,
+      times_used: p.usedCount || 0,
+      valid_from: p.validFrom || null,
+      valid_until: p.validUntil || null,
+      event_id: p.eventId || null,
+      is_active: p.isActive ?? true,
+      created_at: p.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      code: r.code,
+      discountType: r.discount_type || 'percentage',
+      discountValue: Number(r.discount_value) || 0,
+      minPurchase: Number(r.min_purchase) || 0,
+      maxUses: r.max_uses || null,
+      usedCount: r.times_used || 0,
+      validFrom: r.valid_from || '',
+      validUntil: r.valid_until || '',
+      eventId: r.event_id || '',
+      isActive: r.is_active ?? true,
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Auditions ---
+  serenades_auditions: {
+    table: 'auditions',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (a: any) => ({
+      id: a.id,
+      applicant_name: a.candidateName,
+      candidate_name: a.candidateName,
+      email: a.candidateEmail || null,
+      candidate_phone: a.candidatePhone || null,
+      phone: a.candidatePhone || null,
+      scheduled_date: a.scheduledAt ? new Date(a.scheduledAt).toISOString().split('T')[0] : null,
+      panelists: a.panelists || [],
+      evaluation_notes: a.notes || null,
+      rating: a.rating || null,
+      recommended_voice: a.recommendedVoice || null,
+      voice_type: a.recommendedVoice || 'Soprano',
+      status: a.status || 'scheduled',
+      created_at: a.createdAt || new Date().toISOString(),
+      updated_at: a.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      candidateName: r.candidate_name || r.applicant_name,
+      candidateEmail: r.email || '',
+      candidatePhone: r.candidate_phone || r.phone || '',
+      scheduledAt: r.scheduled_date || '',
+      panelists: r.panelists || [],
+      notes: r.evaluation_notes || '',
+      rating: r.rating || null,
+      recommendedVoice: r.recommended_voice || r.voice_type || '',
+      status: r.status || 'scheduled',
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Receipts ---
+  serenades_receipts: {
+    table: 'receipts',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (r: any) => ({
+      id: r.id,
+      member_id: r.memberId || null,
+      member_name: r.memberName || '',
+      member_email: r.memberEmail || null,
+      amount: r.amount,
+      category: r.category || null,
+      type_name: r.typeName || null,
+      reference: r.reference || null,
+      payment_method: r.paymentMethod || null,
+      month: r.month || null,
+      year: r.year || null,
+      recorded_by: r.recordedBy || null,
+      created_at: r.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id || '',
+      memberName: r.member_name || '',
+      memberEmail: r.member_email || '',
+      amount: Number(r.amount),
+      category: r.category || '',
+      typeName: r.type_name || '',
+      reference: r.reference || '',
+      paymentMethod: r.payment_method || '',
+      month: r.month,
+      year: r.year,
+      recordedBy: r.recorded_by || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Payments ---
+  serenades_payments: {
+    table: 'payments',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (p: any) => ({
+      id: p.id,
+      member_id: p.memberId || null,
+      amount: p.amount,
+      currency: p.currency || 'RWF',
+      method: p.method || null,
+      purpose: p.purpose || null,
+      reference: p.reference || null,
+      status: p.status || 'pending',
+      metadata: p.metadata || {},
+      created_at: p.createdAt || new Date().toISOString(),
+      updated_at: p.updatedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id || '',
+      amount: Number(r.amount),
+      currency: r.currency || 'RWF',
+      method: r.method || '',
+      purpose: r.purpose || '',
+      reference: r.reference || '',
+      status: r.status || 'pending',
+      metadata: r.metadata || {},
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }),
+  },
+
+  // --- Contributions ---
+  choir_contributions: {
+    table: 'contributions',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (c: any) => ({
+      id: c.id,
+      member_id: c.memberId,
+      member_name: c.memberName || null,
+      member_email: c.memberEmail || null,
+      type: c.typeName || c.type || '',
+      type_id: c.typeId || null,
+      type_name: c.typeName || null,
+      category: c.category || 'other',
+      amount: c.amount,
+      expected_amount: c.expectedAmount || null,
+      month: c.month || null,
+      year: c.year || null,
+      payment_method: c.paymentMethod || null,
+      reference: c.reference || null,
+      notes: c.notes || null,
+      recorded_by: c.recordedBy || null,
+      created_at: c.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id,
+      memberName: r.member_name || '',
+      memberEmail: r.member_email || '',
+      typeId: r.type_id || '',
+      typeName: r.type_name || r.type || '',
+      type: r.type || '',
+      category: r.category || 'other',
+      amount: Number(r.amount),
+      expectedAmount: r.expected_amount ? Number(r.expected_amount) : undefined,
+      month: r.month,
+      year: r.year,
+      paymentMethod: r.payment_method || '',
+      reference: r.reference || '',
+      notes: r.notes || '',
+      recordedBy: r.recorded_by || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Contribution Types ---
+  choir_contribution_types: {
+    table: 'contribution_types',
+    orderBy: 'created_at',
+    toDb: (t: any) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category || 'monthly',
+      amount: t.amount || 0,
+      description: t.description || null,
+      is_recurring: t.isRecurring ?? false,
+      rate_history: t.rateHistory || [],
+      target_amount: t.targetAmount || null,
+      deadline: t.deadline || null,
+      is_active: t.isActive ?? true,
+      created_at: t.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      category: r.category || 'monthly',
+      amount: Number(r.amount) || 0,
+      description: r.description || '',
+      isRecurring: r.is_recurring ?? false,
+      rateHistory: r.rate_history || [],
+      targetAmount: r.target_amount ? Number(r.target_amount) : undefined,
+      deadline: r.deadline || '',
+      isActive: r.is_active ?? true,
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Attendance ---
+  choir_attendance: {
+    table: 'attendance',
+    orderBy: 'date',
+    orderAsc: false,
+    toDb: (a: any) => ({
+      id: a.id,
+      member_id: a.memberId,
+      member_name: a.memberName || null,
+      member_email: a.memberEmail || null,
+      member_voice: a.memberVoice || null,
+      date: a.date,
+      session_title: a.sessionTitle || null,
+      status: a.status || 'present',
+      notes: a.notes || null,
+      marked_by: a.markedBy || null,
+      created_at: a.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id,
+      memberName: r.member_name || '',
+      memberEmail: r.member_email || '',
+      memberVoice: r.member_voice || '',
+      date: r.date,
+      sessionTitle: r.session_title || '',
+      status: r.status || 'present',
+      notes: r.notes || '',
+      markedBy: r.marked_by || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Attendance Sessions ---
+  choir_attendance_sessions: {
+    table: 'attendance_sessions',
+    orderBy: 'date',
+    orderAsc: false,
+    toDb: (s: any) => ({
+      id: s.id,
+      date: s.date,
+      title: s.title || null,
+      total_present: s.totalPresent || 0,
+      total_absent: s.totalAbsent || 0,
+      total_excused: s.totalExcused || 0,
+      total_late: s.totalLate || 0,
+      created_at: s.createdAt || new Date().toISOString(),
+      created_by: s.createdBy || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      date: r.date,
+      title: r.title || '',
+      totalPresent: r.total_present || 0,
+      totalAbsent: r.total_absent || 0,
+      totalExcused: r.total_excused || 0,
+      totalLate: r.total_late || 0,
+      createdAt: r.created_at,
+      createdBy: r.created_by || '',
+    }),
+  },
+
+  // --- Donations ---
+  choir_donations: {
+    table: 'donations',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (d: any) => ({
+      id: d.id,
+      donor_name: d.donorName || d.name || '',
+      donor_email: d.donorEmail || d.email || null,
+      amount: d.amount,
+      method: d.method || null,
+      payment_method: d.method || null,
+      reference: d.reference || null,
+      message: d.message || null,
+      date: d.date || null,
+      recorded_by: d.recordedBy || null,
+      status: 'completed',
+      created_at: d.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      donorName: r.donor_name || '',
+      donorEmail: r.donor_email || '',
+      amount: Number(r.amount),
+      method: r.method || r.payment_method || '',
+      reference: r.reference || r.payment_reference || '',
+      message: r.message || '',
+      date: r.date || r.created_at?.split('T')[0] || '',
+      recordedBy: r.recorded_by || '',
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Gallery ---
+  serenades_gallery: {
+    table: 'gallery_items',
+    orderBy: 'uploaded_at',
+    orderAsc: false,
+    toDb: (g: any) => ({
+      id: g.id,
+      type: g.type || 'photo',
+      title: g.title || '',
+      url: g.url,
+      thumbnail: g.thumbnail || null,
+      category: g.category || '',
+      album_name: g.albumName || null,
+      uploaded_at: g.uploadedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      type: r.type || 'photo',
+      title: r.title || '',
+      url: r.url,
+      thumbnail: r.thumbnail || '',
+      category: r.category || '',
+      albumName: r.album_name || '',
+      uploadedAt: r.uploaded_at,
+    }),
+  },
+
+  // --- Event Staff ---
+  serenades_event_staff: {
+    table: 'event_staff',
+    orderBy: 'created_at',
+    toDb: (s: any) => ({
+      id: s.id,
+      name: s.name,
+      national_id: s.nationalId,
+      phone: s.phone || null,
+      email: s.email || null,
+      status: s.status || 'active',
+      assigned_events: s.assignedEvents || [],
+      created_at: s.createdAt || new Date().toISOString(),
+      last_active_at: s.lastActiveAt || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      nationalId: r.national_id,
+      phone: r.phone || '',
+      email: r.email || '',
+      status: r.status || 'active',
+      assignedEvents: r.assigned_events || [],
+      createdAt: r.created_at,
+      lastActiveAt: r.last_active_at || '',
+    }),
+  },
+
+  // --- Scan Records ---
+  serenades_scan_records: {
+    table: 'scan_records',
+    orderBy: 'scanned_at',
+    orderAsc: false,
+    toDb: (s: any) => ({
+      id: s.id,
+      order_id: s.orderId,
+      tx_ref: s.txRef || null,
+      staff_id: s.staffId,
+      staff_name: s.staffName || null,
+      staff_national_id: s.staffNationalId || null,
+      event_id: s.eventId,
+      scanned_at: s.scannedAt || new Date().toISOString(),
+      ticket_count: s.ticketCount || 1,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      orderId: r.order_id,
+      txRef: r.tx_ref || '',
+      staffId: r.staff_id,
+      staffName: r.staff_name || '',
+      staffNationalId: r.staff_national_id || '',
+      eventId: r.event_id,
+      scannedAt: r.scanned_at,
+      ticketCount: r.ticket_count || 1,
+    }),
+  },
+
+  // --- Admin Users ---
+  choir_admin_users: {
+    table: 'admin_users',
+    orderBy: 'created_at',
+    toDb: (a: any) => ({
+      id: a.id,
+      email: a.email,
+      name: a.name,
+      password_hash: a.password || a.passwordHash || '',
+      role: a.role || 'reviewer',
+      member_id: a.memberId || null,
+      is_active: a.isActive ?? true,
+      last_login: a.lastLogin || null,
+      created_by: a.createdBy || null,
+      created_at: a.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      password: r.password_hash,
+      role: r.role || 'reviewer',
+      memberId: r.member_id || '',
+      isActive: r.is_active ?? true,
+      lastLogin: r.last_login || '',
+      createdBy: r.created_by || '',
+      createdAt: r.created_at,
+      passwordHashed: true,
+    }),
+  },
+
+  // --- Admin Invites ---
+  choir_admin_invites: {
+    table: 'admin_invites',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (i: any) => ({
+      id: i.id,
+      email: i.email,
+      name: i.name,
+      role: i.role || 'reviewer',
+      invite_code: i.inviteCode,
+      created_at: i.createdAt || new Date().toISOString(),
+      created_by: i.createdBy || null,
+      expires_at: i.expiresAt || null,
+      used: i.used ?? false,
+      member_id: i.memberId || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      role: r.role || 'reviewer',
+      inviteCode: r.invite_code,
+      createdAt: r.created_at,
+      createdBy: r.created_by || '',
+      expiresAt: r.expires_at || '',
+      used: r.used ?? false,
+      memberId: r.member_id || '',
+    }),
+  },
+
+  // --- Audit Log ---
+  choir_audit_log: {
+    table: 'audit_logs',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (l: any) => ({
+      id: l.id,
+      user_id: l.userId || '',
+      user_email: l.userEmail || '',
+      user_name: l.userName || '',
+      action: l.action,
+      details: l.details || null,
+      ip_address: l.ipAddress || null,
+      created_at: l.timestamp || l.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      userId: r.user_id,
+      userEmail: r.user_email,
+      userName: r.user_name,
+      action: r.action,
+      details: r.details || '',
+      ipAddress: r.ip_address || '',
+      timestamp: r.created_at,
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Password Resets ---
+  choir_password_resets: {
+    table: 'password_resets',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (p: any) => ({
+      id: p.id,
+      user_id: p.userId,
+      email: p.email,
+      token: p.token,
+      expires_at: p.expiresAt,
+      used: p.used ?? false,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      userId: r.user_id,
+      email: r.email,
+      token: r.token,
+      expiresAt: r.expires_at,
+      used: r.used ?? false,
+    }),
+  },
+
+  // --- Members (from dataService) ---
+  serenades_members: {
+    table: 'members',
+    orderBy: 'name',
+    toDb: (m: any) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      phone: m.phone || null,
+      voice: m.voice,
+      status: m.status || 'Pending',
+      joined_date: m.joinedDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+      date_of_birth: m.dateOfBirth || null,
+      photo: m.photo || null,
+      emergency_contact_name: m.emergencyContact?.name || null,
+      emergency_contact_phone: m.emergencyContact?.phone || null,
+      emergency_contact_relationship: m.emergencyContact?.relationship || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      phone: r.phone || '',
+      voice: r.voice,
+      status: r.status || 'Pending',
+      joinedDate: r.joined_date,
+      dateOfBirth: r.date_of_birth || undefined,
+      photo: r.photo || undefined,
+      emergencyContact: r.emergency_contact_name ? {
+        name: r.emergency_contact_name,
+        phone: r.emergency_contact_phone || '',
+        relationship: r.emergency_contact_relationship || 'Other',
+      } : undefined,
+    }),
+  },
+
+  // --- Events ---
+  serenades_events: {
+    table: 'events',
+    orderBy: 'date',
+    orderAsc: false,
+    toDb: (e: any) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description || null,
+      date: e.date,
+      time: e.time,
+      location: e.location || null,
+      category: e.category || 'Other',
+      image: e.image || null,
+      is_free: e.isFree ?? true,
+      status: e.status || 'draft',
+      livestream_url: e.livestreamUrl || null,
+      is_live: e.isLive ?? false,
+      created_at: e.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description || '',
+      date: r.date,
+      time: r.time || '',
+      location: r.location || '',
+      category: r.category || 'Other',
+      image: r.image || undefined,
+      isFree: r.is_free ?? true,
+      tickets: [],
+      createdAt: r.created_at,
+      status: r.status || 'draft',
+      livestreamUrl: r.livestream_url || undefined,
+      isLive: r.is_live ?? false,
+    }),
+  },
+
+  // --- Settings ---
+  serenades_settings: {
+    table: 'choir_settings',
+    toDb: (_: any) => ({}), // Settings use a different sync pattern (key-value)
+    fromDb: (_: any) => ({}),
+  },
+
+  // --- Albums (music) ---
+  sop_albums: {
+    table: 'albums',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (a: any) => ({
+      id: a.id,
+      title: a.title,
+      year: a.year || null,
+      cover_image: a.coverImage || null,
+      track_count: a.trackCount || 0,
+      description: a.description || null,
+      listen_url: a.listenUrl || null,
+      is_latest: a.isLatest ?? false,
+      created_at: a.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      year: r.year || new Date().getFullYear(),
+      coverImage: r.cover_image || '',
+      trackCount: r.track_count || 0,
+      description: r.description || '',
+      listenUrl: r.listen_url || '',
+      isLatest: r.is_latest ?? false,
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Music Videos ---
+  sop_music_videos: {
+    table: 'music_videos',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (v: any) => ({
+      id: v.id,
+      title: v.title,
+      youtube_id: v.youtubeId || null,
+      thumbnail: v.thumbnail || null,
+      album_id: v.albumId || null,
+      is_latest: v.isLatest ?? false,
+      is_featured: v.isFeatured ?? false,
+      created_at: v.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      title: r.title,
+      youtubeId: r.youtube_id || '',
+      thumbnail: r.thumbnail || '',
+      albumId: r.album_id || '',
+      isLatest: r.is_latest ?? false,
+      isFeatured: r.is_featured ?? false,
+      createdAt: r.created_at,
+    }),
+  },
+
+  // --- Streaming Platforms ---
+  sop_streaming_platforms: {
+    table: 'streaming_platforms',
+    toDb: (p: any) => ({
+      id: p.id,
+      name: p.name,
+      url: p.url || null,
+      is_visible: p.isVisible ?? true,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      url: r.url || '',
+      isVisible: r.is_visible ?? true,
+    }),
+  },
+};
+
+// Settings keys that are NOT array-based (they use key-value store)
+const SETTINGS_KEYS = ['serenades_settings'];
+
+// Keys that should NOT be synced (client-only)
+const SKIP_KEYS = [
+  'choir_verification_codes', // Ephemeral verification codes
+];
+
+// ============ CORE SYNC FUNCTIONS ============
+
+/**
+ * Pull all data from Supabase into localStorage (called on app init)
+ */
+export async function initializeFromSupabase(): Promise<{ loaded: string[]; errors: string[] }> {
+  if (!isSupabaseConfigured()) {
+    return { loaded: [], errors: ['Supabase not configured'] };
+  }
+
+  const loaded: string[] = [];
+  const errors: string[] = [];
+
+  for (const [localKey, config] of Object.entries(SYNC_CONFIG)) {
+    if (SKIP_KEYS.includes(localKey)) continue;
+
+    // Settings use key-value pattern
+    if (SETTINGS_KEYS.includes(localKey)) {
+      try {
+        const { data, error } = await supabase.from('choir_settings').select('*');
+        if (!error && data && data.length > 0) {
+          const settings: Record<string, string> = {};
+          data.forEach((row: any) => {
+            settings[row.key] = row.value;
+          });
+          localStorage.setItem(localKey, JSON.stringify(settings));
+          loaded.push(localKey);
+        }
+      } catch (e) {
+        errors.push(`${localKey}: ${e}`);
+      }
+      continue;
+    }
+
+    try {
+      let query = supabase.from(config.table).select('*');
+
+      if (config.orderBy) {
+        query = query.order(config.orderBy, { ascending: config.orderAsc ?? true });
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        // Table might not exist yet - that's OK
+        if (!error.message.includes('does not exist')) {
+          errors.push(`${localKey}: ${error.message}`);
+        }
+        continue;
+      }
+
+      if (data && data.length > 0) {
+        const items = data.map(config.fromDb);
+        localStorage.setItem(localKey, JSON.stringify(items));
+        loaded.push(localKey);
+      }
+    } catch (e) {
+      errors.push(`${localKey}: ${e}`);
+    }
+  }
+
+  return { loaded, errors };
+}
+
+/**
+ * Sync a single item to Supabase (upsert)
+ * Called after localStorage writes in services
+ */
+export async function syncItemToSupabase(localStorageKey: string, item: any): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const config = SYNC_CONFIG[localStorageKey];
+  if (!config || SKIP_KEYS.includes(localStorageKey)) return;
+
+  try {
+    const dbItem = config.toDb(item);
+    // Remove undefined values
+    Object.keys(dbItem).forEach(k => dbItem[k] === undefined && delete dbItem[k]);
+
+    await supabase.from(config.table).upsert(dbItem, { onConflict: 'id' });
+  } catch (e) {
+    console.error(`[Sync] Error syncing ${localStorageKey}:`, e);
+  }
+}
+
+/**
+ * Delete a single item from Supabase
+ * Called after localStorage deletes in services
+ */
+export async function deleteItemFromSupabase(localStorageKey: string, id: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const config = SYNC_CONFIG[localStorageKey];
+  if (!config || SKIP_KEYS.includes(localStorageKey)) return;
+
+  try {
+    await supabase.from(config.table).delete().eq('id', id);
+  } catch (e) {
+    console.error(`[Sync] Error deleting from ${localStorageKey}:`, e);
+  }
+}
+
+/**
+ * Sync settings to Supabase (key-value store)
+ */
+export async function syncSettingsToSupabase(settings: Record<string, any>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const rows = Object.entries(settings).map(([key, value]) => ({
+      key,
+      value: typeof value === 'string' ? value : JSON.stringify(value),
+      updated_at: new Date().toISOString(),
+    }));
+
+    for (const row of rows) {
+      await supabase.from('choir_settings').upsert(row, { onConflict: 'key' });
+    }
+  } catch (e) {
+    console.error('[Sync] Error syncing settings:', e);
+  }
+}
+
+/**
+ * Sync an entire localStorage key's data to Supabase (bulk upsert)
+ */
+export async function syncAllItemsForKey(localStorageKey: string): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+
+  const config = SYNC_CONFIG[localStorageKey];
+  if (!config || SKIP_KEYS.includes(localStorageKey)) return 0;
+
+  const stored = localStorage.getItem(localStorageKey);
+  if (!stored) return 0;
+
+  const items = JSON.parse(stored);
+  let synced = 0;
+
+  for (const item of items) {
+    try {
+      const dbItem = config.toDb(item);
+      Object.keys(dbItem).forEach(k => dbItem[k] === undefined && delete dbItem[k]);
+      await supabase.from(config.table).upsert(dbItem, { onConflict: 'id' });
+      synced++;
+    } catch (e) {
+      console.error(`[Sync] Error bulk syncing ${localStorageKey}:`, e);
+    }
+  }
+
+  return synced;
+}
+
+/**
+ * Push ALL localStorage data to Supabase (full migration)
+ */
+export async function pushAllToSupabase(): Promise<{
+  synced: Record<string, number>;
+  errors: string[];
+}> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase not configured');
+  }
+
+  const synced: Record<string, number> = {};
+  const errors: string[] = [];
+
+  for (const localKey of Object.keys(SYNC_CONFIG)) {
+    if (SKIP_KEYS.includes(localKey) || SETTINGS_KEYS.includes(localKey)) continue;
+
+    try {
+      const count = await syncAllItemsForKey(localKey);
+      if (count > 0) {
+        synced[localKey] = count;
+      }
+    } catch (e) {
+      errors.push(`${localKey}: ${e}`);
+    }
+  }
+
+  // Sync settings separately
+  const settingsStr = localStorage.getItem('serenades_settings');
+  if (settingsStr) {
+    try {
+      const settings = JSON.parse(settingsStr);
+      await syncSettingsToSupabase(settings);
+      synced['serenades_settings'] = 1;
+    } catch (e) {
+      errors.push(`settings: ${e}`);
+    }
+  }
+
+  return { synced, errors };
+}
+
+/**
+ * Check if a table exists and has data in Supabase
+ */
+export async function checkSupabaseTable(tableName: string): Promise<{
+  exists: boolean;
+  count: number;
+}> {
+  if (!isSupabaseConfigured()) return { exists: false, count: 0 };
+
+  try {
+    const { count, error } = await supabase
+      .from(tableName)
+      .select('*', { count: 'exact', head: true });
+
+    if (error) return { exists: false, count: 0 };
+    return { exists: true, count: count || 0 };
+  } catch {
+    return { exists: false, count: 0 };
+  }
+}
+
+/**
+ * Get sync status for all tables
+ */
+export async function getSyncStatus(): Promise<{
+  configured: boolean;
+  tables: Record<string, { localCount: number; supabaseCount: number }>;
+}> {
+  const configured = isSupabaseConfigured();
+  const tables: Record<string, { localCount: number; supabaseCount: number }> = {};
+
+  for (const [localKey, config] of Object.entries(SYNC_CONFIG)) {
+    if (SKIP_KEYS.includes(localKey) || SETTINGS_KEYS.includes(localKey)) continue;
+
+    const stored = localStorage.getItem(localKey);
+    const localCount = stored ? JSON.parse(stored).length : 0;
+
+    let supabaseCount = 0;
+    if (configured) {
+      try {
+        const { count } = await supabase
+          .from(config.table)
+          .select('*', { count: 'exact', head: true });
+        supabaseCount = count || 0;
+      } catch {
+        // Table doesn't exist
+      }
+    }
+
+    if (localCount > 0 || supabaseCount > 0) {
+      tables[localKey] = { localCount, supabaseCount };
+    }
+  }
+
+  return { configured, tables };
+}
+
+// ============ LOCALSTORAGE INTERCEPTOR ============
+// Automatically syncs localStorage writes to Supabase
+// This means NO changes needed in existing service files!
+
+let interceptorInstalled = false;
+let syncDebounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+/**
+ * Install localStorage interceptor that auto-syncs to Supabase.
+ * Call once on app initialization.
+ */
+export function installLocalStorageInterceptor(): void {
+  if (interceptorInstalled || !isSupabaseConfigured()) return;
+
+  const originalSetItem = localStorage.setItem.bind(localStorage);
+  const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+
+  // Override setItem to trigger Supabase sync
+  localStorage.setItem = function (key: string, value: string) {
+    // Always call the original first
+    originalSetItem(key, value);
+
+    // Check if this key should be synced
+    const config = SYNC_CONFIG[key];
+    if (!config || SKIP_KEYS.includes(key)) return;
+
+    // Debounce sync to avoid hammering Supabase on rapid writes
+    if (syncDebounceTimers[key]) {
+      clearTimeout(syncDebounceTimers[key]);
+    }
+
+    syncDebounceTimers[key] = setTimeout(async () => {
+      try {
+        // Settings use key-value pattern
+        if (SETTINGS_KEYS.includes(key)) {
+          const settings = JSON.parse(value);
+          await syncSettingsToSupabase(settings);
+          return;
+        }
+
+        // For array data, do a full table sync
+        const items = JSON.parse(value);
+        if (!Array.isArray(items)) return;
+
+        const localIds = new Set(items.map((i: any) => i.id).filter(Boolean));
+
+        // Upsert all items (batch for efficiency)
+        const batchSize = 50;
+        for (let i = 0; i < items.length; i += batchSize) {
+          const batch = items.slice(i, i + batchSize);
+          const dbBatch = batch
+            .filter((item: any) => item.id)
+            .map((item: any) => {
+              const dbItem = config.toDb(item);
+              Object.keys(dbItem).forEach(k => dbItem[k] === undefined && delete dbItem[k]);
+              return dbItem;
+            });
+
+          if (dbBatch.length > 0) {
+            const { error } = await supabase.from(config.table).upsert(dbBatch, { onConflict: 'id' });
+            if (error) {
+              console.debug(`[Sync] ${key} batch upsert warning:`, error.message);
+            }
+          }
+        }
+
+        // Clean up deleted items from Supabase
+        // Fetch current IDs in Supabase and delete any not in localStorage
+        const { data: supabaseRows } = await supabase
+          .from(config.table)
+          .select('id');
+
+        if (supabaseRows) {
+          const idsToDelete = supabaseRows
+            .map((r: any) => r.id)
+            .filter((id: string) => !localIds.has(id));
+
+          if (idsToDelete.length > 0) {
+            await supabase.from(config.table).delete().in('id', idsToDelete);
+          }
+        }
+      } catch (e) {
+        console.debug('[Sync] Background sync error:', e);
+      }
+    }, 1500); // 1.5 second debounce
+  };
+
+  // Override removeItem to also clean Supabase
+  localStorage.removeItem = function (key: string) {
+    originalRemoveItem(key);
+    // We don't delete from Supabase on removeItem
+    // as it's usually used for clearing cache, not deleting data
+  };
+
+  interceptorInstalled = true;
+  console.log('[Sync] localStorage interceptor installed - all writes will sync to Supabase');
+}
+
+/**
+ * Full app initialization:
+ * 1. Pull data from Supabase into localStorage
+ * 2. Install interceptor for ongoing sync
+ */
+export async function initializeSupabaseSync(): Promise<{
+  loaded: string[];
+  errors: string[];
+}> {
+  if (!isSupabaseConfigured()) {
+    console.log('[Sync] Supabase not configured - using localStorage only');
+    return { loaded: [], errors: ['Supabase not configured'] };
+  }
+
+  console.log('[Sync] Initializing Supabase sync...');
+
+  // Step 1: Pull data from Supabase
+  const result = await initializeFromSupabase();
+
+  // Step 2: Install interceptor for ongoing writes
+  installLocalStorageInterceptor();
+
+  console.log(`[Sync] Initialized: ${result.loaded.length} tables loaded, ${result.errors.length} errors`);
+  if (result.loaded.length > 0) {
+    console.log('[Sync] Loaded tables:', result.loaded.join(', '));
+  }
+  if (result.errors.length > 0) {
+    console.warn('[Sync] Errors:', result.errors);
+  }
+
+  return result;
+}
+
+// Export config for use in services
+export { SYNC_CONFIG };

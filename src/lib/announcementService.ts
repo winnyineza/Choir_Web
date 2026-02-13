@@ -1,5 +1,7 @@
 // Announcement Service - Manage announcements for members
 
+import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
+
 const ANNOUNCEMENTS_KEY = "choir_announcements";
 
 export interface Announcement {
@@ -61,7 +63,7 @@ export function createAnnouncement(announcement: Omit<Announcement, "id" | "crea
   
   announcements.push(newAnnouncement);
   localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
-  
+  syncItemToSupabase('choir_announcements', newAnnouncement);
   return newAnnouncement;
 }
 
@@ -74,7 +76,7 @@ export function updateAnnouncement(id: string, updates: Partial<Announcement>): 
   
   announcements[index] = { ...announcements[index], ...updates };
   localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
-  
+  syncItemToSupabase('choir_announcements', announcements[index]);
   return announcements[index];
 }
 
@@ -86,6 +88,7 @@ export function deleteAnnouncement(id: string): boolean {
   if (filtered.length === announcements.length) return false;
   
   localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(filtered));
+  deleteItemFromSupabase('choir_announcements', id);
   return true;
 }
 

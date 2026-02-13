@@ -1,4 +1,5 @@
 import { addAuditLog, type AdminUser } from "./adminService";
+import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
 
 export type AuditionStatus = "scheduled" | "completed" | "accepted" | "rejected" | "waitlist";
 

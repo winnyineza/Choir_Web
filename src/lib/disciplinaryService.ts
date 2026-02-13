@@ -1,5 +1,7 @@
 // Disciplinary Service - manages disciplinary records
 
+import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
+
 export interface DisciplinaryRecord {
   id: string;
   memberId: string;
@@ -100,6 +102,7 @@ export function createDisciplinaryRecord(
   
   records.unshift(newRecord);
   saveRecords(records);
+  syncItemToSupabase('choir_disciplinary_records', newRecord);
   return newRecord;
 }
 

@@ -42,6 +42,7 @@ export const REQUIRED_DENIALS = 2;
 export const MINIMUM_NOTICE_DAYS = 2;
 
 import { getSettings } from './dataService';
+import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
 
 const LEAVE_REQUESTS_KEY = 'choir_leave_requests';
 const VERIFICATION_CODES_KEY = 'choir_verification_codes';
@@ -263,8 +264,8 @@ export function deleteLeaveRequest(id: string): boolean {
   if (filtered.length === requests.length) return false;
   
   localStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(filtered));
+  deleteItemFromSupabase('choir_leave_requests', id);
   window.dispatchEvent(new Event('storage'));
-  
   return true;
 }
 

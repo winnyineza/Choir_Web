@@ -1,5 +1,7 @@
 // Expense tracking service for choir finances
 
+import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
+
 export type ExpenseCategory = 
   | "equipment" 
   | "transport" 
@@ -80,6 +82,7 @@ export function createExpense(expense: Omit<Expense, "id" | "createdAt" | "updat
   };
   expenses.push(newExpense);
   localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
+  syncItemToSupabase('choir_expenses', newExpense);
   return newExpense;
 }
 
@@ -95,6 +98,7 @@ export function updateExpense(id: string, updates: Partial<Expense>): Expense | 
     updatedAt: new Date().toISOString(),
   };
   localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
+  syncItemToSupabase('choir_expenses', expenses[index]);
   return expenses[index];
 }
 
@@ -104,6 +108,7 @@ export function deleteExpense(id: string): boolean {
   const filtered = expenses.filter(e => e.id !== id);
   if (filtered.length === expenses.length) return false;
   localStorage.setItem(EXPENSES_KEY, JSON.stringify(filtered));
+  deleteItemFromSupabase('choir_expenses', id);
   return true;
 }
 

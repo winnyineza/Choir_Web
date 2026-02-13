@@ -2,6 +2,12 @@ import { createRoot } from "react-dom/client";
 import { Component, ErrorInfo, ReactNode } from "react";
 import App from "./App.tsx";
 import "./index.css";
+import { initializeSupabaseSync } from "./lib/supabaseSync";
+
+// Initialize Supabase sync (pulls data from Supabase, installs write interceptor)
+initializeSupabaseSync().catch((e) => {
+  console.warn('[Sync] Initialization failed, using localStorage only:', e);
+});
 
 // Error Boundary to catch rendering errors
 interface ErrorBoundaryState {
