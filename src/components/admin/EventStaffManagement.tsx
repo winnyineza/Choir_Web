@@ -24,7 +24,7 @@ import {
   assignStaffToEvent,
   removeStaffFromEvent,
   getActiveEvents,
-  getScanRecordsByStaff,
+  getAllScanRecords,
   type EventStaff,
   type Event,
 } from "@/lib/dataService";
@@ -49,6 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 export function EventStaffManagement() {
   const [staff, setStaff] = useState<EventStaff[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [scanCountsByStaff, setScanCountsByStaff] = useState<Record<string, number>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<EventStaff | null>(null);
@@ -67,9 +68,19 @@ export function EventStaffManagement() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setStaff(getAllEventStaff());
-    setEvents(getActiveEvents());
+  const loadData = async () => {
+    const [staffData, eventsData, scanRecords] = await Promise.all([
+      getAllEventStaff(),
+      getActiveEvents(),
+      getAllScanRecords(),
+    ]);
+    const counts: Record<string, number> = {};
+    scanRecords.forEach((r) => {
+      counts[r.staffId] = (counts[r.staffId] || 0) + 1;
+    });
+    setStaff(staffData);
+    setEvents(eventsData);
+    setScanCountsByStaff(counts);
   };
 
   const resetForm = () => {
@@ -99,7 +110,7 @@ export function EventStaffManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.nationalId || !formData.phone) {
       toast({
         title: "Missing Information",
@@ -133,39 +144,40 @@ export function EventStaffManagement() {
     }
 
     if (editingStaff) {
-      updateEventStaff(editingStaff.id, formData);
+      await updateEventStaff(editingStaff.id, formData);
       toast({ title: "Staff Updated", description: `${formData.name} has been updated.` });
     } else {
-      addEventStaff({ ...formData, assignedEvents: [] });
+      await addEventStaff({ ...formData, assignedEvents: [] });
       toast({ title: "Staff Added", description: `${formData.name} has been added.` });
     }
 
     setIsModalOpen(false);
     resetForm();
-    loadData();
+    await loadData();
   };
 
-  const handleDelete = (staffMember: EventStaff) => {
+  const handleDelete = async (staffMember: EventStaff) => {
     if (confirm(`Are you sure you want to delete ${staffMember.name}?`)) {
-      deleteEventStaff(staffMember.id);
+      await deleteEventStaff(staffMember.id);
       toast({ title: "Staff Deleted", description: `${staffMember.name} has been removed.` });
-      loadData();
+      await loadData();
     }
   };
 
-  const handleAssignEvent = (eventId: string) => {
+  const handleAssignEvent = async (eventId: string) => {
     if (!assigningStaff) return;
     
     if (assigningStaff.assignedEvents.includes(eventId)) {
-      removeStaffFromEvent(assigningStaff.id, eventId);
+      await removeStaffFromEvent(assigningStaff.id, eventId);
       toast({ title: "Unassigned", description: `Removed from event.` });
     } else {
-      assignStaffToEvent(assigningStaff.id, eventId);
+      await assignStaffToEvent(assigningStaff.id, eventId);
       toast({ title: "Assigned", description: `Assigned to event.` });
     }
-    loadData();
+    await loadData();
     // Refresh the assigning staff data
-    const updated = getAllEventStaff().find((s) => s.id === assigningStaff.id);
+    const allStaff = await getAllEventStaff();
+    const updated = allStaff.find((s) => s.id === assigningStaff.id);
     if (updated) setAssigningStaff(updated);
   };
 
@@ -177,7 +189,7 @@ export function EventStaffManagement() {
   );
 
   const getScansCount = (staffId: string) => {
-    return getScanRecordsByStaff(staffId).length;
+    return scanCountsByStaff[staffId] ?? 0;
   };
 
   return (

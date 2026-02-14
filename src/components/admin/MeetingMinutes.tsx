@@ -103,13 +103,14 @@ export function MeetingMinutesComponent() {
   }, []);
 
   const loadData = async () => {
-    const [meetingsData, statsData] = await Promise.all([
+    const [meetingsData, statsData, membersData] = await Promise.all([
       getAllMeetings(),
       getMeetingStats(),
+      getAllMembers(),
     ]);
     setMeetings(meetingsData);
     setStats(statsData);
-    setMembers(getAllMembers());
+    setMembers(membersData);
   };
 
   // Filter meetings

@@ -73,7 +73,7 @@ export interface PasswordResetToken {
   used: boolean;
 }
 
-// Lazy initialization - ensure default admin exists when Supabase is empty
+// Lazy initialization - migrate unhashed passwords when needed
 let adminUsersInitialized = false;
 
 async function ensureAdminUsersInitialized(): Promise<void> {
@@ -81,49 +81,15 @@ async function ensureAdminUsersInitialized(): Promise<void> {
 
   const users = await dbGetAll<AdminUser>(ADMIN_USERS_KEY);
 
-  if (users.length === 0) {
-    const defaultSuperAdmin: AdminUser = {
-      id: "super-admin-winny",
-      email: "w.ineza@alustudent.com",
-      name: "Winny Ineza",
-      password: hashPassword("Igiraneza1234@ALU"),
-      passwordHashed: true,
-      role: "super_admin",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-    await dbInsert<AdminUser>(ADMIN_USERS_KEY, defaultSuperAdmin);
-  } else {
-    let needsUpdate = false;
-    let usersToUpdate = [...users];
-
+  if (users.length > 0) {
     // Remove old hardcoded super-admin-001 if it exists
-    const oldHardcodedIndex = usersToUpdate.findIndex(u => u.id === "super-admin-001");
-    if (oldHardcodedIndex !== -1) {
+    const oldHardcoded = users.find(u => u.id === "super-admin-001");
+    if (oldHardcoded) {
       await dbDelete(ADMIN_USERS_KEY, "super-admin-001");
-      usersToUpdate = usersToUpdate.filter(u => u.id !== "super-admin-001");
-      needsUpdate = true;
-    }
-
-    // Ensure super admin exists
-    const superAdminExists = usersToUpdate.some(u => u.email.toLowerCase() === "w.ineza@alustudent.com");
-    if (!superAdminExists) {
-      const defaultSuperAdmin: AdminUser = {
-        id: "super-admin-winny",
-        email: "w.ineza@alustudent.com",
-        name: "Winny Ineza",
-        password: hashPassword("Igiraneza1234@ALU"),
-        passwordHashed: true,
-        role: "super_admin",
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-      await dbInsert<AdminUser>(ADMIN_USERS_KEY, defaultSuperAdmin);
-      needsUpdate = true;
     }
 
     // Migrate unhashed passwords
-    for (const user of usersToUpdate) {
+    for (const user of users) {
       if (!user.passwordHashed && !user.password.startsWith("$2")) {
         await dbUpdate<AdminUser>(ADMIN_USERS_KEY, user.id, {
           password: hashPassword(user.password),

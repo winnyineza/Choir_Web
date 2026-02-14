@@ -76,12 +76,13 @@ export function PromoManagement() {
   const [stats, setStats] = useState({ total: 0, active: 0, totalUses: 0 });
 
   const loadData = async () => {
-    const [codes, promoStats] = await Promise.all([
+    const [codes, promoStats, eventsData] = await Promise.all([
       getAllPromoCodes(),
       getPromoStats(),
+      getAllEvents(),
     ]);
     setPromoCodes(codes);
-    setEvents(getAllEvents());
+    setEvents(eventsData);
     setStats(promoStats);
   };
 
@@ -151,12 +152,12 @@ export function PromoManagement() {
     loadData();
   };
 
-  const handleToggleActive = (code: PromoCode) => {
-    updatePromoCode(code.id, { isActive: !code.isActive });
+  const handleToggleActive = async (code: PromoCode) => {
+    await updatePromoCode(code.id, { isActive: !code.isActive });
     if (currentUser) {
       addAuditLog(currentUser, "TOGGLE_PROMO", `${code.isActive ? "Deactivated" : "Activated"} promo code: ${code.code}`);
     }
-    loadData();
+    await loadData();
     toast({
       title: code.isActive ? "Deactivated" : "Activated",
       description: `Promo code ${code.code} has been ${code.isActive ? "deactivated" : "activated"}.`,

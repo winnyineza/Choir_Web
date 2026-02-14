@@ -147,7 +147,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     setTicketRevenue(ticketRev);
 
     // Contributions
-    const contributions = getAllContributions();
+    const contributions = await getAllContributions();
     setAllContributions(contributions);
     const contribTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
     setContributionTotal(contribTotal);
@@ -278,11 +278,11 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     return Array.from(years).sort((a, b) => b - a);
   }, [allOrders, allContributions, donations, allExpenses]);
 
-  const handleSaveDonation = () => {
+  const handleSaveDonation = async () => {
     if (!donationForm.donorName || !donationForm.amount) return;
 
     if (editingDonation) {
-      updateDonation(editingDonation.id, {
+      await updateDonation(editingDonation.id, {
         ...donationForm,
         amount: parseFloat(donationForm.amount),
       });
@@ -290,7 +290,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         addAuditLog(currentUser, "UPDATE_DONATION", `Updated donation from ${donationForm.donorName}`);
       }
     } else {
-      createDonation({
+      await createDonation({
         ...donationForm,
         amount: parseFloat(donationForm.amount),
         recordedBy: currentUser?.name || "admin",
@@ -311,7 +311,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
       message: "",
       date: new Date().toISOString().split("T")[0],
     });
-    loadFinancialData();
+    await loadFinancialData();
   };
 
   const handleEditDonation = (donation: Donation) => {
@@ -328,14 +328,14 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     setShowDonationForm(true);
   };
 
-  const handleDeleteDonation = (id: string) => {
+  const handleDeleteDonation = async (id: string) => {
     if (confirm("Are you sure you want to delete this donation record?")) {
       const donation = donations.find(d => d.id === id);
-      deleteDonation(id);
+      await deleteDonation(id);
       if (currentUser && donation) {
         addAuditLog(currentUser, "DELETE_DONATION", `Deleted donation from ${donation.donorName}`);
       }
-      loadFinancialData();
+      await loadFinancialData();
     }
   };
 

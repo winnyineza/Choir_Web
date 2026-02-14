@@ -384,7 +384,7 @@ export function TicketPurchaseModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-card border-primary/20">
-        {step !== "processing" && step !== "confirmation" && (
+        {step !== "processing" && step !== "confirmation" ? (
           <DialogHeader>
             <div className="flex items-center justify-between">
               {step === "payment" && (
@@ -405,6 +405,15 @@ export function TicketPurchaseModal({
               {step === "select" ? "Select your tickets and proceed to payment" : "Complete your secure payment"}
             </DialogDescription>
           </DialogHeader>
+        ) : (
+          <>
+            <DialogTitle className="sr-only">
+              {step === "processing" ? "Processing Payment" : "Booking Confirmed"}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {step === "processing" ? "Your payment is being processed" : "Your booking has been confirmed"}
+            </DialogDescription>
+          </>
         )}
 
         {/* Event Summary - Show on select and payment steps */}

@@ -70,10 +70,15 @@ export function AdminTeamManagement() {
   const { currentUser } = useAuth();
   const { toast } = useToast();
 
-  const loadData = () => {
-    setAdmins(getAllAdminUsers());
-    setInvites(getAllInvites().filter(i => !i.used));
-    setMembers(getAllMembers());
+  const loadData = async () => {
+    const [adminsList, invitesList, membersList] = await Promise.all([
+      getAllAdminUsers(),
+      getAllInvites(),
+      getAllMembers(),
+    ]);
+    setAdmins(adminsList);
+    setInvites(invitesList.filter(i => !i.used));
+    setMembers(membersList);
   };
 
   useEffect(() => {

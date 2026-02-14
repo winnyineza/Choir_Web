@@ -55,6 +55,7 @@ const CATEGORIES = [
 
 export function GalleryManagement() {
   const [items, setItems] = useState<GalleryItem[]>([]);
+  const [albumStats, setAlbumStats] = useState<{ name: string; count: number; coverImage: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -80,11 +81,14 @@ export function GalleryManagement() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setItems(getAllGalleryItems());
+  const loadData = async () => {
+    const [itemsData, albumsData] = await Promise.all([
+      getAllGalleryItems(),
+      getGalleryAlbums(),
+    ]);
+    setItems(itemsData);
+    setAlbumStats(albumsData);
   };
-
-  const albumStats = getGalleryAlbums();
 
   // Filter items
   const filteredItems = items.filter(item => {
@@ -102,7 +106,7 @@ export function GalleryManagement() {
     return acc;
   }, {} as Record<string, GalleryItem[]>);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title || !formData.url) {
       toast({
         title: "Error",
@@ -112,7 +116,7 @@ export function GalleryManagement() {
       return;
     }
 
-    addGalleryItem({
+    await addGalleryItem({
       type: formData.type,
       title: formData.title,
       url: formData.url,
@@ -124,31 +128,33 @@ export function GalleryManagement() {
       addAuditLog(currentUser, "ADD_GALLERY", `Added gallery ${formData.type}: ${formData.title}`);
     }
     toast({ title: "Item Added", description: "Gallery item has been added." });
-    loadData();
+    await loadData();
     setShowAddModal(false);
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this item?")) return;
     const item = items.find(i => i.id === id);
-    deleteGalleryItem(id);
+    await deleteGalleryItem(id);
     if (currentUser && item) {
       addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${item.title}`);
     }
     toast({ title: "Item Deleted", description: "Gallery item has been deleted." });
-    loadData();
+    await loadData();
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedItems.length} selected items?`)) return;
-    selectedItems.forEach(id => deleteGalleryItem(id));
+    for (const id of selectedItems) {
+      await deleteGalleryItem(id);
+    }
     if (currentUser) {
       addAuditLog(currentUser, "BULK_DELETE_GALLERY", `Deleted ${selectedItems.length} gallery items`);
     }
     toast({ title: "Items Deleted", description: `${selectedItems.length} items have been deleted.` });
     setSelectedItems([]);
-    loadData();
+    await loadData();
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,16 +165,16 @@ export function GalleryManagement() {
     // In production, you'd upload to a storage service
     Array.from(files).forEach(file => {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const url = event.target?.result as string;
-        addGalleryItem({
+        await addGalleryItem({
           type: file.type.startsWith("video/") ? "video" : "photo",
           title: file.name.replace(/\.[^/.]+$/, ""),
           url: url,
           category: formData.category,
           albumName: formData.albumName,
         });
-        loadData();
+        await loadData();
       };
       reader.readAsDataURL(file);
     });
@@ -563,6 +569,7 @@ export function GalleryManagement() {
       {/* Preview Modal */}
       <Dialog open={showPreview} onOpenChange={(open) => { if (!open) { setShowPreview(false); setPreviewItem(null); } }}>
         <DialogContent className="sm:max-w-3xl bg-charcoal border-primary/20 p-0 overflow-hidden">
+          <DialogDescription className="sr-only">Preview of gallery item</DialogDescription>
           <button
             onClick={() => setShowPreview(false)}
             className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"

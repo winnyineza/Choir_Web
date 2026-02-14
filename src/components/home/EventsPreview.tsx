@@ -10,9 +10,11 @@ export function EventsPreview() {
   const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
-    // Load events from admin-managed data
-    const bookableEvents = getBookableEvents();
-    setEvents(bookableEvents.slice(0, 3)); // Show first 3 events
+    async function load() {
+      const data = await getBookableEvents();
+      setEvents(data.slice(0, 3)); // Show first 3 events
+    }
+    load();
   }, []);
 
   useEffect(() => {

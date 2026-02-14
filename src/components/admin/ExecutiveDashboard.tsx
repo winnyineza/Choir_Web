@@ -115,8 +115,8 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
       getOverallAttendanceStats(),
       getRecentSessions(10),
     ]);
-    const contributions = getAllContributions();
-    const contributionStats = getContributionStats();
+    const contributions = await getAllContributions();
+    const contributionStats = await getContributionStats();
     const analyticsStats = await getPageViewStats();
 
     // Set page stats

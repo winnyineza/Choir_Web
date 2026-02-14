@@ -185,9 +185,9 @@ export default function Events() {
     return event.tickets.reduce((sum, t) => sum + (t.available - t.sold), 0);
   };
 
-  const handleWatchLive = (event: DisplayEvent) => {
+  const handleWatchLive = async (event: DisplayEvent) => {
     // Find the original event data with livestream info
-    const bookableEvents = getBookableEvents();
+    const bookableEvents = await getBookableEvents();
     const originalEvent = bookableEvents.find(e => e.id === event.id);
     if (originalEvent && originalEvent.livestreamUrl) {
       setLivestreamEvent(originalEvent);

@@ -115,13 +115,14 @@ export function DisciplinaryManagement() {
   }, []);
 
   const loadData = async () => {
-    const [recordsData, statsData] = await Promise.all([
+    const [recordsData, statsData, membersData] = await Promise.all([
       getAllDisciplinaryRecords(),
       getDisciplinaryStats(),
+      getAllMembers(),
     ]);
     setRecords(recordsData);
     setStats(statsData);
-    setMembers(getAllMembers());
+    setMembers(membersData);
   };
 
   // Filter records

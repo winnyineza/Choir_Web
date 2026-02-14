@@ -66,10 +66,11 @@ export function VoiceBalanceTracker() {
 
   const loadData = async () => {
     setIsLoading(true);
-    const [activeMembers, allAuditions] = await Promise.all([
-      Promise.resolve(getAllMembers().filter((m) => m.status === "Active")),
+    const [allMembers, allAuditions] = await Promise.all([
+      getAllMembers(),
       getAllAuditions(),
     ]);
+    const activeMembers = allMembers.filter((m) => m.status === "Active");
     setMembers(activeMembers);
     setAuditions(allAuditions);
     setIsLoading(false);

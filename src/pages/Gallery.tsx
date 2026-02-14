@@ -60,8 +60,8 @@ export default function Gallery() {
 
   // Load gallery from dataService (admin-managed content only)
   useEffect(() => {
-    const loadGallery = () => {
-      const galleryItems = getAllGalleryItems();
+    const loadGallery = async () => {
+      const galleryItems = await getAllGalleryItems();
       
       // Process gallery items into albums and videos
       const photoItems = galleryItems.filter((item) => item.type === "photo");
@@ -127,7 +127,7 @@ export default function Gallery() {
   }, []);
 
   // Get current photos based on view mode
-  const currentPhotos = selectedAlbum ? selectedAlbum.photos : allPhotos;
+  const currentPhotos = selectedAlbum ? (selectedAlbum.photos || []) : allPhotos;
 
   const handlePrevImage = useCallback(() => {
     if (selectedImageIndex !== null && selectedImageIndex > 0) {
@@ -375,7 +375,7 @@ export default function Gallery() {
 
                   {/* Album Photos Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {selectedAlbum.photos.map((photo, index) => (
+                    {(selectedAlbum.photos || []).map((photo, index) => (
                       <div
                         key={photo.id}
                         className="group cursor-pointer"

@@ -99,10 +99,15 @@ export function SurveyManagement() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setSurveys(getSurveys());
-    setEvents(getAllEvents().map(e => ({ id: e.id, title: e.title })));
-    setMembers(getAllMembers().map(m => ({ id: m.id, name: m.name })));
+  const loadData = async () => {
+    const [surveysData, eventsData, membersData] = await Promise.all([
+      getSurveys(),
+      getAllEvents(),
+      getAllMembers(),
+    ]);
+    setSurveys(surveysData);
+    setEvents(eventsData.map(e => ({ id: e.id, title: e.title })));
+    setMembers(membersData.map(m => ({ id: m.id, name: m.name })));
   };
 
   const filteredSurveys = surveys.filter(survey => {
@@ -245,7 +250,7 @@ export function SurveyManagement() {
     const responses = getResponses(survey.id);
     return {
       totalResponses: responses.length,
-      responsesByQuestion: survey.questions.map(q => {
+      responsesByQuestion: (survey.questions || []).map(q => {
         const questionResponses = responses.map(r => r.answers[q.id]).filter(Boolean);
         
         if (q.type === "rating") {
@@ -422,7 +427,7 @@ export function SurveyManagement() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <MessageSquare className="w-3 h-3" />
-                        {survey.questions.length} questions
+                        {(survey.questions || []).length} questions
                       </span>
                       <span className="flex items-center gap-1">
                         <Users className="w-3 h-3" />

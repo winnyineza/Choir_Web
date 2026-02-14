@@ -165,7 +165,7 @@ export function ExpenseManagement() {
     setShowAddExpense(false);
     setEditingExpense(null);
     resetForm();
-    loadData();
+    await loadData();
   };
   
   const handleEdit = (expense: Expense) => {
@@ -183,14 +183,14 @@ export function ExpenseManagement() {
     setShowAddExpense(true);
   };
   
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this expense?")) {
-      deleteExpense(id);
+      await deleteExpense(id);
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_EXPENSE", "Deleted an expense record");
       }
       toast({ title: "Deleted", description: "Expense deleted." });
-      loadData();
+      await loadData();
     }
   };
   

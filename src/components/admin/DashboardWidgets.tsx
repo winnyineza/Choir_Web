@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { 
   Cake, 
   AlertTriangle, 
@@ -16,35 +16,43 @@ import { cn } from "@/lib/utils";
 
 // Birthday Widget - Shows upcoming birthdays this week
 export function BirthdayWidget() {
-  const upcomingBirthdays = useMemo(() => {
-    const members = getAllMembers().filter(m => m.status === "Active" && m.dateOfBirth);
-    const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState<{ member: Member; daysUntil: number; date: Date }[]>([]);
 
-    return members
-      .map(member => {
-        const dob = new Date(member.dateOfBirth!);
-        const thisYearBirthday = new Date(
-          today.getFullYear(),
-          dob.getMonth(),
-          dob.getDate()
-        );
-        
-        // If birthday has passed this year, check next year
-        if (thisYearBirthday < today) {
-          thisYearBirthday.setFullYear(today.getFullYear() + 1);
-        }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const members = (await getAllMembers()).filter(m => m.status === "Active" && m.dateOfBirth);
+      if (cancelled) return;
+      const today = new Date();
+      const nextWeek = new Date(today);
+      nextWeek.setDate(today.getDate() + 7);
 
-        const daysUntil = Math.ceil(
-          (thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+      const birthdays = members
+        .map(member => {
+          const dob = new Date(member.dateOfBirth!);
+          const thisYearBirthday = new Date(
+            today.getFullYear(),
+            dob.getMonth(),
+            dob.getDate()
+          );
+          
+          // If birthday has passed this year, check next year
+          if (thisYearBirthday < today) {
+            thisYearBirthday.setFullYear(today.getFullYear() + 1);
+          }
 
-        return { member, daysUntil, date: thisYearBirthday };
-      })
-      .filter(({ daysUntil }) => daysUntil >= 0 && daysUntil <= 7)
-      .sort((a, b) => a.daysUntil - b.daysUntil)
-      .slice(0, 5);
+          const daysUntil = Math.ceil(
+            (thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          return { member, daysUntil, date: thisYearBirthday };
+        })
+        .filter(({ daysUntil }) => daysUntil >= 0 && daysUntil <= 7)
+        .sort((a, b) => a.daysUntil - b.daysUntil)
+        .slice(0, 5);
+      if (!cancelled) setUpcomingBirthdays(birthdays);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   if (upcomingBirthdays.length === 0) {
@@ -94,23 +102,34 @@ export function BirthdayWidget() {
 
 // Overdue Contributions Widget
 export function OverdueContributionsWidget() {
-  const overdueMembers = useMemo(() => {
-    const members = getAllMembers().filter(m => m.status === "Active");
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
+  const [overdueMembers, setOverdueMembers] = useState<{ member: Member; unpaidMonths: number; totalOwed: number }[]>([]);
 
-    return members
-      .map(member => {
-        const status = getMemberContributionStatus(member.id);
-        const unpaidMonths = status.monthlyDues.filter(
-          m => m.status === "unpaid" && 
-          (m.year < currentYear || (m.year === currentYear && m.month < currentMonth))
-        );
-        return { member, unpaidMonths: unpaidMonths.length, totalOwed: status.totalOwed };
-      })
-      .filter(m => m.unpaidMonths > 0)
-      .sort((a, b) => b.unpaidMonths - a.unpaidMonths)
-      .slice(0, 5);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const members = (await getAllMembers()).filter(m => m.status === "Active");
+      if (cancelled) return;
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const statuses = await Promise.all(
+        members.map(m => getMemberContributionStatus(m.id, m.name, m.email || ""))
+      );
+      if (cancelled) return;
+
+      const result = members
+        .map((member, i) => {
+          const status = statuses[i];
+          const unpaidCount = status.unpaidMonths.length;
+          const totalOwed = status.unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0);
+          return { member, unpaidMonths: unpaidCount, totalOwed };
+        })
+        .filter(m => m.unpaidMonths > 0)
+        .sort((a, b) => b.unpaidMonths - a.unpaidMonths)
+        .slice(0, 5);
+      if (!cancelled) setOverdueMembers(result);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   if (overdueMembers.length === 0) {

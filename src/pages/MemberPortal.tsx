@@ -171,9 +171,15 @@ export default function MemberPortal() {
   // Load contributions when member logs in
   useEffect(() => {
     if (memberInfo) {
-      const contributions = getContributionsByMemberEmail(memberInfo.email);
-      setMyContributions(contributions);
-      setContributionStatus(getMemberContributionStatus(memberInfo.id, memberInfo.name, memberInfo.email));
+      const loadContributions = async () => {
+        const [contributions, status] = await Promise.all([
+          getContributionsByMemberEmail(memberInfo.email),
+          getMemberContributionStatus(memberInfo.id, memberInfo.name, memberInfo.email),
+        ]);
+        setMyContributions(contributions);
+        setContributionStatus(status);
+      };
+      loadContributions();
     }
   }, [memberInfo]);
 
@@ -189,7 +195,7 @@ export default function MemberPortal() {
         setEditEmergencyContact({ name: "", relationship: "Spouse", phone: "", altPhone: "" });
       }
       // Load active surveys
-      setActiveSurveys(getActiveSurveysForMembers());
+      getActiveSurveysForMembers().then(setActiveSurveys);
     }
   }, [memberInfo]);
 
@@ -243,7 +249,7 @@ export default function MemberPortal() {
     if (!selectedSurvey || !memberInfo) return;
     
     // Check if all required questions are answered
-    const unanswered = selectedSurvey.questions.filter(q => !surveyAnswers[q.id]);
+    const unanswered = (selectedSurvey.questions || []).filter(q => !surveyAnswers[q.id]);
     if (unanswered.length > 0) {
       toast({
         title: "Please answer all questions",
@@ -255,7 +261,7 @@ export default function MemberPortal() {
 
     setIsSubmittingSurvey(true);
     try {
-      submitSurveyResponse({
+      await submitSurveyResponse({
         surveyId: selectedSurvey.id,
         memberId: memberInfo.id,
         answers: surveyAnswers,
@@ -269,7 +275,8 @@ export default function MemberPortal() {
       setSelectedSurvey(null);
       setSurveyAnswers({});
       // Refresh surveys list
-      setActiveSurveys(getActiveSurveysForMembers());
+      const surveys = await getActiveSurveysForMembers();
+      setActiveSurveys(surveys);
     } catch (error) {
       toast({
         title: "Error",
@@ -1539,8 +1546,8 @@ export default function MemberPortal() {
                     <div className="card-glass rounded-xl p-4 text-center border border-red-500/30 bg-red-500/5">
                       <p className="text-2xl font-bold text-red-500">
                         {formatCurrency(
-                          contributionStatus.unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0) +
-                          contributionStatus.specialStatus
+                          (contributionStatus.unpaidMonths || []).reduce((sum, m) => sum + m.expectedAmount, 0) +
+                          (contributionStatus.specialStatus || [])
                             .filter(s => !s.isPaid)
                             .reduce((sum, s) => sum + (s.expectedAmount - s.paidAmount), 0)
                         )}
@@ -2038,14 +2045,12 @@ export default function MemberPortal() {
                         <ClipboardList className="w-5 h-5 text-primary" />
                         {selectedSurvey?.title}
                       </DialogTitle>
-                      {selectedSurvey?.description && (
-                        <DialogDescription>{selectedSurvey.description}</DialogDescription>
-                      )}
+                      <DialogDescription>{selectedSurvey?.description || 'Complete this survey'}</DialogDescription>
                     </DialogHeader>
                     
                     {selectedSurvey && (
                       <div className="space-y-6 pt-4">
-                        {selectedSurvey.questions.map((question, index) => (
+                        {(selectedSurvey.questions || []).map((question, index) => (
                           <div key={question.id} className="space-y-3">
                             <div className="flex items-start gap-2">
                               <span className="text-xs text-muted-foreground font-medium mt-1">Q{index + 1}</span>

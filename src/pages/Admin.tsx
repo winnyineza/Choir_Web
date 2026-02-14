@@ -599,13 +599,13 @@ export default function Admin() {
   };
 
   // Delete actions
-  const handleDeleteMember = (id: string, name: string) => {
+  const handleDeleteMember = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to remove ${name} from the choir?`)) {
-      deleteMember(id);
+      await deleteMember(id);
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_MEMBER", `Deleted member: ${name}`);
       }
-      loadData();
+      await loadData();
       toast({ title: "Member Removed", description: `${name} has been removed.` });
     }
   };
@@ -625,15 +625,13 @@ export default function Admin() {
     }
   };
 
-  const handleBulkStatusUpdate = (status: Member["status"]) => {
+  const handleBulkStatusUpdate = async (status: Member["status"]) => {
     if (selectedMembers.length === 0) return;
     if (!confirm(`Update ${selectedMembers.length} member(s) to ${status}?`)) return;
     
-    selectedMembers.forEach(id => {
-      updateMember(id, { status });
-    });
+    await Promise.all(selectedMembers.map(id => updateMember(id, { status })));
     
-    loadData();
+    await loadData();
     setSelectedMembers([]);
     toast({ 
       title: "Members Updated", 
@@ -641,15 +639,13 @@ export default function Admin() {
     });
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedMembers.length === 0) return;
     if (!confirm(`Delete ${selectedMembers.length} member(s)? This cannot be undone.`)) return;
     
-    selectedMembers.forEach(id => {
-      deleteMember(id);
-    });
+    await Promise.all(selectedMembers.map(id => deleteMember(id)));
     
-    loadData();
+    await loadData();
     setSelectedMembers([]);
     toast({ 
       title: "Members Deleted", 
@@ -657,40 +653,40 @@ export default function Admin() {
     });
   };
 
-  const handleDeleteEvent = (id: string, title: string) => {
+  const handleDeleteEvent = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      deleteEvent(id);
+      await deleteEvent(id);
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_EVENT", `Deleted event: ${title}`);
       }
-      loadData();
+      await loadData();
       toast({ title: "Event Deleted", description: `"${title}" has been deleted.` });
     }
   };
 
-  const handleDeleteGalleryItem = (id: string, title: string) => {
+  const handleDeleteGalleryItem = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      deleteGalleryItem(id);
+      await deleteGalleryItem(id);
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${title}`);
       }
-      loadData();
+      await loadData();
       toast({ title: "Media Deleted", description: `"${title}" has been removed.` });
     }
   };
 
-  const handleDeleteAlbum = (id: string, title: string) => {
+  const handleDeleteAlbum = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete album "${title}"?`)) {
-      deleteAlbum(id);
-      loadData();
+      await deleteAlbum(id);
+      await loadData();
       toast({ title: "Album Deleted", description: `"${title}" has been removed.` });
     }
   };
 
-  const handleDeleteMusicVideo = (id: string, title: string) => {
+  const handleDeleteMusicVideo = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      deleteMusicVideo(id);
-      loadData();
+      await deleteMusicVideo(id);
+      await loadData();
       toast({ title: "Video Deleted", description: `"${title}" has been removed.` });
     }
   };

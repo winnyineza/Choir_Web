@@ -134,11 +134,11 @@ export default function Scanner() {
   }, []);
 
   // Handle PIN submission
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError("");
     
-    const settings = getSettings();
+    const settings = await getSettings();
     if (pin === settings.scannerPin) {
       setAuthStep("national-id");
       setPin("");
@@ -149,7 +149,7 @@ export default function Scanner() {
   };
 
   // Handle National ID submission
-  const handleNationalIdSubmit = (e: React.FormEvent) => {
+  const handleNationalIdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNationalIdError("");
     
@@ -158,7 +158,7 @@ export default function Scanner() {
       return;
     }
     
-    const staff = getEventStaffByNationalId(nationalId);
+    const staff = await getEventStaffByNationalId(nationalId);
     if (!staff) {
       setNationalIdError("This National ID is not registered. Contact your supervisor.");
       return;
@@ -170,7 +170,8 @@ export default function Scanner() {
     }
     
     // Get events this staff is assigned to
-    const events = getActiveEvents().filter((e) => staff.assignedEvents.includes(e.id));
+    const allActiveEvents = await getActiveEvents();
+    const events = allActiveEvents.filter((e) => staff.assignedEvents.includes(e.id));
     if (events.length === 0) {
       setNationalIdError("You are not assigned to any active events. Contact your supervisor.");
       return;
@@ -362,7 +363,7 @@ export default function Scanner() {
       await updateOrderStatus(scanResult.order.id, "used");
       
       // Record the scan
-      addScanRecord({
+      await addScanRecord({
         orderId: scanResult.order.id,
         txRef: scanResult.order.txRef,
         staffId: session.staffId,

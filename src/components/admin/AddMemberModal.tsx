@@ -142,18 +142,48 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
         emergencyContact: emergencyContact.name ? emergencyContact : undefined,
       };
       if (editMember) {
-        updateMember(editMember.id, memberData);
+        // When editing, check if new email conflicts with another member
+        if (editMember.email.toLowerCase() !== email.toLowerCase()) {
+          const existingMembers = await getAllMembers();
+          const duplicate = existingMembers.find(
+            m => m.email.toLowerCase() === email.toLowerCase() && m.id !== editMember.id
+          );
+          if (duplicate) {
+            toast({
+              title: "Duplicate Email",
+              description: `A member with email "${email}" already exists.`,
+              variant: "destructive",
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+        await updateMember(editMember.id, memberData);
         toast({
           title: "Member Updated",
           description: `${name} has been updated successfully.`,
         });
       } else {
-        addMember(memberData);
+        // Check for duplicate email before adding
+        const existingMembers = await getAllMembers();
+        const duplicate = existingMembers.find(
+          m => m.email.toLowerCase() === email.toLowerCase()
+        );
+        if (duplicate) {
+          toast({
+            title: "Duplicate Email",
+            description: `A member with email "${email}" already exists.`,
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        await addMember(memberData);
         
         // Send welcome invite email if checkbox is checked
         if (sendInvite && email) {
           // Find the newly added member to get their ID
-          const members = getAllMembers();
+          const members = await getAllMembers();
           const newMember = members.find(m => m.email.toLowerCase() === email.toLowerCase());
           
           if (newMember) {

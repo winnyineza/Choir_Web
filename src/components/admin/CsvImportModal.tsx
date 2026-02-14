@@ -77,7 +77,7 @@ export function CsvImportModal({ open, onOpenChange, onSuccess }: CsvImportModal
     try {
       const text = await selectedFile.text();
       const lines = text.split("\n").filter((line) => line.trim());
-      const existingMembers = getAllMembers();
+      const existingMembers = await getAllMembers();
       const existingEmails = new Set(existingMembers.map((m) => m.email.toLowerCase()));
 
       // Parse header
@@ -167,7 +167,7 @@ export function CsvImportModal({ open, onOpenChange, onSuccess }: CsvImportModal
       }
 
       try {
-        createMember({
+        await createMember({
           name: member.name,
           email: member.email,
           phone: member.phone,

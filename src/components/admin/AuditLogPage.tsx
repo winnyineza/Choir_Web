@@ -232,10 +232,14 @@ export function AuditLogPage() {
   
   const { toast } = useToast();
 
-  const loadData = () => {
+  const loadData = async () => {
     setIsLoading(true);
-    setAllLogs(getAuditLog(10000)); // Get all logs
-    setAdmins(getAllAdminUsers());
+    const [logsData, adminsData] = await Promise.all([
+      getAuditLog(10000),
+      getAllAdminUsers(),
+    ]);
+    setAllLogs(logsData);
+    setAdmins(adminsData);
     setIsLoading(false);
   };
 

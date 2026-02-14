@@ -112,7 +112,7 @@ export function UploadGalleryModal({ isOpen, onClose, onSuccess }: UploadGallery
           return;
         }
 
-        addGalleryItem({
+        await addGalleryItem({
           type: "photo",
           title,
           url,
@@ -181,7 +181,7 @@ export function UploadGalleryModal({ isOpen, onClose, onSuccess }: UploadGallery
 
         // Add all photos to gallery
         for (const photo of photosToUpload) {
-          addGalleryItem({
+          await addGalleryItem({
             type: "photo",
             title: photo.title,
             url: photo.url,
@@ -227,7 +227,7 @@ export function UploadGalleryModal({ isOpen, onClose, onSuccess }: UploadGallery
           }
         }
 
-        addGalleryItem({
+        await addGalleryItem({
           type: "video",
           title,
           url,

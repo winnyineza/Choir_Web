@@ -34,13 +34,26 @@ export function GlobalSearch({ open, onOpenChange, onResultClick }: GlobalSearch
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Load all data
-  const members = useMemo(() => getAllMembers(), []);
-  const events = useMemo(() => getAllEvents(), []);
-  const contributions = useMemo(() => getAllContributions(), []);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [contributions, setContributions] = useState<Contribution[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   useEffect(() => {
-    getAllDocuments().then(setDocuments);
-  }, []);
+    if (!open) return;
+    async function loadData() {
+      const [m, e, c, d] = await Promise.all([
+        getAllMembers(),
+        getAllEvents(),
+        getAllContributions(),
+        getAllDocuments(),
+      ]);
+      setMembers(m);
+      setEvents(e);
+      setContributions(c);
+      setDocuments(d);
+    }
+    loadData();
+  }, [open]);
 
   // Search results
   const results = useMemo<SearchResult[]>(() => {

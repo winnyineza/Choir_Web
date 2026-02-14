@@ -14,16 +14,18 @@ export function BirthdayAlert({ currentUserEmail, currentUserName }: BirthdayAle
   const [isOwnBirthday, setIsOwnBirthday] = useState(false);
 
   useEffect(() => {
-    const todaysBirthdays = getTodaysBirthdays();
-    setBirthdayMembers(todaysBirthdays);
-    
-    // Check if current user has a birthday today
-    if (currentUserEmail) {
-      const ownBirthday = todaysBirthdays.some(
-        m => m.email.toLowerCase() === currentUserEmail.toLowerCase()
-      );
-      setIsOwnBirthday(ownBirthday);
+    async function load() {
+      const todaysBirthdays = await getTodaysBirthdays();
+      setBirthdayMembers(todaysBirthdays);
+      
+      if (currentUserEmail) {
+        const ownBirthday = todaysBirthdays.some(
+          m => m.email.toLowerCase() === currentUserEmail.toLowerCase()
+        );
+        setIsOwnBirthday(ownBirthday);
+      }
     }
+    load();
   }, [currentUserEmail]);
 
   // Don't show if no birthdays today or dismissed

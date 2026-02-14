@@ -380,7 +380,7 @@ export function ContributionManagement() {
   };
   
   // Save special contribution payment
-  const handleSaveSpecialPayment = () => {
+  const handleSaveSpecialPayment = async () => {
     if (!specialCellPayment) return;
     
     const amount = parseFloat(specialCellPayment.amount) || 0;
@@ -390,7 +390,7 @@ export function ContributionManagement() {
       return;
     }
     
-    createContribution({
+    await createContribution({
       memberId: specialCellPayment.memberId,
       memberName: specialCellPayment.memberName,
       memberEmail: specialCellPayment.memberEmail,
@@ -408,7 +408,7 @@ export function ContributionManagement() {
     });
     
     setSpecialCellPayment(null);
-    loadData();
+    await loadData();
   };
 
   // Save cell payment
@@ -446,7 +446,7 @@ export function ContributionManagement() {
   };
   
   // Handle add contribution
-  const handleAddContribution = () => {
+  const handleAddContribution = async () => {
     const member = members.find(m => m.id === contributionForm.memberId);
     const type = contributionTypes.find(t => t.id === contributionForm.typeId);
     
@@ -461,7 +461,7 @@ export function ContributionManagement() {
       return;
     }
     
-    createContribution({
+    await createContribution({
       memberId: member.id,
       memberName: member.name,
       memberEmail: member.email,
@@ -480,7 +480,7 @@ export function ContributionManagement() {
     toast({ title: "Contribution Recorded", description: `${formatCurrency(amount)} from ${member.name} recorded.` });
     setShowAddContribution(false);
     resetContributionForm();
-    loadData();
+    await loadData();
   };
   
   const resetContributionForm = () => {
@@ -497,7 +497,7 @@ export function ContributionManagement() {
   };
   
   // Handle add/edit type
-  const handleSaveType = () => {
+  const handleSaveType = async () => {
     if (!typeForm.name || !typeForm.amount) {
       toast({ title: "Error", description: "Please fill in required fields.", variant: "destructive" });
       return;
@@ -510,7 +510,7 @@ export function ContributionManagement() {
     }
     
     if (editingType) {
-      updateContributionType(editingType.id, {
+      await updateContributionType(editingType.id, {
         name: typeForm.name,
         category: typeForm.category,
         amount,
@@ -523,7 +523,7 @@ export function ContributionManagement() {
       }
       toast({ title: "Updated", description: "Contribution type updated." });
     } else {
-      createContributionType({
+      await createContributionType({
         name: typeForm.name,
         category: typeForm.category,
         amount,
@@ -541,7 +541,7 @@ export function ContributionManagement() {
     setShowAddType(false);
     setEditingType(null);
     resetTypeForm();
-    loadData();
+    await loadData();
   };
   
   const resetTypeForm = () => {
@@ -555,15 +555,15 @@ export function ContributionManagement() {
     });
   };
   
-  const handleDeleteContribution = (id: string) => {
+  const handleDeleteContribution = async (id: string) => {
     if (confirm("Delete this contribution record?")) {
-      deleteContribution(id);
+      await deleteContribution(id);
       toast({ title: "Deleted", description: "Contribution deleted." });
-      loadData();
+      await loadData();
     }
   };
   
-  const handleDeleteType = (id: string) => {
+  const handleDeleteType = async (id: string) => {
     const hasContributions = contributions.some(c => c.typeId === id);
     if (hasContributions) {
       toast({ 
@@ -575,15 +575,15 @@ export function ContributionManagement() {
     }
     
     if (confirm("Delete this contribution type?")) {
-      deleteContributionType(id);
+      await deleteContributionType(id);
       toast({ title: "Deleted", description: "Contribution type deleted." });
-      loadData();
+      await loadData();
     }
   };
   
-  const handleToggleTypeActive = (type: ContributionType) => {
-    updateContributionType(type.id, { isActive: !type.isActive });
-    loadData();
+  const handleToggleTypeActive = async (type: ContributionType) => {
+    await updateContributionType(type.id, { isActive: !type.isActive });
+    await loadData();
     toast({ 
       title: type.isActive ? "Deactivated" : "Activated", 
       description: `${type.name} is now ${type.isActive ? "inactive" : "active"}.` 

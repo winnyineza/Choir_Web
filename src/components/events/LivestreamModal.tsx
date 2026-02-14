@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -72,6 +73,7 @@ export function LivestreamModal({ event, isOpen, onClose }: LivestreamModalProps
               </DialogTitle>
             </div>
           </div>
+          <DialogDescription className="sr-only">Watch the livestream for {event.title}</DialogDescription>
         </DialogHeader>
 
         {/* Video Player */}

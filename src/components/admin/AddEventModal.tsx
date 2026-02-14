@@ -136,13 +136,13 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
       };
 
       if (editEvent) {
-        updateEvent(editEvent.id, eventData);
+        await updateEvent(editEvent.id, eventData);
         toast({
           title: "Event Updated",
           description: `"${title}" has been updated successfully.`,
         });
       } else {
-        addEvent(eventData);
+        await addEvent(eventData);
         toast({
           title: "Event Created",
           description: `"${title}" has been created successfully.`,

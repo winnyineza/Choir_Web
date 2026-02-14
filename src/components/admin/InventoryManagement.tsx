@@ -35,6 +35,7 @@ import {
   type ItemCategory,
   type ItemCondition,
   type ItemAssignment,
+  type InventoryStats,
 } from "@/lib/inventoryService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,6 +74,8 @@ const categoryIcons: Record<ItemCategory, any> = {
 export function InventoryManagement() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [stats, setStats] = useState<InventoryStats | null>(null);
+  const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterCondition, setFilterCondition] = useState<string>("all");
@@ -105,12 +108,18 @@ export function InventoryManagement() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setItems(getAllInventoryItems());
-    setMembers(getAllMembers().filter(m => m.status === "Active"));
+  const loadData = async () => {
+    const [itemsData, membersData, statsData, assignmentsData] = await Promise.all([
+      getAllInventoryItems(),
+      getAllMembers(),
+      getInventoryStats(),
+      getAllAssignments(),
+    ]);
+    setItems(itemsData);
+    setMembers(membersData.filter(m => m.status === "Active"));
+    setStats(statsData);
+    setAssignments(assignmentsData.filter(a => !a.returnedAt));
   };
-
-  const stats = getInventoryStats();
 
   // Filter items
   const filteredItems = items.filter(item => {
@@ -121,7 +130,7 @@ export function InventoryManagement() {
     return matchesSearch && matchesCategory && matchesCondition;
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.location) {
       toast({
         title: "Error",
@@ -132,7 +141,7 @@ export function InventoryManagement() {
     }
 
     if (selectedItem) {
-      updateInventoryItem(selectedItem.id, {
+      await updateInventoryItem(selectedItem.id, {
         ...formData,
         purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : undefined,
       });
@@ -141,7 +150,7 @@ export function InventoryManagement() {
       }
       toast({ title: "Item Updated", description: "Inventory item has been updated." });
     } else {
-      createInventoryItem({
+      await createInventoryItem({
         ...formData,
         purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : undefined,
       });
@@ -151,7 +160,7 @@ export function InventoryManagement() {
       toast({ title: "Item Added", description: "New inventory item has been added." });
     }
 
-    loadData();
+    await loadData();
     setShowAddModal(false);
     resetForm();
   };
@@ -298,7 +307,7 @@ export function InventoryManagement() {
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Box className="w-4 h-4 text-blue-400" />
-            <span className="text-xl font-bold">{stats.totalQuantity}</span>
+            <span className="text-xl font-bold">{stats?.totalQuantity ?? 0}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Total Items</p>
         </div>
@@ -319,7 +328,7 @@ export function InventoryManagement() {
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <AlertTriangle className="w-4 h-4 text-orange-400" />
-            <span className="text-xl font-bold text-orange-400">{stats.needsRepairCount}</span>
+            <span className="text-xl font-bold text-orange-400">{stats?.needsRepairCount ?? 0}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Needs Repair</p>
         </div>

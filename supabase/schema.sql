@@ -459,17 +459,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =============================================
--- INSERT DEFAULT SUPER ADMIN
--- =============================================
-INSERT INTO admin_users (email, name, password_hash, role, is_active)
-VALUES (
-  'w.ineza@alustudent.com',
-  'Winny Ineza',
-  '$2b$10$POMQ.J5wyCbe417P61akfeAlH/20L/RVvghsc.EG8AGljdOoGJP7S',
-  'super_admin',
-  true
-) ON CONFLICT (email) DO NOTHING;
+-- Super admin should be created via the Admin Team Management UI, not hardcoded
 
 COMMENT ON TABLE members IS 'Choir members information';
 COMMENT ON TABLE events IS 'Choir events and concerts';

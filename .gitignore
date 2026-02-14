@@ -26,3 +26,6 @@ yarn-error.log*
 
 # Test coverage
 coverage
+
+# E2E test screenshots
+test-screenshots
