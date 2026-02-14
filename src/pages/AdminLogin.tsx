@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { validateInvite, redeemInvite, requestPasswordReset, validateResetToken, resetPassword } from "@/lib/adminService";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { validateEmail, validatePassword, checkRateLimit, LOGIN_RATE_LIMIT, sanitizeString } from "@/lib/validation";
-import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound } from "lucide-react";
+import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router-dom";
 
 type View = "login" | "signup" | "forgot" | "reset";
@@ -32,6 +32,8 @@ export default function AdminLogin() {
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -408,15 +410,18 @@ export default function AdminLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="At least 8 characters"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-primary/20"
+                      className="pl-10 pr-10 bg-secondary border-primary/20"
                       required
                       minLength={8}
                       disabled={isLoading}
                     />
+                    <button type="button" tabIndex={-1} onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                   <PasswordStrength password={password} />
                 </div>
@@ -427,14 +432,17 @@ export default function AdminLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="confirmPassword"
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       placeholder="Re-enter password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-primary/20"
+                      className="pl-10 pr-10 bg-secondary border-primary/20"
                       required
                       disabled={isLoading}
                     />
+                    <button type="button" tabIndex={-1} onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -490,14 +498,17 @@ export default function AdminLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Enter password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-primary/20"
+                      className="pl-10 pr-10 bg-secondary border-primary/20"
                       required
                       disabled={isLoading}
                     />
+                    <button type="button" tabIndex={-1} onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -644,15 +655,18 @@ export default function AdminLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="newPassword"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="At least 8 characters"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-primary/20"
+                      className="pl-10 pr-10 bg-secondary border-primary/20"
                       required
                       minLength={8}
                       disabled={isLoading}
                     />
+                    <button type="button" tabIndex={-1} onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                   <PasswordStrength password={password} />
                 </div>
@@ -663,14 +677,17 @@ export default function AdminLogin() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="confirmNewPassword"
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       placeholder="Re-enter password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-primary/20"
+                      className="pl-10 pr-10 bg-secondary border-primary/20"
                       required
                       disabled={isLoading}
                     />
+                    <button type="button" tabIndex={-1} onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 

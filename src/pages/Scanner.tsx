@@ -31,6 +31,8 @@ import {
   Phone,
   ArrowRight,
   ArrowLeft,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -64,6 +66,7 @@ export default function Scanner() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [nationalId, setNationalId] = useState("");
   const [nationalIdError, setNationalIdError] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -439,15 +442,20 @@ export default function Scanner() {
           </p>
           
           <form onSubmit={handlePinSubmit} className="space-y-4">
-            <Input
-              type="password"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="Enter PIN"
-              className="text-center text-2xl tracking-widest bg-secondary border-primary/20"
-              maxLength={10}
-              autoFocus
-            />
+            <div className="relative">
+              <Input
+                type={showPin ? "text" : "password"}
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="Enter PIN"
+                className="text-center text-2xl tracking-widest pr-10 bg-secondary border-primary/20"
+                maxLength={10}
+                autoFocus
+              />
+              <button type="button" tabIndex={-1} onClick={() => setShowPin(!showPin)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             
             {pinError && (
               <p className="text-red-500 text-sm">{pinError}</p>

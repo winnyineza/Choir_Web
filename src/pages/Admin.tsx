@@ -41,6 +41,7 @@ import {
   Send,
   Loader2,
   Lock,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -296,6 +297,9 @@ export default function Admin() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [accountSaving, setAccountSaving] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   // Load data
   const loadData = async () => {
@@ -2826,36 +2830,51 @@ export default function Admin() {
                   <div className="space-y-3">
                     <div>
                       <Label htmlFor="currentPassword">Current Password</Label>
-                      <Input
-                        id="currentPassword"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="mt-1 bg-secondary border-primary/20"
-                        placeholder="Enter current password"
-                      />
+                      <div className="relative mt-1">
+                        <Input
+                          id="currentPassword"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="pr-10 bg-secondary border-primary/20"
+                          placeholder="Enter current password"
+                        />
+                        <button type="button" tabIndex={-1} onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                          {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <Label htmlFor="newPassword">New Password</Label>
-                      <Input
-                        id="newPassword"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="mt-1 bg-secondary border-primary/20"
-                        placeholder="Enter new password (min 8 chars)"
-                      />
+                      <div className="relative mt-1">
+                        <Input
+                          id="newPassword"
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="pr-10 bg-secondary border-primary/20"
+                          placeholder="Enter new password (min 8 chars)"
+                        />
+                        <button type="button" tabIndex={-1} onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                          {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
-                      <Input
-                        id="confirmNewPassword"
-                        type="password"
-                        value={confirmNewPassword}
-                        onChange={(e) => setConfirmNewPassword(e.target.value)}
-                        className="mt-1 bg-secondary border-primary/20"
-                        placeholder="Confirm new password"
-                      />
+                      <div className="relative mt-1">
+                        <Input
+                          id="confirmNewPassword"
+                          type={showConfirmNewPassword ? "text" : "password"}
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          className="pr-10 bg-secondary border-primary/20"
+                          placeholder="Confirm new password"
+                        />
+                        <button type="button" tabIndex={-1} onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                          {showConfirmNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <Button
                       variant="outline"
