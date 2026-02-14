@@ -142,7 +142,9 @@ export default function MemberPortal() {
   // Profile editing
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editDateOfBirth, setEditDateOfBirth] = useState("");
   const [editEmergencyContact, setEditEmergencyContact] = useState<EmergencyContact>({
     name: "",
     relationship: "Spouse",
@@ -178,9 +180,13 @@ export default function MemberPortal() {
   // Populate edit form when member info is loaded
   useEffect(() => {
     if (memberInfo) {
+      setEditName(memberInfo.name || "");
       setEditPhone(memberInfo.phone || "");
+      setEditDateOfBirth(memberInfo.dateOfBirth || "");
       if (memberInfo.emergencyContact) {
         setEditEmergencyContact(memberInfo.emergencyContact);
+      } else {
+        setEditEmergencyContact({ name: "", relationship: "Spouse", phone: "", altPhone: "" });
       }
       // Load active surveys
       setActiveSurveys(getActiveSurveysForMembers());
@@ -193,8 +199,10 @@ export default function MemberPortal() {
     
     setIsSavingProfile(true);
     try {
-      const updatedMember = updateMember(memberInfo.id, {
+      const updatedMember = await updateMember(memberInfo.id, {
+        name: editName,
         phone: editPhone,
+        dateOfBirth: editDateOfBirth || undefined,
         emergencyContact: editEmergencyContact.name ? editEmergencyContact : undefined,
       });
       
@@ -205,6 +213,12 @@ export default function MemberPortal() {
           description: "Your information has been saved successfully.",
         });
         setShowProfileEdit(false);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({
@@ -752,6 +766,30 @@ export default function MemberPortal() {
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                  <button
+                    onClick={() => {
+                      if (!memberInfo) {
+                        toast({
+                          title: "Enter your email first",
+                          description: "We need your email to edit your profile.",
+                        });
+                        return;
+                      }
+                      setShowProfileEdit(true);
+                    }}
+                    className="card-glass rounded-2xl p-6 text-left hover:border-primary/30 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                        <User className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">My Profile</h3>
+                        <p className="text-sm text-muted-foreground">Edit your profile information</p>
+                      </div>
+                    </div>
+                  </button>
+
                   <button
                     onClick={() => {
                       if (!memberInfo) {
@@ -1797,21 +1835,49 @@ export default function MemberPortal() {
                     )}
                   </DialogContent>
                 </Dialog>
+              </div>
+            )}
 
-                {/* Profile Edit Modal */}
-                <Dialog open={showProfileEdit} onOpenChange={setShowProfileEdit}>
+            {/* Profile Edit Modal - available from dashboard and contributions */}
+            <Dialog open={showProfileEdit} onOpenChange={setShowProfileEdit}>
                   <DialogContent className="max-w-md bg-background border-primary/20">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Pencil className="w-5 h-5 text-primary" />
-                        Edit Profile
+                        My Profile
                       </DialogTitle>
                       <DialogDescription>
-                        Update your phone number and emergency contact information.
+                        Update your profile information. Email and voice part cannot be changed.
                       </DialogDescription>
                     </DialogHeader>
                     
                     <div className="space-y-6 pt-4">
+                      {/* Name */}
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-name">Name</Label>
+                        <Input
+                          id="profile-name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Full name"
+                          className="bg-secondary border-primary/20"
+                        />
+                      </div>
+
+                      {/* Email (read-only) */}
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-email">Email</Label>
+                        <Input
+                          id="profile-email"
+                          type="email"
+                          value={memberInfo?.email || ""}
+                          readOnly
+                          disabled
+                          className="bg-muted border-primary/20 text-muted-foreground cursor-not-allowed"
+                        />
+                        <p className="text-xs text-muted-foreground">Email cannot be changed. Contact an admin if needed.</p>
+                      </div>
+
                       {/* Phone Number */}
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone Number</Label>
@@ -1823,6 +1889,33 @@ export default function MemberPortal() {
                           placeholder="e.g., 078 123 4567"
                           className="bg-secondary border-primary/20"
                         />
+                      </div>
+
+                      {/* Voice (read-only) */}
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-voice">Voice Part</Label>
+                        <Input
+                          id="profile-voice"
+                          value={memberInfo?.voice || ""}
+                          readOnly
+                          disabled
+                          className="bg-muted border-primary/20 text-muted-foreground cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Date of Birth */}
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-dob">Date of Birth</Label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="profile-dob"
+                            type="date"
+                            value={editDateOfBirth}
+                            onChange={(e) => setEditDateOfBirth(e.target.value)}
+                            className="pl-10 bg-secondary border-primary/20"
+                          />
+                        </div>
                       </div>
 
                       {/* Emergency Contact */}
@@ -2079,8 +2172,7 @@ export default function MemberPortal() {
                     )}
                   </DialogContent>
                 </Dialog>
-              </div>
-            )}
+
           </div>
         </div>
       </main>

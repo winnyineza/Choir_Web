@@ -141,6 +141,54 @@
   .light [style*="--gradient-gold"] {
     box-shadow: 0 2px 10px hsl(38 100% 45% / 0.3);
   }
+
+  /* Enhance nav icons & text in light mode for visibility */
+  .light .text-primary {
+    color: hsl(32 100% 35%) !important;
+  }
+
+  .light a:hover .text-primary,
+  .light button:hover .text-primary {
+    color: hsl(38 100% 40%) !important;
+  }
+
+  /* Ensure nav link text is clearly visible in light mode */
+  .light nav a,
+  .light nav button {
+    color: hsl(0 0% 15%);
+  }
+
+  .light nav a:hover,
+  .light nav button:hover {
+    color: hsl(32 100% 35%);
+  }
+
+  /* Heart/Donate and other icon buttons more visible */
+  .light .text-primary\/80 {
+    color: hsl(32 100% 38%) !important;
+  }
+
+  /* Make subscribe/CTA buttons bold in light mode */
+  .light .bg-primary {
+    background-color: hsl(32 100% 38%) !important;
+  }
+
+  .light .bg-primary:hover {
+    background-color: hsl(32 100% 32%) !important;
+  }
+
+  /* Border visibility boost */
+  .light .border-primary\/10 {
+    border-color: hsl(38 100% 45% / 0.2) !important;
+  }
+
+  .light .border-primary\/20 {
+    border-color: hsl(38 100% 45% / 0.3) !important;
+  }
+
+  .light .border-primary\/30 {
+    border-color: hsl(38 100% 45% / 0.4) !important;
+  }
 }
 
 @layer base {

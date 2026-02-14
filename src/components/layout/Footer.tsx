@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Instagram, Facebook, Youtube, Twitter, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { useVisitorCount } from "@/hooks/useVisitorCount";
+import { getBookableEvents } from "@/lib/dataService";
 import logo from "@/assets/LogoTSC.jpg";
 
 // Custom Spotify icon component
@@ -27,6 +29,11 @@ const quickLinks = [
 
 export function Footer() {
   const visitorCount = useVisitorCount();
+  const [hasEvents, setHasEvents] = useState(false);
+
+  useEffect(() => {
+    getBookableEvents().then(events => setHasEvents(events.length > 0));
+  }, []);
   
   return (
     <footer className="bg-charcoal border-t border-primary/10">
@@ -75,7 +82,9 @@ export function Footer() {
               Quick Links
             </h3>
             <ul className="space-y-2">
-              {quickLinks.map((link) => (
+              {quickLinks
+                .filter(link => link.name !== "Events" || hasEvents)
+                .map((link) => (
                 <li key={link.name}>
                   <Link
                     to={link.href}

@@ -32,18 +32,19 @@ export function Header() {
 
   // Check if there are any bookable events
   useEffect(() => {
-    const checkEvents = () => {
-      const events = getBookableEvents();
+    const checkEvents = async () => {
+      const events = await getBookableEvents();
       setHasEvents(events.length > 0);
     };
     checkEvents();
     
     // Listen for event updates
-    window.addEventListener("storage", checkEvents);
-    window.addEventListener("eventsUpdated", checkEvents);
+    const handler = () => { checkEvents(); };
+    window.addEventListener("eventsUpdated", handler);
+    const interval = setInterval(checkEvents, 60000); // Re-check every minute
     return () => {
-      window.removeEventListener("storage", checkEvents);
-      window.removeEventListener("eventsUpdated", checkEvents);
+      window.removeEventListener("eventsUpdated", handler);
+      clearInterval(interval);
     };
   }, []);
 

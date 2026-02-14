@@ -4,6 +4,7 @@
 // - GMAIL_USER
 // - GMAIL_APP_PASSWORD
 // - ADMIN_NOTIFICATION_EMAILS (comma-separated)
+// - FINANCE_NOTIFICATION_EMAILS (comma-separated, for finance/contribution summary emails)
 // - SUPABASE_URL or VITE_SUPABASE_URL
 // - SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY
 
@@ -889,16 +890,19 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         // Sort by total overdue (highest first)
         overdueByMember.sort((a, b) => b.total - a.total);
 
-        // Get finance-specific emails (finance officers, reviewers, main admin)
-        // Use FINANCE_NOTIFICATION_EMAILS env var, fallback to admin emails
-        const financeEmails = process.env.FINANCE_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) 
-          || adminEmails;
+        // Finance summary: ONLY send to restricted recipients (finance + main admin)
+        const financeList = process.env.FINANCE_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) || [];
+        const adminListForFinance = process.env.ADMIN_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) || [];
+        const financeEmails = [...new Set([...financeList, ...adminListForFinance].map(e => e.toLowerCase()))]
+          .filter(Boolean);
 
-        const financeEmailsSent = await sendEmail(
-          financeEmails,
-          `📊 Finance Report: ${overdueByMember.length} Members with Overdue Contributions`,
-          generateFinanceOverdueEmail(overdueByMember)
-        );
+        const financeEmailsSent = financeEmails.length > 0
+          ? await sendEmail(
+              financeEmails,
+              `📊 Finance Report: ${overdueByMember.length} Members with Overdue Contributions`,
+              generateFinanceOverdueEmail(overdueByMember)
+            )
+          : false;
 
         if (financeEmailsSent) {
           results.financeReportSent = true;

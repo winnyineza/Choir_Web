@@ -12,7 +12,7 @@ import { addToCalendar } from "@/lib/exportUtils";
 import { ShareButtons } from "@/components/ShareButtons";
 import { useToast } from "@/hooks/use-toast";
 import { getBookableEvents, isEventSoldOut, getAvailableCount, type Event as DataEvent, type EventTicket } from "@/lib/dataService";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import choirImage from "@/assets/choir-group.jpg";
 import { LivestreamModal } from "@/components/events/LivestreamModal";
 import { EventReminderButton } from "@/components/events/EventReminderButton";
@@ -60,9 +60,9 @@ export default function Events() {
 
   // Fetch events from dataService
   useEffect(() => {
-    const loadEvents = () => {
+    const loadEvents = async () => {
       setIsLoading(true);
-      const bookableEvents = getBookableEvents();
+      const bookableEvents = await getBookableEvents();
       
       // Transform to display format
       const displayEvents: DisplayEvent[] = bookableEvents.map((event) => ({
@@ -142,6 +142,11 @@ export default function Events() {
       .includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  // Redirect to home if no events and done loading
+  if (!isLoading && events.length === 0) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleGetTickets = (event: DisplayEvent) => {
     // Check if any tickets are available

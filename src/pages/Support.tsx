@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Heart, CreditCard, Phone, Send, CheckCircle, Loader2, Zap, Copy,
-  Music, Users, Globe, Mic2, Shield, Lock
+  Music, Users, Globe, Mic2, Shield, Lock, Smartphone, Banknote, Wallet, QrCode
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -137,6 +137,26 @@ export default function Support() {
                 Choose How to <span className="gold-text">Give</span>
               </h2>
 
+              {/* Accepted Payment Methods */}
+              <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  MTN MoMo
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Airtel Money
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Visa / Mastercard
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
+                  <Banknote className="w-3.5 h-3.5" />
+                  Bank Transfer
+                </div>
+              </div>
+
               {/* Payment Mode Toggle */}
               <div className="flex justify-center mb-8">
                 <div className="inline-flex bg-secondary rounded-xl p-1 w-full max-w-md">
@@ -148,7 +168,7 @@ export default function Support() {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <Zap className="w-4 h-4" />
+                    <Wallet className="w-4 h-4" />
                     Pay Online
                   </button>
                   <button
@@ -159,7 +179,7 @@ export default function Support() {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <Phone className="w-4 h-4" />
+                    <QrCode className="w-4 h-4" />
                     Manual Transfer
                   </button>
                 </div>
