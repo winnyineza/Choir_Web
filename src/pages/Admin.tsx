@@ -151,7 +151,7 @@ const ContributionManagement = lazy(() => import("@/components/admin/Contributio
 import { getAllContributions } from "@/lib/contributionService";
 import { getAllExpenses } from "@/lib/expenseService";
 import { getAllDonations } from "@/lib/donationService";
-import { BarChart3, Shield, History, Mail, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
+import { BarChart3, Shield, History, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
 import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer, changePassword, updateAdminUser } from "@/lib/adminService";
 const ContactSubmissions = lazy(() => import("@/components/admin/ContactSubmissions").then(m => ({ default: m.ContactSubmissions })));
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
@@ -2920,7 +2920,8 @@ export default function Admin() {
               </div>
 
               {/* System settings - only for super_admin and main_admin */}
-              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (<>
+              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
+              <div className="space-y-6">
               <div className="card-glass rounded-2xl p-6 max-w-2xl">
                 <h3 className="font-semibold text-foreground mb-4">Choir Information</h3>
                 <div className="space-y-4">
@@ -3080,7 +3081,8 @@ export default function Admin() {
               <div className="max-w-2xl">
                 <BackupRestore />
               </div>
-              </>)}
+              </div>
+              )}
 
             </div>
           )}
