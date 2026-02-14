@@ -950,13 +950,15 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
       id: a.id,
       email: a.email,
       name: a.name,
-      password_hash: a.password || a.passwordHash || '',
-      role: a.role || 'reviewer',
-      member_id: a.memberId || null,
-      is_active: a.isActive ?? true,
-      last_login: a.lastLogin || null,
-      created_by: a.createdBy || null,
-      created_at: a.createdAt || new Date().toISOString(),
+      // Only include password_hash if explicitly provided (avoid wiping on partial updates)
+      password_hash: a.password || a.passwordHash || undefined,
+      // Only include role if explicitly provided (avoid resetting to 'reviewer' on partial updates)
+      role: a.role || undefined,
+      member_id: a.memberId !== undefined ? a.memberId : undefined,
+      is_active: a.isActive !== undefined ? a.isActive : undefined,
+      last_login: a.lastLogin || undefined,
+      created_by: a.createdBy || undefined,
+      created_at: a.createdAt || undefined,
     }),
     fromDb: (r: any) => ({
       id: r.id,
