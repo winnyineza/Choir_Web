@@ -15,6 +15,8 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences,
   showNotification,
+  subscribeToPush,
+  isPushSubscribed,
   type NotificationPreferences,
 } from "@/lib/pushNotificationService";
 
@@ -41,6 +43,10 @@ export function NotificationSettings() {
       
       if (result === 'granted') {
         setEnabled(true);
+        
+        // Subscribe to server push notifications
+        await subscribeToPush();
+        
         toast({
           title: "Notifications Enabled",
           description: "You'll now receive push notifications.",

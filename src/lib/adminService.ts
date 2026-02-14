@@ -132,6 +132,91 @@ export async function authenticateAdmin(email: string, password: string): Promis
   return user;
 }
 
+// ============ LOGIN WITH RATE LIMITING ============
+
+export interface LoginResult {
+  success: boolean;
+  user?: AdminUser;
+  error?: string;
+  isLocked?: boolean;
+  lockoutUntil?: Date;
+  remainingAttempts?: number;
+}
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const loginAttempts = new Map<string, { count: number; lockedUntil?: number }>();
+
+export async function loginAdmin(email: string, password: string): Promise<LoginResult> {
+  const key = email.toLowerCase();
+  const attempts = loginAttempts.get(key);
+
+  // Check if locked out
+  if (attempts?.lockedUntil && Date.now() < attempts.lockedUntil) {
+    return {
+      success: false,
+      error: `Account locked. Try again after ${new Date(attempts.lockedUntil).toLocaleTimeString()}`,
+      isLocked: true,
+      lockoutUntil: new Date(attempts.lockedUntil),
+    };
+  }
+
+  // Reset if lockout expired
+  if (attempts?.lockedUntil && Date.now() >= attempts.lockedUntil) {
+    loginAttempts.delete(key);
+  }
+
+  try {
+    const user = await getAdminByEmail(email);
+
+    if (!user) {
+      recordFailedAttempt(key);
+      const current = loginAttempts.get(key);
+      return {
+        success: false,
+        error: "Invalid email or password",
+        remainingAttempts: Math.max(0, MAX_LOGIN_ATTEMPTS - (current?.count || 0)),
+      };
+    }
+
+    if (!user.isActive) {
+      return {
+        success: false,
+        error: "Account is disabled. Contact administrator.",
+      };
+    }
+
+    if (!comparePassword(password, user.password)) {
+      recordFailedAttempt(key);
+      const current = loginAttempts.get(key);
+      return {
+        success: false,
+        error: "Invalid email or password",
+        remainingAttempts: Math.max(0, MAX_LOGIN_ATTEMPTS - (current?.count || 0)),
+      };
+    }
+
+    // Success - clear attempts
+    loginAttempts.delete(key);
+    await updateAdminUser(user.id, { lastLogin: new Date().toISOString() });
+    await addAuditLog(user, "LOGIN", "Successful login");
+
+    return { success: true, user };
+  } catch (error) {
+    console.error("Login error:", error);
+    return { success: false, error: "Authentication failed. Please try again." };
+  }
+}
+
+function recordFailedAttempt(key: string): void {
+  const current = loginAttempts.get(key) || { count: 0 };
+  current.count += 1;
+  if (current.count >= MAX_LOGIN_ATTEMPTS) {
+    current.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+  }
+  loginAttempts.set(key, current);
+}
+
 // Create admin user (only super_admin can do this)
 export async function createAdminUser(
   data: Omit<AdminUser, "id" | "createdAt" | "isActive">,
