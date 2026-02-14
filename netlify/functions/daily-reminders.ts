@@ -29,11 +29,29 @@ interface Event {
 interface Contribution {
   id: string;
   member_id: string;
+  member_name?: string;
+  member_email?: string;
+  type_id?: string;
+  type_name?: string;
   type: string;
+  category: 'monthly' | 'special';
   amount: number;
-  due_date: string;
-  paid_date?: string;
-  status: 'pending' | 'paid' | 'overdue';
+  month?: number;
+  year?: number;
+  payment_method?: string;
+  reference?: string;
+  notes?: string;
+  recorded_by?: string;
+  created_at: string;
+}
+
+interface ContributionType {
+  id: string;
+  name: string;
+  category: 'monthly' | 'special';
+  amount: number;
+  is_active: boolean;
+  deadline?: string;
 }
 
 interface MemberWithContributions extends Member {
@@ -93,93 +111,138 @@ function getTomorrowEvents(events: Event[]): Event[] {
   });
 }
 
-// Helper to get overdue contributions
-function getOverdueContributions(contributions: Contribution[]): Contribution[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  return contributions.filter(c => {
-    if (c.status === 'paid' || c.paid_date) return false;
-    const dueDate = new Date(c.due_date);
-    return dueDate < today;
-  });
+// Helper to find unpaid months for a member (months where they have no monthly contribution)
+function getUnpaidMonthsForMember(
+  memberId: string,
+  contributions: Contribution[],
+  monthlyAmount: number
+): { month: number; year: number; expectedAmount: number }[] {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1; // 1-12
+  const currentYear = now.getFullYear();
+  const unpaid: { month: number; year: number; expectedAmount: number }[] = [];
+
+  // Check each month of the current year up to the current month
+  for (let m = 1; m <= currentMonth; m++) {
+    const paid = contributions.filter(
+      c => c.member_id === memberId && c.category === 'monthly' && c.month === m && c.year === currentYear
+    );
+    const paidAmount = paid.reduce((sum, c) => sum + c.amount, 0);
+    if (paidAmount < monthlyAmount) {
+      unpaid.push({ month: m, year: currentYear, expectedAmount: monthlyAmount - paidAmount });
+    }
+  }
+
+  return unpaid;
 }
 
-// Helper to get upcoming contributions (due in next X days)
-function getUpcomingContributions(contributions: Contribution[], daysAhead: number = 7): Contribution[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const futureDate = new Date(today);
-  futureDate.setDate(futureDate.getDate() + daysAhead);
-  
-  return contributions.filter(c => {
-    if (c.status === 'paid' || c.paid_date) return false;
-    const dueDate = new Date(c.due_date);
-    return dueDate >= today && dueDate <= futureDate;
-  });
+// Helper to find special contributions with deadlines that are approaching or overdue
+function getSpecialContributionReminders(
+  memberId: string,
+  contributions: Contribution[],
+  types: ContributionType[]
+): { overdue: ContributionType[]; upcoming: ContributionType[] } {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const weekFromNow = new Date(now);
+  weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+  const overdue: ContributionType[] = [];
+  const upcoming: ContributionType[] = [];
+
+  for (const type of types) {
+    if (type.category !== 'special' || !type.is_active || !type.deadline) continue;
+
+    const deadline = new Date(type.deadline);
+    const memberPaid = contributions
+      .filter(c => c.member_id === memberId && c.type_id === type.id)
+      .reduce((sum, c) => sum + c.amount, 0);
+
+    if (memberPaid >= type.amount) continue; // Already fully paid
+
+    if (deadline < now) {
+      overdue.push(type);
+    } else if (deadline <= weekFromNow) {
+      upcoming.push(type);
+    }
+  }
+
+  return { overdue, upcoming };
 }
+
+// Month names for display
+const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // Generate contribution reminder email for a member
 function generateContributionReminderEmail(
-  memberName: string, 
-  upcoming: Contribution[], 
-  overdue: Contribution[]
+  memberName: string,
+  unpaidMonths: { month: number; year: number; expectedAmount: number }[],
+  overdueSpecial: ContributionType[],
+  upcomingSpecial: ContributionType[]
 ): string {
   const formatAmount = (amount: number) => `${amount.toLocaleString()} RWF`;
-  
-  let upcomingHtml = '';
-  if (upcoming.length > 0) {
-    const upcomingItems = upcoming.map(c => `
+
+  let unpaidHtml = '';
+  if (unpaidMonths.length > 0) {
+    const totalUnpaid = unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0);
+    const unpaidItems = unpaidMonths.map(m => `
       <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #333;">${c.type}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${formatAmount(c.amount)}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${new Date(c.due_date).toLocaleDateString()}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #333;">Monthly Dues</td>
+        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${MONTH_NAMES[m.month]} ${m.year}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">${formatAmount(m.expectedAmount)}</td>
       </tr>
     `).join('');
-    
-    upcomingHtml = `
-      <div style="margin: 20px 0;">
-        <h3 style="color: #d4a537;">📅 Upcoming Contributions</h3>
-        <table style="width: 100%; border-collapse: collapse; background: #2a2a2a; border-radius: 8px;">
-          <thead>
-            <tr style="background: #333;">
-              <th style="padding: 10px; text-align: left;">Type</th>
-              <th style="padding: 10px; text-align: right;">Amount</th>
-              <th style="padding: 10px; text-align: right;">Due Date</th>
-            </tr>
-          </thead>
-          <tbody>${upcomingItems}</tbody>
-        </table>
-      </div>
-    `;
-  }
-  
-  let overdueHtml = '';
-  if (overdue.length > 0) {
-    const overdueItems = overdue.map(c => `
-      <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #333;">${c.type}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">${formatAmount(c.amount)}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">${new Date(c.due_date).toLocaleDateString()}</td>
-      </tr>
-    `).join('');
-    
-    const totalOverdue = overdue.reduce((sum, c) => sum + c.amount, 0);
-    
-    overdueHtml = `
+
+    unpaidHtml = `
       <div style="margin: 20px 0; padding: 15px; background: #4a2020; border-radius: 8px; border-left: 4px solid #ff6b6b;">
-        <h3 style="color: #ff6b6b; margin-top: 0;">⚠️ Overdue Contributions</h3>
+        <h3 style="color: #ff6b6b; margin-top: 0;">⚠️ Unpaid Monthly Dues</h3>
         <table style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr style="background: #3a1515;">
               <th style="padding: 10px; text-align: left;">Type</th>
-              <th style="padding: 10px; text-align: right;">Amount</th>
-              <th style="padding: 10px; text-align: right;">Was Due</th>
+              <th style="padding: 10px; text-align: center;">Month</th>
+              <th style="padding: 10px; text-align: right;">Amount Due</th>
             </tr>
           </thead>
-          <tbody>${overdueItems}</tbody>
+          <tbody>${unpaidItems}</tbody>
         </table>
-        <p style="margin-top: 15px; font-weight: bold; color: #ff6b6b;">Total Overdue: ${formatAmount(totalOverdue)}</p>
+        <p style="margin-top: 15px; font-weight: bold; color: #ff6b6b;">Total Outstanding: ${formatAmount(totalUnpaid)}</p>
+      </div>
+    `;
+  }
+
+  let specialHtml = '';
+  if (overdueSpecial.length > 0 || upcomingSpecial.length > 0) {
+    const items = [
+      ...overdueSpecial.map(t => `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #333;">${t.name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">${formatAmount(t.amount)}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">Overdue${t.deadline ? ' (' + new Date(t.deadline).toLocaleDateString() + ')' : ''}</td>
+        </tr>
+      `),
+      ...upcomingSpecial.map(t => `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #333;">${t.name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${formatAmount(t.amount)}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #d4a537;">Due ${t.deadline ? new Date(t.deadline).toLocaleDateString() : 'soon'}</td>
+        </tr>
+      `)
+    ].join('');
+
+    specialHtml = `
+      <div style="margin: 20px 0;">
+        <h3 style="color: #d4a537;">📅 Special Contributions</h3>
+        <table style="width: 100%; border-collapse: collapse; background: #2a2a2a; border-radius: 8px;">
+          <thead>
+            <tr style="background: #333;">
+              <th style="padding: 10px; text-align: left;">Contribution</th>
+              <th style="padding: 10px; text-align: right;">Amount</th>
+              <th style="padding: 10px; text-align: right;">Status</th>
+            </tr>
+          </thead>
+          <tbody>${items}</tbody>
+        </table>
       </div>
     `;
   }
@@ -200,8 +263,8 @@ function generateContributionReminderEmail(
         <h1>💰 Contribution Reminder</h1>
         <p>Dear ${memberName},</p>
         <p>This is a friendly reminder about your choir contributions:</p>
-        ${overdueHtml}
-        ${upcomingHtml}
+        ${unpaidHtml}
+        ${specialHtml}
         <p style="margin-top: 20px;">Please make your payments on time to support our choir ministry. Thank you!</p>
         <div class="footer">
           <p>Serenades of Praise Choir</p>
@@ -214,17 +277,17 @@ function generateContributionReminderEmail(
 
 // Generate finance admin summary email
 function generateFinanceOverdueEmail(
-  overdueByMember: { member: Member; contributions: Contribution[]; total: number }[]
+  overdueByMember: { member: Member; unpaidMonths: number; totalDue: number }[]
 ): string {
   const formatAmount = (amount: number) => `${amount.toLocaleString()} RWF`;
-  const grandTotal = overdueByMember.reduce((sum, m) => sum + m.total, 0);
+  const grandTotal = overdueByMember.reduce((sum, m) => sum + m.totalDue, 0);
   
-  const memberRows = overdueByMember.map(({ member, contributions, total }) => `
+  const memberRows = overdueByMember.map(({ member, unpaidMonths, totalDue }) => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #333;">${member.name}</td>
       <td style="padding: 10px; border-bottom: 1px solid #333;">${member.email}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${contributions.length}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b; font-weight: bold;">${formatAmount(total)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${unpaidMonths} month${unpaidMonths > 1 ? 's' : ''}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b; font-weight: bold;">${formatAmount(totalDue)}</td>
     </tr>
   `).join('');
 
@@ -651,20 +714,20 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     let members: Member[] = [];
     let events: Event[] = [];
     let contributions: Contribution[] = [];
+    let contributionTypes: ContributionType[] = [];
 
     if (SUPABASE_URL && SUPABASE_KEY) {
+      const headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      };
+
       // Fetch members
       try {
-        const membersRes = await fetch(`${SUPABASE_URL}/rest/v1/members?select=id,name,email,date_of_birth`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-          },
-        });
-        
+        const membersRes = await fetch(`${SUPABASE_URL}/rest/v1/members?select=id,name,email,date_of_birth&status=eq.Active`, { headers });
         if (membersRes.ok) {
           members = await membersRes.json();
-          console.log(`Fetched ${members.length} members`);
+          console.log(`Fetched ${members.length} active members`);
         }
       } catch (e) {
         console.error("Failed to fetch members:", e);
@@ -672,13 +735,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
       // Fetch events
       try {
-        const eventsRes = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,date,time,location`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-          },
-        });
-        
+        const eventsRes = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,date,time,location`, { headers });
         if (eventsRes.ok) {
           events = await eventsRes.json();
           console.log(`Fetched ${events.length} events`);
@@ -687,24 +744,33 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         console.error("Failed to fetch events:", e);
       }
 
-      // Fetch contributions (unpaid only)
+      // Fetch all contributions for the current year
+      const currentYear = new Date().getFullYear();
       try {
         const contributionsRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/contributions?select=id,member_id,type,amount,due_date,paid_date,status&status=neq.paid`,
-          {
-            headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
-            },
-          }
+          `${SUPABASE_URL}/rest/v1/contributions?select=*&year=eq.${currentYear}`,
+          { headers }
         );
-        
         if (contributionsRes.ok) {
           contributions = await contributionsRes.json();
-          console.log(`Fetched ${contributions.length} unpaid contributions`);
+          console.log(`Fetched ${contributions.length} contributions for ${currentYear}`);
         }
       } catch (e) {
         console.error("Failed to fetch contributions:", e);
+      }
+
+      // Fetch contribution types
+      try {
+        const typesRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/contribution_types?select=*&is_active=eq.true`,
+          { headers }
+        );
+        if (typesRes.ok) {
+          contributionTypes = await typesRes.json();
+          console.log(`Fetched ${contributionTypes.length} contribution types`);
+        }
+      } catch (e) {
+        console.error("Failed to fetch contribution types:", e);
       }
     } else {
       return {
@@ -816,79 +882,61 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     }
 
     // ===== CONTRIBUTION REMINDERS =====
-    if (contributions.length > 0) {
-      const overdue = getOverdueContributions(contributions);
-      const upcoming = getUpcomingContributions(contributions, 7);
-      
-      console.log(`Found ${overdue.length} overdue and ${upcoming.length} upcoming contributions`);
+    // Find the monthly dues amount
+    const monthlyType = contributionTypes.find(t => t.category === 'monthly');
+    const monthlyAmount = monthlyType?.amount || 0;
 
-      // Group by member
-      const memberContributions = new Map<string, { overdue: Contribution[]; upcoming: Contribution[] }>();
-      
-      overdue.forEach(c => {
-        if (!memberContributions.has(c.member_id)) {
-          memberContributions.set(c.member_id, { overdue: [], upcoming: [] });
-        }
-        memberContributions.get(c.member_id)!.overdue.push(c);
-      });
-      
-      upcoming.forEach(c => {
-        if (!memberContributions.has(c.member_id)) {
-          memberContributions.set(c.member_id, { overdue: [], upcoming: [] });
-        }
-        memberContributions.get(c.member_id)!.upcoming.push(c);
-      });
+    if (members.length > 0 && monthlyAmount > 0) {
+      const overdueByMember: { member: Member; unpaidMonths: number; totalDue: number }[] = [];
+      let totalMembersReminded = 0;
 
-      // Send reminders to each member
-      for (const [memberId, contribs] of memberContributions) {
-        const member = members.find(m => m.id === memberId);
-        if (!member || !member.email) continue;
+      for (const member of members) {
+        if (!member.email) continue;
 
-        // Only send if there's something to remind about
-        if (contribs.overdue.length > 0 || contribs.upcoming.length > 0) {
+        // Check unpaid monthly dues
+        const unpaidMonths = getUnpaidMonthsForMember(member.id, contributions, monthlyAmount);
+
+        // Check special contributions
+        const specialReminders = getSpecialContributionReminders(member.id, contributions, contributionTypes);
+
+        // Determine if we need to send a reminder
+        const hasUnpaid = unpaidMonths.length > 0;
+        const hasSpecial = specialReminders.overdue.length > 0 || specialReminders.upcoming.length > 0;
+
+        if (hasUnpaid || hasSpecial) {
           const sent = await sendEmail(
             [member.email],
-            contribs.overdue.length > 0 
-              ? `⚠️ Contribution Reminder: You have overdue payments`
-              : `💰 Contribution Reminder: Upcoming payments due`,
-            generateContributionReminderEmail(member.name, contribs.upcoming, contribs.overdue)
+            hasUnpaid
+              ? `⚠️ Contribution Reminder: You have ${unpaidMonths.length} unpaid month${unpaidMonths.length > 1 ? 's' : ''}`
+              : `💰 Contribution Reminder: Special contributions due`,
+            generateContributionReminderEmail(
+              member.name,
+              unpaidMonths,
+              specialReminders.overdue,
+              specialReminders.upcoming
+            )
           );
 
           if (sent) {
-            if (contribs.overdue.length > 0) {
-              results.overdueRemindersSent++;
-            } else {
-              results.contributionRemindersSent++;
-            }
+            totalMembersReminded++;
+            if (hasUnpaid) results.overdueRemindersSent++;
+            else results.contributionRemindersSent++;
+          }
+
+          // Track for finance summary
+          if (hasUnpaid) {
+            const totalDue = unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0);
+            overdueByMember.push({ member, unpaidMonths: unpaidMonths.length, totalDue });
           }
         }
       }
 
+      console.log(`Sent contribution reminders to ${totalMembersReminded} members`);
+
       // Send finance admin summary if there are overdues
-      if (overdue.length > 0) {
-        const overdueByMember: { member: Member; contributions: Contribution[]; total: number }[] = [];
-        
-        const memberOverdueMap = new Map<string, Contribution[]>();
-        overdue.forEach(c => {
-          if (!memberOverdueMap.has(c.member_id)) {
-            memberOverdueMap.set(c.member_id, []);
-          }
-          memberOverdueMap.get(c.member_id)!.push(c);
-        });
-
-        for (const [memberId, contribs] of memberOverdueMap) {
-          const member = members.find(m => m.id === memberId);
-          if (member) {
-            overdueByMember.push({
-              member,
-              contributions: contribs,
-              total: contribs.reduce((sum, c) => sum + c.amount, 0),
-            });
-          }
-        }
-
+      if (overdueByMember.length > 0) {
         // Sort by total overdue (highest first)
-        overdueByMember.sort((a, b) => b.total - a.total);
+        overdueByMember.sort((a, b) => b.totalDue - a.totalDue);
 
         // Finance summary: ONLY send to restricted recipients (finance + main admin)
         const financeList = process.env.FINANCE_NOTIFICATION_EMAILS?.split(',').map(e => e.trim()).filter(Boolean) || [];
@@ -899,7 +947,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         const financeEmailsSent = financeEmails.length > 0
           ? await sendEmail(
               financeEmails,
-              `📊 Finance Report: ${overdueByMember.length} Members with Overdue Contributions`,
+              `📊 Finance Report: ${overdueByMember.length} Members with Unpaid Contributions`,
               generateFinanceOverdueEmail(overdueByMember)
             )
           : false;
@@ -907,7 +955,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         if (financeEmailsSent) {
           results.financeReportSent = true;
           results.membersWithOverdue = overdueByMember.length;
-          results.totalOverdueAmount = overdueByMember.reduce((sum, m) => sum + m.total, 0);
+          results.totalOverdueAmount = overdueByMember.reduce((sum, m) => sum + m.totalDue, 0);
           results.financeRecipients = financeEmails.length;
         }
       }
@@ -924,11 +972,11 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           membersFound: members.length,
           eventsFound: events.length,
           contributionsFound: contributions.length,
+          contributionTypesFound: contributionTypes.length,
+          monthlyDuesAmount: monthlyAmount,
           todayBirthdays: todayBirthdays.map(m => m.name),
           upcomingBirthdays: upcomingBirthdays.map(m => m.name),
           tomorrowEvents: tomorrowEvents.map(e => e.title),
-          overdueContributions: getOverdueContributions(contributions).length,
-          upcomingContributions: getUpcomingContributions(contributions, 7).length,
         },
         timestamp: new Date().toISOString(),
       }),

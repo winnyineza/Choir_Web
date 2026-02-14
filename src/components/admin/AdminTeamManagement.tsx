@@ -53,6 +53,7 @@ import {
   type AdminRole,
 } from "@/lib/adminService";
 import { getAllMembers, type Member } from "@/lib/dataService";
+import { sendAdminInviteEmail } from "@/lib/memberInviteService";
 
 export function AdminTeamManagement() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -109,7 +110,7 @@ export function AdminTeamManagement() {
     }
   };
 
-  const handleCreateInvite = () => {
+  const handleCreateInvite = async () => {
     if (!selectedMemberId) {
       toast({
         title: "Select a Member",
@@ -129,20 +130,39 @@ export function AdminTeamManagement() {
     }
 
     try {
-      createInvite(inviteEmail, inviteName, inviteRole, currentUser!.id, selectedMemberId);
+      const invite = await createInvite(inviteEmail, inviteName, inviteRole, currentUser!.id, selectedMemberId);
       if (currentUser) {
-        addAuditLog(currentUser, "CREATE_ADMIN_INVITE", `Created invite for ${inviteName} (${inviteEmail}) as ${getRoleLabel(inviteRole)}`);
+        await addAuditLog(currentUser, "CREATE_ADMIN_INVITE", `Created invite for ${inviteName} (${inviteEmail}) as ${getRoleLabel(inviteRole)}`);
       }
-      toast({
-        title: "Invite Created!",
-        description: `Invite sent to ${inviteEmail}`,
-      });
+
+      // Send the invite email with the code
+      const emailResult = await sendAdminInviteEmail(
+        inviteEmail,
+        inviteName,
+        getRoleLabel(inviteRole),
+        invite.inviteCode
+      );
+
+      if (emailResult.success) {
+        toast({
+          title: "Invite Sent!",
+          description: `Invite email sent to ${inviteEmail} with their invite code.`,
+        });
+      } else {
+        // Invite was created but email failed — still show success with warning
+        toast({
+          title: "Invite Created (Email Issue)",
+          description: `Invite created but email failed: ${emailResult.message}. You can copy the invite link instead.`,
+          variant: "destructive",
+        });
+      }
+
       setIsInviteModalOpen(false);
       setSelectedMemberId("");
       setInviteEmail("");
       setInviteName("");
       setInviteRole("secretary");
-      loadData();
+      await loadData();
     } catch (err: any) {
       toast({
         title: "Error",

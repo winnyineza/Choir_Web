@@ -80,15 +80,22 @@ CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_a
 -- CONTRIBUTIONS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS contributions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-  type VARCHAR(100) NOT NULL,
-  category VARCHAR(50) DEFAULT 'other' CHECK (category IN ('monthly_dues', 'special', 'tithe', 'offering', 'other')),
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  member_name VARCHAR(255),
+  member_email VARCHAR(255),
+  type_id TEXT,
+  type_name VARCHAR(255),
+  type VARCHAR(100),
+  category VARCHAR(50) DEFAULT 'monthly' CHECK (category IN ('monthly', 'special')),
   amount DECIMAL(12, 2) NOT NULL,
+  expected_amount DECIMAL(12, 2),
   month INTEGER CHECK (month >= 1 AND month <= 12),
   year INTEGER,
+  payment_method VARCHAR(50),
+  reference VARCHAR(255),
   notes TEXT,
-  recorded_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  recorded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -100,17 +107,21 @@ CREATE INDEX IF NOT EXISTS idx_contributions_date ON contributions(year, month);
 -- ATTENDANCE TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS attendance (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  member_name VARCHAR(255),
+  member_email VARCHAR(255),
+  member_voice VARCHAR(20),
   date DATE NOT NULL,
   session_title VARCHAR(255),
-  status VARCHAR(20) NOT NULL CHECK (status IN ('present', 'absent', 'excused', 'late')),
+  status VARCHAR(20) NOT NULL DEFAULT 'present' CHECK (status IN ('present', 'absent', 'excused', 'late')),
   notes TEXT,
+  marked_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Unique constraint: one attendance record per member per date
-CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_member_date ON attendance(member_id, date);
+CREATE INDEX IF NOT EXISTS idx_attendance_member ON attendance(member_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
 
 -- =============================================
 -- LEAVE REQUESTS TABLE
@@ -474,13 +485,337 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
 
+-- =============================================
+-- CONTRIBUTION TYPES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS contribution_types (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(20) DEFAULT 'monthly' CHECK (category IN ('monthly', 'special')),
+  amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  description TEXT,
+  is_recurring BOOLEAN DEFAULT false,
+  rate_history JSONB DEFAULT '[]'::jsonb,
+  target_amount DECIMAL(12, 2),
+  deadline DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- ATTENDANCE SESSIONS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  title VARCHAR(255),
+  total_present INTEGER DEFAULT 0,
+  total_absent INTEGER DEFAULT 0,
+  total_excused INTEGER DEFAULT 0,
+  total_late INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by TEXT
+);
+
+-- =============================================
+-- ADMIN INVITES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS admin_invites (
+  id TEXT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'reviewer',
+  invite_code VARCHAR(50) NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by TEXT,
+  expires_at TIMESTAMPTZ,
+  used BOOLEAN DEFAULT false,
+  member_id TEXT
+);
+
+-- =============================================
+-- PASSWORD RESETS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS password_resets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  token TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- CHOIR SETTINGS TABLE (Key-Value Store)
+-- =============================================
+CREATE TABLE IF NOT EXISTS choir_settings (
+  key VARCHAR(255) PRIMARY KEY,
+  value TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- GALLERY ITEMS TABLE (unified gallery storage)
+-- =============================================
+CREATE TABLE IF NOT EXISTS gallery_items (
+  id TEXT PRIMARY KEY,
+  type VARCHAR(20) DEFAULT 'photo' CHECK (type IN ('photo', 'video')),
+  title VARCHAR(255) DEFAULT '',
+  url TEXT NOT NULL,
+  thumbnail TEXT,
+  category VARCHAR(100) DEFAULT '',
+  album_name VARCHAR(255),
+  uploaded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- EVENT STAFF TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS event_staff (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  national_id VARCHAR(50) NOT NULL,
+  phone VARCHAR(50),
+  email VARCHAR(255),
+  status VARCHAR(20) DEFAULT 'active',
+  assigned_events JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_active_at TIMESTAMPTZ
+);
+
+-- =============================================
+-- SCAN RECORDS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS scan_records (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  tx_ref TEXT,
+  staff_id TEXT NOT NULL,
+  staff_name VARCHAR(255),
+  staff_national_id VARCHAR(50),
+  event_id TEXT NOT NULL,
+  scanned_at TIMESTAMPTZ DEFAULT NOW(),
+  ticket_count INTEGER DEFAULT 1
+);
+
+-- =============================================
+-- SURVEYS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS surveys (
+  id TEXT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  questions JSONB DEFAULT '[]'::jsonb,
+  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'closed')),
+  target_audience VARCHAR(50) DEFAULT 'all',
+  event_id TEXT,
+  created_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  closes_at TIMESTAMPTZ
+);
+
+-- =============================================
+-- SURVEY RESPONSES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS survey_responses (
+  id TEXT PRIMARY KEY,
+  survey_id TEXT NOT NULL,
+  member_id TEXT,
+  member_name VARCHAR(255),
+  member_email VARCHAR(255),
+  answers JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- LEAVE VERIFICATION CODES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS leave_verification_codes (
+  id TEXT PRIMARY KEY,
+  leave_id TEXT NOT NULL,
+  approver_id TEXT NOT NULL,
+  code VARCHAR(20) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- DOCUMENT FOLDERS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS document_folders (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  parent_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- INVENTORY ASSIGNMENTS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS inventory_assignments (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  member_id TEXT NOT NULL,
+  assigned_date DATE DEFAULT CURRENT_DATE,
+  returned_date DATE,
+  condition_on_assign VARCHAR(50),
+  condition_on_return VARCHAR(50),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- RECEIPTS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS receipts (
+  id TEXT PRIMARY KEY,
+  member_id TEXT,
+  member_name VARCHAR(255),
+  type VARCHAR(100),
+  amount DECIMAL(12, 2) NOT NULL,
+  date DATE DEFAULT CURRENT_DATE,
+  reference VARCHAR(255),
+  issued_by TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- PAYMENTS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY,
+  member_id TEXT,
+  member_name VARCHAR(255),
+  amount DECIMAL(12, 2) NOT NULL,
+  method VARCHAR(50),
+  reference VARCHAR(255),
+  category VARCHAR(100),
+  date DATE DEFAULT CURRENT_DATE,
+  notes TEXT,
+  recorded_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- ALBUMS TABLE (Music)
+-- =============================================
+CREATE TABLE IF NOT EXISTS albums (
+  id TEXT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  year INTEGER,
+  cover_image TEXT,
+  track_count INTEGER DEFAULT 0,
+  description TEXT,
+  listen_url TEXT,
+  is_latest BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- MUSIC VIDEOS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS music_videos (
+  id TEXT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  youtube_id VARCHAR(50),
+  thumbnail TEXT,
+  album_id TEXT,
+  is_latest BOOLEAN DEFAULT false,
+  is_featured BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- STREAMING PLATFORMS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS streaming_platforms (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  url TEXT,
+  is_visible BOOLEAN DEFAULT true
+);
+
+-- =============================================
+-- ANALYTICS PAGE VIEWS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS analytics_page_views (
+  id TEXT PRIMARY KEY,
+  path VARCHAR(500) NOT NULL,
+  title VARCHAR(500),
+  "timestamp" TIMESTAMPTZ DEFAULT NOW(),
+  referrer TEXT,
+  session_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_pv_path ON analytics_page_views(path);
+CREATE INDEX IF NOT EXISTS idx_analytics_pv_session ON analytics_page_views(session_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_pv_time ON analytics_page_views("timestamp" DESC);
+
+-- =============================================
+-- ANALYTICS SESSIONS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS analytics_sessions (
+  id TEXT PRIMARY KEY,
+  start_time TIMESTAMPTZ DEFAULT NOW(),
+  last_activity TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- EMAIL QUEUE TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS email_queue (
+  id TEXT PRIMARY KEY,
+  "to" TEXT NOT NULL,
+  template VARCHAR(100),
+  data TEXT,
+  subject VARCHAR(500),
+  queued_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- NOTIFICATION PREFERENCES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  channels JSONB DEFAULT '[]'::jsonb
+);
+
+-- =============================================
+-- MEMBER INVITES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS member_invites (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  error TEXT
+);
+
+-- =============================================
+-- COMMENTS ON TABLES
+-- =============================================
 COMMENT ON TABLE members IS 'Choir members information';
 COMMENT ON TABLE events IS 'Choir events and concerts';
 COMMENT ON TABLE admin_users IS 'Administrative users with roles';
 COMMENT ON TABLE login_attempts IS 'Track login attempts for rate limiting';
 COMMENT ON TABLE contributions IS 'Member financial contributions';
+COMMENT ON TABLE contribution_types IS 'Contribution type definitions (monthly, special)';
 COMMENT ON TABLE attendance IS 'Rehearsal and event attendance tracking';
+COMMENT ON TABLE attendance_sessions IS 'Attendance session summaries';
 COMMENT ON TABLE leave_requests IS 'Member leave requests with approval workflow';
 COMMENT ON TABLE expenses IS 'Choir expense tracking';
 COMMENT ON TABLE announcements IS 'Announcements and notifications';
 COMMENT ON TABLE audit_logs IS 'Audit trail of all admin actions';
+COMMENT ON TABLE admin_invites IS 'Admin user invitations';
+COMMENT ON TABLE choir_settings IS 'Application settings (key-value)';
+COMMENT ON TABLE surveys IS 'Survey definitions';
+COMMENT ON TABLE survey_responses IS 'Member survey responses';
+COMMENT ON TABLE analytics_page_views IS 'Page view tracking for analytics';
+COMMENT ON TABLE analytics_sessions IS 'Session tracking for analytics';

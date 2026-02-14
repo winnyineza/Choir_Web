@@ -5,7 +5,9 @@
 export const FLUTTERWAVE_PUBLIC_KEY = 
   import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || "FLWPUBK_TEST-PLACEHOLDER";
 
-// Payment settings from localStorage (can be configured in admin)
+// Payment settings - stored in Supabase via choir_settings key-value store
+import { dbGetSettings, dbSaveSettings } from './supabaseDB';
+
 const PAYMENT_SETTINGS_KEY = "choir_payment_settings";
 
 export interface PaymentSettings {
@@ -40,15 +42,20 @@ export const defaultPaymentSettings: PaymentSettings = {
   },
 };
 
-export function getPaymentSettings(): PaymentSettings {
-  const data = localStorage.getItem(PAYMENT_SETTINGS_KEY);
-  if (!data) return defaultPaymentSettings;
-  return { ...defaultPaymentSettings, ...JSON.parse(data) };
+export async function getPaymentSettings(): Promise<PaymentSettings> {
+  try {
+    const stored = await dbGetSettings(PAYMENT_SETTINGS_KEY);
+    if (!stored) return defaultPaymentSettings;
+    const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    return { ...defaultPaymentSettings, ...parsed };
+  } catch {
+    return defaultPaymentSettings;
+  }
 }
 
-export function updatePaymentSettings(settings: Partial<PaymentSettings>): void {
-  const current = getPaymentSettings();
-  localStorage.setItem(PAYMENT_SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
+export async function updatePaymentSettings(settings: Partial<PaymentSettings>): Promise<void> {
+  const current = await getPaymentSettings();
+  await dbSaveSettings(PAYMENT_SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
 }
 
 export interface FlutterwaveConfig {

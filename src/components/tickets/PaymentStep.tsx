@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Phone, CreditCard, Building2, Sparkles, Loader2, CheckCircle, Smartphone } from "lucide-react";
-import { formatCurrency, isFlutterwaveConfigured, detectMomoProvider, getPaymentSettings } from "@/lib/flutterwave";
+import { formatCurrency, isFlutterwaveConfigured, detectMomoProvider, getPaymentSettings, type PaymentSettings, defaultPaymentSettings } from "@/lib/flutterwave";
 
 export type PaymentMethod = "momo" | "card" | "bank" | "demo";
 
@@ -33,6 +33,11 @@ export function PaymentStep({
   isProcessing,
 }: PaymentStepProps) {
   const flutterwaveReady = isFlutterwaveConfigured();
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
+
+  useEffect(() => {
+    getPaymentSettings().then(setPaymentSettings);
+  }, []);
 
   const paymentMethods = [
     {
@@ -211,7 +216,6 @@ export function PaymentStep({
           
           {customerInfo.phone && (() => {
             const provider = detectMomoProvider(customerInfo.phone);
-            const settings = getPaymentSettings();
             if (provider === "mtn") {
               return (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
@@ -222,7 +226,7 @@ export function PaymentStep({
                   <p className="text-sm text-muted-foreground">
                     {flutterwaveReady 
                       ? "Click Pay Now to receive a USSD push notification on your phone." 
-                      : settings.momoInstructions.mtn}
+                      : paymentSettings.momoInstructions.mtn}
                   </p>
                 </div>
               );
@@ -236,7 +240,7 @@ export function PaymentStep({
                   <p className="text-sm text-muted-foreground">
                     {flutterwaveReady 
                       ? "Click Pay Now to receive a USSD push notification on your phone."
-                      : settings.momoInstructions.airtel}
+                      : paymentSettings.momoInstructions.airtel}
                   </p>
                 </div>
               );
