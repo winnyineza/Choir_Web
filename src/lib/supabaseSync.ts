@@ -98,6 +98,27 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     }),
   },
 
+  // --- Verification Codes (leave portal) ---
+  choir_verification_codes: {
+    table: 'leave_verification_codes',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (v: any) => ({
+      id: v.id,
+      email: v.email,
+      code: v.code,
+      expires_at: typeof v.expiresAt === 'number' ? new Date(v.expiresAt).toISOString() : v.expiresAt,
+      used: v.used ?? false,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      email: r.email,
+      code: r.code,
+      expiresAt: typeof r.expires_at === 'string' ? new Date(r.expires_at).getTime() : r.expires_at,
+      used: r.used ?? false,
+    }),
+  },
+
   // --- Leave Requests ---
   choir_leave_requests: {
     table: 'leave_requests',
@@ -364,6 +385,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     orderAsc: false,
     toDb: (o: any) => ({
       id: o.id,
+      event_id: o.eventId || null,
       tx_ref: o.txRef || null,
       event_title: o.eventTitle || null,
       event_date: o.eventDate || null,
@@ -1190,14 +1212,92 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
       isVisible: r.is_visible ?? true,
     }),
   },
+
+  // --- Analytics Page Views ---
+  choir_analytics_page_views: {
+    table: 'analytics_page_views',
+    orderBy: 'timestamp',
+    orderAsc: false,
+    toDb: (p: any) => ({
+      id: p.id,
+      path: p.path,
+      title: p.title,
+      timestamp: p.timestamp,
+      referrer: p.referrer || null,
+      session_id: p.sessionId || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      path: r.path,
+      title: r.title,
+      timestamp: r.timestamp,
+      referrer: r.referrer || undefined,
+      sessionId: r.session_id || undefined,
+    }),
+  },
+
+  // --- Analytics Sessions ---
+  choir_analytics_sessions: {
+    table: 'analytics_sessions',
+    orderBy: 'last_activity',
+    orderAsc: false,
+    toDb: (s: any) => ({
+      id: s.id,
+      start_time: s.startTime,
+      last_activity: s.lastActivity,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      startTime: r.start_time,
+      lastActivity: r.last_activity,
+    }),
+  },
+
+  // --- Email Queue ---
+  choir_email_queue: {
+    table: 'email_queue',
+    orderBy: 'queued_at',
+    toDb: (e: any) => ({
+      id: e.id,
+      to: typeof e.to === 'string' ? e.to : JSON.stringify(e.to || {}),
+      template: e.template,
+      data: typeof e.data === 'string' ? e.data : JSON.stringify(e.data || {}),
+      subject: e.subject || null,
+      queued_at: e.queuedAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      to: typeof r.to === 'string' ? (() => { try { return JSON.parse(r.to); } catch { return r.to; } })() : r.to,
+      template: r.template,
+      data: typeof r.data === 'string' ? JSON.parse(r.data || '{}') : r.data || {},
+      subject: r.subject || undefined,
+      queuedAt: r.queued_at,
+    }),
+  },
+
+  // --- Notification Preferences ---
+  serenades_notification_preferences: {
+    table: 'notification_preferences',
+    orderBy: 'user_id',
+    toDb: (p: any) => ({
+      id: p.id,
+      user_id: p.userId,
+      channels: Array.isArray(p.channels) ? p.channels : [],
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      userId: r.user_id,
+      channels: r.channels || [],
+    }),
+  },
 };
 
 // Settings keys that are NOT array-based (they use key-value store)
 const SETTINGS_KEYS = ['serenades_settings'];
 
 // Keys that should NOT be synced (client-only)
-const SKIP_KEYS = [
-  'choir_verification_codes', // Ephemeral verification codes
+const SKIP_KEYS: string[] = [
+  // choir_verification_codes now uses Supabase directly
 ];
 
 // ============ CORE SYNC FUNCTIONS ============

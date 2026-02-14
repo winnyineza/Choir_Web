@@ -23,7 +23,11 @@ export function BackupRestore() {
 
   // Load stats on mount
   useEffect(() => {
-    setStats(getBackupStats());
+    const load = async () => {
+      const s = await getBackupStats();
+      setStats(s);
+    };
+    void load();
   }, []);
 
   const handleExport = async () => {
@@ -33,8 +37,8 @@ export function BackupRestore() {
       const result = await downloadBackup('auto');
       
       if (result.success) {
-        recordBackupTimestamp();
-        setStats(getBackupStats());
+        await recordBackupTimestamp();
+        setStats(await getBackupStats());
         
         toast({
           title: "Backup Created!",
@@ -79,13 +83,13 @@ export function BackupRestore() {
         <div className="grid grid-cols-3 gap-4">
           <div className="p-3 rounded-lg bg-secondary/50 text-center">
             <div className="text-2xl font-bold text-primary">
-              {stats?.localStorage.tables || 0}
+              {stats?.supabase?.tables ?? stats?.localStorage.tables ?? 0}
             </div>
             <div className="text-xs text-muted-foreground">Data Tables</div>
           </div>
           <div className="p-3 rounded-lg bg-secondary/50 text-center">
             <div className="text-2xl font-bold text-primary">
-              {stats?.localStorage.records || 0}
+              {stats?.supabase?.records ?? stats?.localStorage.records ?? 0}
             </div>
             <div className="text-xs text-muted-foreground">Total Records</div>
           </div>

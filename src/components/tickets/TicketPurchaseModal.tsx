@@ -99,21 +99,18 @@ export function TicketPurchaseModal({
     }
   };
   
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
-    
+
     setIsValidatingPromo(true);
-    
-    // Simulate network delay
-    setTimeout(() => {
-      const validation = validatePromoCode(
+    try {
+      const validation = await validatePromoCode(
         promoCode.trim(),
         subtotal,
         String(event.id)
       );
       setPromoValidation(validation);
-      setIsValidatingPromo(false);
-      
+
       if (validation.valid) {
         toast({
           title: "Promo Code Applied!",
@@ -126,7 +123,9 @@ export function TicketPurchaseModal({
           variant: "destructive",
         });
       }
-    }, 500);
+    } finally {
+      setIsValidatingPromo(false);
+    }
   };
   
   const handleRemovePromo = () => {
@@ -178,7 +177,7 @@ export function TicketPurchaseModal({
         priceEach: tier.price,
       }));
 
-    const orderResult = createOrder({
+    const orderResult = await createOrder({
       txRef,
       eventId: String(event.id),
       eventTitle: event.title,
@@ -213,12 +212,12 @@ export function TicketPurchaseModal({
       await new Promise((resolve) => setTimeout(resolve, 2000));
       
       // Use the confirmOrder function which also reduces ticket availability
-      const confirmed = confirmOrder(order.id, `DEMO-${Date.now()}`);
+      const confirmed = await confirmOrder(order.id, `DEMO-${Date.now()}`);
       
       if (confirmed) {
         // Mark promo code as used if applied
         if (promoValidation?.valid && promoCode) {
-          redeemPromoCode(promoCode);
+          await redeemPromoCode(promoCode);
         }
         
         // Dispatch event to refresh events page
@@ -319,10 +318,10 @@ export function TicketPurchaseModal({
         description: `Tickets for ${event.title}`,
         logo: "https://lovable.dev/opengraph-image-p98pqg.png",
       },
-      callback: (response: any) => {
+      callback: async (response: any) => {
         if (response.status === "successful") {
           // Use confirmOrder to update status and reduce availability
-          const confirmed = confirmOrder(order.id, response.transaction_id?.toString());
+          const confirmed = await confirmOrder(order.id, response.transaction_id?.toString());
           
           if (confirmed) {
             // Mark promo code as used if applied

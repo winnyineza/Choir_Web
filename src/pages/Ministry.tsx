@@ -14,12 +14,11 @@ export default function Ministry() {
   const [memberCount, setMemberCount] = useState(0);
 
   useEffect(() => {
-    // Load data from admin
-    const video = getLatestMusicVideo();
-    setFeaturedVideo(video || null);
-    
-    const members = getAllMembers();
-    setMemberCount(members.filter(m => m.status === "Active").length);
+    (async () => {
+      const [video, members] = await Promise.all([getLatestMusicVideo(), getAllMembers()]);
+      setFeaturedVideo(video || null);
+      setMemberCount(members.filter(m => m.status === "Active").length);
+    })();
   }, []);
 
   const ministryStats = [

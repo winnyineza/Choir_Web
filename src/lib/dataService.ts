@@ -1,4 +1,6 @@
-// Data Service - localStorage-based data management for admin panel
+// Data Service - Supabase-based data management (NO localStorage)
+
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbGetSettings, dbSaveSettings, generateId, supabase } from './supabaseDB';
 
 // ============ TYPES ============
 
@@ -18,7 +20,7 @@ export interface Member {
   status: "Active" | "Pending" | "Inactive";
   joinedDate: string;
   photo?: string;
-  dateOfBirth?: string; // Format: "YYYY-MM-DD"
+  dateOfBirth?: string;
   emergencyContact?: EmergencyContact;
 }
 
@@ -35,8 +37,8 @@ export interface Event {
   tickets: EventTicket[];
   createdAt: string;
   status?: "draft" | "published" | "cancelled";
-  livestreamUrl?: string; // YouTube live stream URL
-  isLive?: boolean; // Whether the event is currently streaming
+  livestreamUrl?: string;
+  isLive?: boolean;
 }
 
 export interface EventTicket {
@@ -45,7 +47,7 @@ export interface EventTicket {
   price: number;
   description: string;
   available: number;
-  sold: number; // Track sold tickets
+  sold: number;
   maxPerPerson: number;
   perks?: string[];
 }
@@ -57,7 +59,7 @@ export interface GalleryItem {
   url: string;
   thumbnail?: string;
   category: string;
-  albumName?: string; // For grouping photos into albums
+  albumName?: string;
   uploadedAt: string;
 }
 
@@ -81,23 +83,21 @@ export interface Settings {
   bankAccount: string;
   bankName: string;
   memberPortalPin: string;
-  scannerPin: string; // PIN for event staff to access ticket scanner
+  scannerPin: string;
 }
 
-// Event Staff - for ticket scanning at entrance
 export interface EventStaff {
   id: string;
   name: string;
-  nationalId: string; // National ID number
+  nationalId: string;
   phone: string;
   email?: string;
   status: "active" | "inactive";
-  assignedEvents: string[]; // Array of event IDs they're assigned to
+  assignedEvents: string[];
   createdAt: string;
   lastActiveAt?: string;
 }
 
-// Scan record - tracks who scanned each ticket
 export interface ScanRecord {
   id: string;
   orderId: string;
@@ -110,7 +110,7 @@ export interface ScanRecord {
   ticketCount: number;
 }
 
-// ============ STORAGE KEYS ============
+// ============ STORAGE KEYS (for supabaseDB config lookup) ============
 
 const KEYS = {
   MEMBERS: "serenades_members",
@@ -122,60 +122,42 @@ const KEYS = {
   SCAN_RECORDS: "serenades_scan_records",
 };
 
-// ============ HELPER FUNCTIONS ============
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-function getFromStorage<T>(key: string, defaultValue: T): T {
-  if (typeof window === "undefined") return defaultValue;
-  const stored = localStorage.getItem(key);
-  return stored ? JSON.parse(stored) : defaultValue;
-}
-
-function saveToStorage<T>(key: string, data: T): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(data));
-}
-
 // ============ MEMBERS ============
 
-export function getAllMembers(): Member[] {
-  return getFromStorage<Member[]>(KEYS.MEMBERS, []);
+export async function getAllMembers(): Promise<Member[]> {
+  return dbGetAll<Member>(KEYS.MEMBERS);
 }
 
-export function addMember(member: Omit<Member, "id" | "joinedDate">): Member {
-  const members = getAllMembers();
+export async function addMember(member: Omit<Member, "id" | "joinedDate">): Promise<Member> {
   const newMember: Member = {
     ...member,
     id: generateId(),
     joinedDate: new Date().toISOString(),
   };
-  members.push(newMember);
-  saveToStorage(KEYS.MEMBERS, members);
-  return newMember;
+  return dbInsert<Member>(KEYS.MEMBERS, newMember);
 }
 
-export function updateMember(id: string, updates: Partial<Member>): Member | null {
-  const members = getAllMembers();
-  const index = members.findIndex((m) => m.id === id);
-  if (index === -1) return null;
-  members[index] = { ...members[index], ...updates };
-  saveToStorage(KEYS.MEMBERS, members);
-  return members[index];
+export async function updateMember(id: string, updates: Partial<Member>): Promise<Member | null> {
+  try {
+    const existing = await dbGetById<Member>(KEYS.MEMBERS, id);
+    if (!existing) return null;
+    return dbUpdate<Member>(KEYS.MEMBERS, id, { ...existing, ...updates });
+  } catch {
+    return null;
+  }
 }
 
-export function deleteMember(id: string): boolean {
-  const members = getAllMembers();
-  const filtered = members.filter((m) => m.id !== id);
-  if (filtered.length === members.length) return false;
-  saveToStorage(KEYS.MEMBERS, filtered);
-  return true;
+export async function deleteMember(id: string): Promise<boolean> {
+  try {
+    await dbDelete(KEYS.MEMBERS, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function getMemberStats() {
-  const members = getAllMembers();
+export async function getMemberStats() {
+  const members = await getAllMembers();
   return {
     total: members.length,
     active: members.filter((m) => m.status === "Active").length,
@@ -191,12 +173,12 @@ export function getMemberStats() {
 
 // ============ BIRTHDAYS ============
 
-export function getTodaysBirthdays(): Member[] {
-  const members = getAllMembers();
+export async function getTodaysBirthdays(): Promise<Member[]> {
+  const members = await getAllMembers();
   const today = new Date();
   const todayMonth = today.getMonth() + 1;
   const todayDay = today.getDate();
-  
+
   return members.filter(m => {
     if (!m.dateOfBirth || m.status !== "Active") return false;
     const [, month, day] = m.dateOfBirth.split('-').map(Number);
@@ -204,29 +186,27 @@ export function getTodaysBirthdays(): Member[] {
   });
 }
 
-export function getUpcomingBirthdays(days: number = 7): { member: Member; daysUntil: number; date: string }[] {
-  const members = getAllMembers();
+export async function getUpcomingBirthdays(days: number = 7): Promise<{ member: Member; daysUntil: number; date: string }[]> {
+  const members = await getAllMembers();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const upcomingBirthdays: { member: Member; daysUntil: number; date: string }[] = [];
-  
+
   members.forEach(m => {
     if (!m.dateOfBirth || m.status !== "Active") return;
-    
-    const [year, month, day] = m.dateOfBirth.split('-').map(Number);
+
+    const [, month, day] = m.dateOfBirth.split('-').map(Number);
     let birthday = new Date(today.getFullYear(), month - 1, day);
     birthday.setHours(0, 0, 0, 0);
-    
-    // If birthday already passed this year, use next year
+
     if (birthday < today) {
       birthday = new Date(today.getFullYear() + 1, month - 1, day);
     }
-    
+
     const diffTime = birthday.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    // Include today's birthdays (diffDays = 0) up to specified days
+
     if (diffDays >= 0 && diffDays <= days) {
       upcomingBirthdays.push({
         member: m,
@@ -235,8 +215,7 @@ export function getUpcomingBirthdays(days: number = 7): { member: Member; daysUn
       });
     }
   });
-  
-  // Sort by days until birthday
+
   return upcomingBirthdays.sort((a, b) => a.daysUntil - b.daysUntil);
 }
 
@@ -245,69 +224,64 @@ export function getMemberAge(dateOfBirth: string): number {
   const birth = new Date(dateOfBirth);
   let age = today.getFullYear() - birth.getFullYear();
   const monthDiff = today.getMonth() - birth.getMonth();
-  
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
     age--;
   }
-  
   return age;
 }
 
 // ============ EVENTS ============
 
-export function getAllEvents(): Event[] {
-  return getFromStorage<Event[]>(KEYS.EVENTS, []);
+export async function getAllEvents(): Promise<Event[]> {
+  return dbGetAll<Event>(KEYS.EVENTS);
 }
 
-export function getUpcomingEvents(): Event[] {
-  const events = getAllEvents();
+export async function getUpcomingEvents(): Promise<Event[]> {
+  const events = await getAllEvents();
   const now = new Date();
   return events
     .filter((e) => new Date(e.date) >= now)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-export function addEvent(event: Omit<Event, "id" | "createdAt">): Event {
-  const events = getAllEvents();
+export async function addEvent(event: Omit<Event, "id" | "createdAt">): Promise<Event> {
   const newEvent: Event = {
     ...event,
     id: generateId(),
     createdAt: new Date().toISOString(),
   };
-  events.push(newEvent);
-  saveToStorage(KEYS.EVENTS, events);
-  return newEvent;
+  return dbInsert<Event>(KEYS.EVENTS, newEvent);
 }
 
-export function updateEvent(id: string, updates: Partial<Event>): Event | null {
-  const events = getAllEvents();
-  const index = events.findIndex((e) => e.id === id);
-  if (index === -1) return null;
-  events[index] = { ...events[index], ...updates };
-  saveToStorage(KEYS.EVENTS, events);
-  return events[index];
+export async function updateEvent(id: string, updates: Partial<Event>): Promise<Event | null> {
+  try {
+    const existing = await dbGetById<Event>(KEYS.EVENTS, id);
+    if (!existing) return null;
+    return dbUpdate<Event>(KEYS.EVENTS, id, { ...existing, ...updates });
+  } catch {
+    return null;
+  }
 }
 
-export function deleteEvent(id: string): boolean {
-  const events = getAllEvents();
-  const filtered = events.filter((e) => e.id !== id);
-  if (filtered.length === events.length) return false;
-  saveToStorage(KEYS.EVENTS, filtered);
-  return true;
+export async function deleteEvent(id: string): Promise<boolean> {
+  try {
+    await dbDelete(KEYS.EVENTS, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function getEventById(id: string): Event | undefined {
-  const events = getAllEvents();
-  return events.find((e) => e.id === id);
+export async function getEventById(id: string): Promise<Event | undefined> {
+  const event = await dbGetById<Event>(KEYS.EVENTS, id);
+  return event || undefined;
 }
 
-// Get events available for display on public site (upcoming, published)
-// Note: Shows events even if sold out - UI will handle sold out display
-export function getBookableEvents(): Event[] {
-  const events = getAllEvents();
+export async function getBookableEvents(): Promise<Event[]> {
+  const events = await getAllEvents();
   const now = new Date();
-  now.setHours(0, 0, 0, 0); // Start of today
-  
+  now.setHours(0, 0, 0, 0);
+
   return events
     .filter((e) => {
       const eventDate = new Date(e.date);
@@ -318,150 +292,119 @@ export function getBookableEvents(): Event[] {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-// Check if an event has any tickets available
+// Pure helpers (no async needed - operate on passed data)
 export function hasAvailableTickets(event: Event): boolean {
   return event.tickets.some((t) => (t.available - (t.sold || 0)) > 0);
 }
 
-// Get available count for a specific tier
 export function getAvailableCount(tier: EventTicket): number {
   return Math.max(0, tier.available - (tier.sold || 0));
 }
 
-// Check if a tier is sold out
 export function isTierSoldOut(tier: EventTicket): boolean {
   return getAvailableCount(tier) === 0;
 }
 
-// Check if event is completely sold out
 export function isEventSoldOut(event: Event): boolean {
   return !hasAvailableTickets(event);
 }
 
-// Reduce ticket availability when tickets are purchased
-export function reduceTicketAvailability(
+export async function reduceTicketAvailability(
   eventId: string,
   ticketPurchases: { tierId: string; quantity: number }[]
-): boolean {
-  const events = getAllEvents();
-  const eventIndex = events.findIndex((e) => e.id === eventId);
-  
-  if (eventIndex === -1) return false;
-  
-  const event = events[eventIndex];
+): Promise<boolean> {
+  const event = await getEventById(eventId);
+  if (!event) return false;
+
   let updated = false;
-  
   for (const purchase of ticketPurchases) {
     const ticketIndex = event.tickets.findIndex((t) => t.id === purchase.tierId);
     if (ticketIndex !== -1) {
       const ticket = event.tickets[ticketIndex];
       const currentSold = ticket.sold || 0;
       const remaining = ticket.available - currentSold;
-      
+
       if (remaining >= purchase.quantity) {
         event.tickets[ticketIndex].sold = currentSold + purchase.quantity;
         updated = true;
       }
     }
   }
-  
+
   if (updated) {
-    events[eventIndex] = event;
-    saveToStorage(KEYS.EVENTS, events);
+    await updateEvent(eventId, { tickets: event.tickets });
   }
-  
   return updated;
 }
 
-// Check if tickets are available for purchase
-export function checkTicketAvailability(
+export async function checkTicketAvailability(
   eventId: string,
   ticketRequests: { tierId: string; quantity: number }[]
-): { available: boolean; message: string } {
-  const event = getEventById(eventId);
-  
-  if (!event) {
-    return { available: false, message: "Event not found" };
-  }
-  
+): Promise<{ available: boolean; message: string }> {
+  const event = await getEventById(eventId);
+  if (!event) return { available: false, message: "Event not found" };
+
   const eventDate = new Date(event.date);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  
-  if (eventDate < now) {
-    return { available: false, message: "This event has already passed" };
-  }
-  
-  if (event.status === "cancelled") {
-    return { available: false, message: "This event has been cancelled" };
-  }
-  
+
+  if (eventDate < now) return { available: false, message: "This event has already passed" };
+  if (event.status === "cancelled") return { available: false, message: "This event has been cancelled" };
+
   for (const request of ticketRequests) {
     const ticket = event.tickets.find((t) => t.id === request.tierId);
-    if (!ticket) {
-      return { available: false, message: `Ticket tier not found: ${request.tierId}` };
-    }
-    
+    if (!ticket) return { available: false, message: `Ticket tier not found: ${request.tierId}` };
+
     const remaining = ticket.available - (ticket.sold || 0);
     if (remaining < request.quantity) {
-      return {
-        available: false,
-        message: `Only ${remaining} ${ticket.name} ticket(s) remaining`,
-      };
+      return { available: false, message: `Only ${remaining} ${ticket.name} ticket(s) remaining` };
     }
-    
     if (request.quantity > ticket.maxPerPerson) {
-      return {
-        available: false,
-        message: `Maximum ${ticket.maxPerPerson} ${ticket.name} tickets per person`,
-      };
+      return { available: false, message: `Maximum ${ticket.maxPerPerson} ${ticket.name} tickets per person` };
     }
   }
-  
+
   return { available: true, message: "Tickets available" };
 }
 
 // ============ GALLERY ============
 
-export function getAllGalleryItems(): GalleryItem[] {
-  return getFromStorage<GalleryItem[]>(KEYS.GALLERY, []);
+export async function getAllGalleryItems(): Promise<GalleryItem[]> {
+  return dbGetAll<GalleryItem>(KEYS.GALLERY);
 }
 
-export function getGalleryByType(type: "photo" | "video"): GalleryItem[] {
-  return getAllGalleryItems().filter((item) => item.type === type);
+export async function getGalleryByType(type: "photo" | "video"): Promise<GalleryItem[]> {
+  const items = await getAllGalleryItems();
+  return items.filter((item) => item.type === type);
 }
 
-export function addGalleryItem(item: Omit<GalleryItem, "id" | "uploadedAt">): GalleryItem {
-  const gallery = getAllGalleryItems();
+export async function addGalleryItem(item: Omit<GalleryItem, "id" | "uploadedAt">): Promise<GalleryItem> {
   const newItem: GalleryItem = {
     ...item,
     id: generateId(),
     uploadedAt: new Date().toISOString(),
   };
-  gallery.push(newItem);
-  saveToStorage(KEYS.GALLERY, gallery);
-  return newItem;
+  return dbInsert<GalleryItem>(KEYS.GALLERY, newItem);
 }
 
-export function deleteGalleryItem(id: string): boolean {
-  const gallery = getAllGalleryItems();
-  const filtered = gallery.filter((item) => item.id !== id);
-  if (filtered.length === gallery.length) return false;
-  saveToStorage(KEYS.GALLERY, filtered);
-  return true;
+export async function deleteGalleryItem(id: string): Promise<boolean> {
+  try {
+    await dbDelete(KEYS.GALLERY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// Get all unique albums from gallery
-export function getGalleryAlbums(): { name: string; count: number; coverImage: string }[] {
-  const gallery = getAllGalleryItems();
+export async function getGalleryAlbums(): Promise<{ name: string; count: number; coverImage: string }[]> {
+  const gallery = await getAllGalleryItems();
   const albumMap = new Map<string, { count: number; coverImage: string }>();
-  
+
   gallery.forEach((item) => {
     if (item.type === "photo") {
-      // Extract album name from category (format: "Category | AlbumName")
       const parts = item.category.split(" | ");
       const albumName = parts.length > 1 ? parts[1] : item.category;
-      
+
       if (!albumMap.has(albumName)) {
         albumMap.set(albumName, { count: 0, coverImage: item.url });
       }
@@ -469,7 +412,7 @@ export function getGalleryAlbums(): { name: string; count: number; coverImage: s
       album.count++;
     }
   });
-  
+
   return Array.from(albumMap.entries()).map(([name, data]) => ({
     name,
     count: data.count,
@@ -477,9 +420,8 @@ export function getGalleryAlbums(): { name: string; count: number; coverImage: s
   }));
 }
 
-// Get gallery items by album name
-export function getGalleryByAlbum(albumName: string): GalleryItem[] {
-  const gallery = getAllGalleryItems();
+export async function getGalleryByAlbum(albumName: string): Promise<GalleryItem[]> {
+  const gallery = await getAllGalleryItems();
   return gallery.filter((item) => {
     if (item.type !== "photo") return false;
     const parts = item.category.split(" | ");
@@ -490,33 +432,29 @@ export function getGalleryByAlbum(albumName: string): GalleryItem[] {
 
 // ============ DONATIONS ============
 
-export function getAllDonations(): Donation[] {
-  return getFromStorage<Donation[]>(KEYS.DONATIONS, []);
+export async function getAllDonations(): Promise<Donation[]> {
+  return dbGetAll<Donation>(KEYS.DONATIONS);
 }
 
-export function addDonation(donation: Omit<Donation, "id" | "date">): Donation {
-  const donations = getAllDonations();
+export async function addDonation(donation: Omit<Donation, "id" | "date">): Promise<Donation> {
   const newDonation: Donation = {
     ...donation,
     id: generateId(),
     date: new Date().toISOString(),
   };
-  donations.push(newDonation);
-  saveToStorage(KEYS.DONATIONS, donations);
-  return newDonation;
+  return dbInsert<Donation>(KEYS.DONATIONS, newDonation);
 }
 
-export function confirmDonation(id: string): Donation | null {
-  const donations = getAllDonations();
-  const index = donations.findIndex((d) => d.id === id);
-  if (index === -1) return null;
-  donations[index].status = "confirmed";
-  saveToStorage(KEYS.DONATIONS, donations);
-  return donations[index];
+export async function confirmDonation(id: string): Promise<Donation | null> {
+  try {
+    return dbUpdate<Donation>(KEYS.DONATIONS, id, { status: "confirmed" } as any);
+  } catch {
+    return null;
+  }
 }
 
-export function getDonationStats() {
-  const donations = getAllDonations();
+export async function getDonationStats() {
+  const donations = await getAllDonations();
   const confirmed = donations.filter((d) => d.status === "confirmed");
   return {
     total: donations.length,
@@ -537,30 +475,27 @@ const DEFAULT_SETTINGS: Settings = {
   bankAccount: "",
   bankName: "",
   memberPortalPin: "2024",
-  scannerPin: "2024", // Default PIN for event staff
+  scannerPin: "2024",
 };
 
-export function getSettings(): Settings {
-  const stored = getFromStorage<Partial<Settings>>(KEYS.SETTINGS, {});
-  // Merge with defaults to ensure new fields get default values
-  return { ...DEFAULT_SETTINGS, ...stored };
+export async function getSettings(): Promise<Settings> {
+  return dbGetSettings<Settings>(DEFAULT_SETTINGS);
 }
 
-export function updateSettings(updates: Partial<Settings>): Settings {
-  const settings = getSettings();
-  const updated = { ...settings, ...updates };
-  saveToStorage(KEYS.SETTINGS, updated);
+export async function updateSettings(updates: Partial<Settings>): Promise<Settings> {
+  const current = await getSettings();
+  const updated = { ...current, ...updates };
+  await dbSaveSettings(updated);
   return updated;
 }
 
 // ============ DASHBOARD STATS ============
 
-export function getDashboardStats() {
-  const members = getAllMembers();
-  const events = getUpcomingEvents();
-  const donations = getDonationStats();
-  
-  // Get this month's new members
+export async function getDashboardStats() {
+  const members = await getAllMembers();
+  const events = await getUpcomingEvents();
+  const donations = await getDonationStats();
+
   const thisMonth = new Date();
   thisMonth.setDate(1);
   const newMembersThisMonth = members.filter(
@@ -573,118 +508,117 @@ export function getDashboardStats() {
     upcomingEvents: events.length,
     nextEvent: events[0]?.date ? new Date(events[0].date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "None",
     totalDonations: donations.totalAmount,
-    donationChange: "+22%", // This would need historical data to calculate
+    donationChange: "+22%",
   };
 }
 
 // ============ CLEAR ALL DATA ============
 
-export function clearAllData(): void {
-  localStorage.removeItem(KEYS.MEMBERS);
-  localStorage.removeItem(KEYS.EVENTS);
-  localStorage.removeItem(KEYS.GALLERY);
-  localStorage.removeItem(KEYS.DONATIONS);
-  localStorage.removeItem(KEYS.EVENT_STAFF);
-  localStorage.removeItem(KEYS.SCAN_RECORDS);
-  // Note: Settings are preserved
+export async function clearAllData(): Promise<void> {
+  // Delete all rows from core tables
+  const tables = ['members', 'events', 'gallery_items', 'donations', 'event_staff', 'scan_records'];
+  for (const table of tables) {
+    await supabase.from(table).delete().neq('id', '');
+  }
 }
 
 // ============ EVENT STAFF ============
 
-export function getAllEventStaff(): EventStaff[] {
-  return getFromStorage<EventStaff[]>(KEYS.EVENT_STAFF, []);
+export async function getAllEventStaff(): Promise<EventStaff[]> {
+  return dbGetAll<EventStaff>(KEYS.EVENT_STAFF);
 }
 
-export function getEventStaffById(id: string): EventStaff | undefined {
-  return getAllEventStaff().find((s) => s.id === id);
+export async function getEventStaffById(id: string): Promise<EventStaff | undefined> {
+  const staff = await dbGetById<EventStaff>(KEYS.EVENT_STAFF, id);
+  return staff || undefined;
 }
 
-export function getEventStaffByNationalId(nationalId: string): EventStaff | undefined {
-  return getAllEventStaff().find((s) => s.nationalId === nationalId);
+export async function getEventStaffByNationalId(nationalId: string): Promise<EventStaff | undefined> {
+  const allStaff = await getAllEventStaff();
+  return allStaff.find((s) => s.nationalId === nationalId);
 }
 
-export function getStaffForEvent(eventId: string): EventStaff[] {
-  return getAllEventStaff().filter(
+export async function getStaffForEvent(eventId: string): Promise<EventStaff[]> {
+  const allStaff = await getAllEventStaff();
+  return allStaff.filter(
     (s) => s.status === "active" && s.assignedEvents.includes(eventId)
   );
 }
 
-export function addEventStaff(staff: Omit<EventStaff, "id" | "createdAt">): EventStaff {
-  const allStaff = getAllEventStaff();
+export async function addEventStaff(staff: Omit<EventStaff, "id" | "createdAt">): Promise<EventStaff> {
   const newStaff: EventStaff = {
     ...staff,
     id: `staff-${Date.now()}`,
     createdAt: new Date().toISOString(),
   };
-  saveToStorage(KEYS.EVENT_STAFF, [...allStaff, newStaff]);
-  return newStaff;
+  return dbInsert<EventStaff>(KEYS.EVENT_STAFF, newStaff);
 }
 
-export function updateEventStaff(id: string, updates: Partial<EventStaff>): EventStaff | null {
-  const allStaff = getAllEventStaff();
-  const index = allStaff.findIndex((s) => s.id === id);
-  if (index === -1) return null;
-  
-  allStaff[index] = { ...allStaff[index], ...updates };
-  saveToStorage(KEYS.EVENT_STAFF, allStaff);
-  return allStaff[index];
+export async function updateEventStaff(id: string, updates: Partial<EventStaff>): Promise<EventStaff | null> {
+  try {
+    const existing = await dbGetById<EventStaff>(KEYS.EVENT_STAFF, id);
+    if (!existing) return null;
+    return dbUpdate<EventStaff>(KEYS.EVENT_STAFF, id, { ...existing, ...updates });
+  } catch {
+    return null;
+  }
 }
 
-export function deleteEventStaff(id: string): boolean {
-  const allStaff = getAllEventStaff();
-  const filtered = allStaff.filter((s) => s.id !== id);
-  if (filtered.length === allStaff.length) return false;
-  saveToStorage(KEYS.EVENT_STAFF, filtered);
-  return true;
+export async function deleteEventStaff(id: string): Promise<boolean> {
+  try {
+    await dbDelete(KEYS.EVENT_STAFF, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function assignStaffToEvent(staffId: string, eventId: string): boolean {
-  const staff = getEventStaffById(staffId);
+export async function assignStaffToEvent(staffId: string, eventId: string): Promise<boolean> {
+  const staff = await getEventStaffById(staffId);
   if (!staff) return false;
-  
   if (!staff.assignedEvents.includes(eventId)) {
     staff.assignedEvents.push(eventId);
-    updateEventStaff(staffId, { assignedEvents: staff.assignedEvents });
+    await updateEventStaff(staffId, { assignedEvents: staff.assignedEvents });
   }
   return true;
 }
 
-export function removeStaffFromEvent(staffId: string, eventId: string): boolean {
-  const staff = getEventStaffById(staffId);
+export async function removeStaffFromEvent(staffId: string, eventId: string): Promise<boolean> {
+  const staff = await getEventStaffById(staffId);
   if (!staff) return false;
-  
   staff.assignedEvents = staff.assignedEvents.filter((id) => id !== eventId);
-  updateEventStaff(staffId, { assignedEvents: staff.assignedEvents });
+  await updateEventStaff(staffId, { assignedEvents: staff.assignedEvents });
   return true;
 }
 
 // ============ SCAN RECORDS ============
 
-export function getAllScanRecords(): ScanRecord[] {
-  return getFromStorage<ScanRecord[]>(KEYS.SCAN_RECORDS, []);
+export async function getAllScanRecords(): Promise<ScanRecord[]> {
+  return dbGetAll<ScanRecord>(KEYS.SCAN_RECORDS);
 }
 
-export function getScanRecordsForEvent(eventId: string): ScanRecord[] {
-  return getAllScanRecords().filter((r) => r.eventId === eventId);
+export async function getScanRecordsForEvent(eventId: string): Promise<ScanRecord[]> {
+  const records = await getAllScanRecords();
+  return records.filter((r) => r.eventId === eventId);
 }
 
-export function getScanRecordsByStaff(staffId: string): ScanRecord[] {
-  return getAllScanRecords().filter((r) => r.staffId === staffId);
+export async function getScanRecordsByStaff(staffId: string): Promise<ScanRecord[]> {
+  const records = await getAllScanRecords();
+  return records.filter((r) => r.staffId === staffId);
 }
 
-export function addScanRecord(record: Omit<ScanRecord, "id" | "scannedAt">): ScanRecord {
-  const allRecords = getAllScanRecords();
+export async function addScanRecord(record: Omit<ScanRecord, "id" | "scannedAt">): Promise<ScanRecord> {
   const newRecord: ScanRecord = {
     ...record,
     id: `scan-${Date.now()}`,
     scannedAt: new Date().toISOString(),
   };
-  saveToStorage(KEYS.SCAN_RECORDS, [...allRecords, newRecord]);
-  return newRecord;
+  return dbInsert<ScanRecord>(KEYS.SCAN_RECORDS, newRecord);
 }
 
-export function getScanRecordByOrderId(orderId: string): ScanRecord | undefined {
-  return getAllScanRecords().find((r) => r.orderId === orderId);
+export async function getScanRecordByOrderId(orderId: string): Promise<ScanRecord | undefined> {
+  const records = await getAllScanRecords();
+  return records.find((r) => r.orderId === orderId);
 }
 
 // ============ EVENT STATUS HELPERS ============
@@ -696,11 +630,12 @@ export function isEventPast(event: Event): boolean {
   return eventDate < today;
 }
 
-export function getActiveEvents(): Event[] {
-  return getAllEvents().filter((e) => !isEventPast(e) && e.status !== "cancelled");
+export async function getActiveEvents(): Promise<Event[]> {
+  const events = await getAllEvents();
+  return events.filter((e) => !isEventPast(e) && e.status !== "cancelled");
 }
 
-export function getPastEvents(): Event[] {
-  return getAllEvents().filter((e) => isEventPast(e));
+export async function getPastEvents(): Promise<Event[]> {
+  const events = await getAllEvents();
+  return events.filter((e) => isEventPast(e));
 }
-

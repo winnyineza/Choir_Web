@@ -32,6 +32,7 @@ import {
   type MeetingMinutes as MeetingMinutesType,
   type MeetingType,
   type MeetingAgendaItem,
+  type MeetingStats,
 } from "@/lib/meetingService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,17 +90,27 @@ export function MeetingMinutesComponent() {
   });
 
   const [agendaItems, setAgendaItems] = useState<Omit<MeetingAgendaItem, "id">[]>([]);
+  const [stats, setStats] = useState<MeetingStats>({
+    totalMeetings: 0,
+    thisMonth: 0,
+    byType: { general: 0, committee: 0, rehearsal: 0, emergency: 0, agm: 0 },
+    drafts: 0,
+    approved: 0,
+  });
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setMeetings(getAllMeetings());
+  const loadData = async () => {
+    const [meetingsData, statsData] = await Promise.all([
+      getAllMeetings(),
+      getMeetingStats(),
+    ]);
+    setMeetings(meetingsData);
+    setStats(statsData);
     setMembers(getAllMembers());
   };
-
-  const stats = getMeetingStats();
 
   // Filter meetings
   const filteredMeetings = meetings.filter(m => {
@@ -110,7 +121,7 @@ export function MeetingMinutesComponent() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title || !formData.date || !formData.location) {
       toast({
         title: "Error",
@@ -128,44 +139,61 @@ export function MeetingMinutesComponent() {
       })),
     };
 
-    if (selectedMeeting) {
-      updateMeeting(selectedMeeting.id, meetingData);
-      if (user) {
-        addAuditLog(user, "UPDATE_MEETING", `Updated meeting minutes: ${formData.title}`);
+    try {
+      if (selectedMeeting) {
+        await updateMeeting(selectedMeeting.id, meetingData);
+        if (user) {
+          addAuditLog(user, "UPDATE_MEETING", `Updated meeting minutes: ${formData.title}`);
+        }
+        toast({ title: "Meeting Updated", description: "Meeting minutes have been updated." });
+      } else {
+        await createMeeting(meetingData);
+        if (user) {
+          addAuditLog(user, "CREATE_MEETING", `Created meeting minutes: ${formData.title}`);
+        }
+        toast({ title: "Meeting Created", description: "New meeting minutes have been created." });
       }
-      toast({ title: "Meeting Updated", description: "Meeting minutes have been updated." });
-    } else {
-      createMeeting(meetingData);
-      if (user) {
-        addAuditLog(user, "CREATE_MEETING", `Created meeting minutes: ${formData.title}`);
-      }
-      toast({ title: "Meeting Created", description: "New meeting minutes have been created." });
+      await loadData();
+      setShowAddModal(false);
+      resetForm();
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to save meeting", variant: "destructive" });
     }
-
-    loadData();
-    setShowAddModal(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Delete this meeting record?")) return;
     const meeting = meetings.find(m => m.id === id);
-    deleteMeeting(id);
-    if (user && meeting) {
-      addAuditLog(user, "DELETE_MEETING", `Deleted meeting minutes: ${meeting.title}`);
+    try {
+      const deleted = await deleteMeeting(id);
+      if (deleted) {
+        if (user && meeting) {
+          addAuditLog(user, "DELETE_MEETING", `Deleted meeting minutes: ${meeting.title}`);
+        }
+        toast({ title: "Meeting Deleted", description: "Meeting minutes have been deleted." });
+        await loadData();
+      } else {
+        toast({ title: "Error", description: "Meeting not found or could not be deleted", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to delete meeting", variant: "destructive" });
     }
-    toast({ title: "Meeting Deleted", description: "Meeting minutes have been deleted." });
-    loadData();
   };
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const meeting = meetings.find(m => m.id === id);
-    approveMeeting(id, user?.name || "Admin");
-    if (user && meeting) {
-      addAuditLog(user, "APPROVE_MEETING", `Approved meeting minutes: ${meeting.title}`);
+    try {
+      const result = await approveMeeting(id, user?.name || "Admin");
+      if (result) {
+        if (user && meeting) {
+          addAuditLog(user, "APPROVE_MEETING", `Approved meeting minutes: ${meeting.title}`);
+        }
+        toast({ title: "Meeting Approved", description: "Meeting minutes have been approved." });
+        await loadData();
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to approve meeting", variant: "destructive" });
     }
-    toast({ title: "Meeting Approved", description: "Meeting minutes have been approved." });
-    loadData();
   };
 
   const handleExportMeeting = (meeting: MeetingMinutesType) => {
@@ -180,16 +208,20 @@ export function MeetingMinutesComponent() {
     toast({ title: "Exported", description: "Meeting minutes exported." });
   };
 
-  const handleExportAll = () => {
-    const csv = exportMeetingsToCSV();
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `meetings_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported", description: "All meetings exported to CSV." });
+  const handleExportAll = async () => {
+    try {
+      const csv = await exportMeetingsToCSV();
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `meetings_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Exported", description: "All meetings exported to CSV." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to export", variant: "destructive" });
+    }
   };
 
   const resetForm = () => {

@@ -224,24 +224,53 @@ export interface BackupData {
 }
 
 // Export all data as JSON backup
-export function exportFullBackup(): void {
+export async function exportFullBackup(): Promise<void> {
+  const [
+    promoCodes,
+    members,
+    events,
+    gallery,
+    leaveRequests,
+    settings,
+    adminUsers,
+    auditLog,
+    orders,
+    attendance,
+    albums,
+    musicVideos,
+    streamingPlatforms,
+  ] = await Promise.all([
+    getAllPromoCodes(),
+    getAllMembers(),
+    getAllEvents(),
+    getAllGalleryItems(),
+    getAllLeaveRequests(),
+    getSettings(),
+    getAllAdminUsers(),
+    getAuditLog(500),
+    getAllOrders(),
+    getAllSessions(),
+    getAllAlbums(),
+    getAllMusicVideos(),
+    getAllPlatforms(),
+  ]);
   const backup: BackupData = {
     version: "1.0",
     exportedAt: new Date().toISOString(),
     data: {
-      members: getAllMembers(),
-      events: getAllEvents(),
-      gallery: getAllGalleryItems(),
-      orders: getAllOrders(),
-      leaveRequests: getAllLeaveRequests(),
-      attendance: getAllSessions(),
-      albums: getAllAlbums(),
-      musicVideos: getAllMusicVideos(),
-      streamingPlatforms: getAllPlatforms(),
-      promoCodes: getAllPromoCodes(),
-      settings: getSettings(),
-      adminUsers: getAllAdminUsers().map(u => ({ ...u, password: "[HIDDEN]" })), // Don't export passwords
-      auditLog: getAuditLog(500),
+      members,
+      events,
+      gallery,
+      orders,
+      leaveRequests,
+      attendance,
+      albums,
+      musicVideos,
+      streamingPlatforms,
+      promoCodes,
+      settings,
+      adminUsers: adminUsers.map((u) => ({ ...u, password: "[HIDDEN]" })), // Don't export passwords
+      auditLog,
     },
   };
 
@@ -273,8 +302,8 @@ export function exportMembersToCSV(): void {
 }
 
 // Export attendance summary to CSV
-export function exportAttendanceToCSV(): void {
-  const sessions = getAllSessions();
+export async function exportAttendanceToCSV(): Promise<void> {
+  const sessions = await getAllSessions();
   
   const headers = ["Date", "Title", "Total Present", "Total Absent", "Total Excused", "Total Late", "Attendance Rate"];
   
@@ -299,8 +328,8 @@ export function exportAttendanceToCSV(): void {
 }
 
 // Export detailed attendance records to CSV
-export function exportDetailedAttendanceToCSV(): void {
-  const records = getAllAttendanceRecords();
+export async function exportDetailedAttendanceToCSV(): Promise<void> {
+  const records = await getAllAttendanceRecords();
   
   const headers = ["Date", "Member Name", "Email", "Voice Part", "Status", "Notes", "Marked By"];
   
@@ -318,13 +347,15 @@ export function exportDetailedAttendanceToCSV(): void {
 }
 
 // Export attendance by member
-export function exportAttendanceByMemberToCSV(): void {
+export async function exportAttendanceByMemberToCSV(): Promise<void> {
   const members = getAllMembers();
-  
+
   const headers = ["Member Name", "Email", "Voice Part", "Total Sessions", "Present", "Absent", "Excused", "Late", "Attendance Rate"];
-  
-  const rows = members.map((m) => {
-    const stats = getMemberAttendanceStats(m.id);
+
+  const statsPromises = members.map((m) => getMemberAttendanceStats(m.id));
+  const statsList = await Promise.all(statsPromises);
+  const rows = members.map((m, i) => {
+    const stats = statsList[i];
     return [
       m.name,
       m.email,
@@ -345,8 +376,8 @@ export function exportAttendanceByMemberToCSV(): void {
 }
 
 // Export attendance for a specific month
-export function exportMonthlyAttendanceToCSV(year: number, month: number): void {
-  const records = getAllAttendanceRecords();
+export async function exportMonthlyAttendanceToCSV(year: number, month: number): Promise<void> {
+  const records = await getAllAttendanceRecords();
   const members = getAllMembers();
   
   // Filter records for the specified month
@@ -436,8 +467,8 @@ export function exportFinancialReportToCSV(): void {
 }
 
 // Export leave requests to CSV
-export function exportLeaveRequestsToCSV(): void {
-  const requests = getAllLeaveRequests();
+export async function exportLeaveRequestsToCSV(): Promise<void> {
+  const requests = await getAllLeaveRequests();
   
   const headers = [
     "Member Name",
@@ -604,11 +635,17 @@ export function exportMonthlyDuesReport(year: number): void {
 }
 
 // Export annual financial summary
-export function exportAnnualFinancialSummary(year: number): void {
-  const contributions = getAllContributions().filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
-  const orders = getAllOrders().filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
-  const expenses = getAllExpenses().filter(e => new Date(e.date).getFullYear() === year);
-  const donations = getAllDonations().filter(d => new Date(d.date).getFullYear() === year);
+export async function exportAnnualFinancialSummary(year: number): Promise<void> {
+  const allContributions = getAllContributions();
+  const [allOrders, allExpenses, allDonations] = await Promise.all([
+    getAllOrders(),
+    getAllExpenses(),
+    getAllDonations(),
+  ]);
+  const contributions = allContributions.filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
+  const orders = allOrders.filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
+  const expenses = allExpenses.filter(e => new Date(e.date).getFullYear() === year);
+  const donations = allDonations.filter(d => new Date(d.date).getFullYear() === year);
   
   const headers = ["Category", "Description", "Amount (RWF)"];
   
@@ -686,28 +723,37 @@ export function exportAnnualFinancialSummary(year: number): void {
 }
 
 // Year-over-year comparison (finance + attendance + membership)
-export function exportYearOverYearReport(years: number[]): void {
+export async function exportYearOverYearReport(years: number[]): Promise<void> {
   const headers = ["Year", "Contributions", "Donations", "Ticket Revenue", "Expenses", "Net", "Attendance Sessions", "Members (end of year)"];
   const rows: any[][] = [];
 
+  const [allExpenses, allMembers, allDonations, allOrders, allSessions] = await Promise.all([
+    getAllExpenses(),
+    getAllMembers(),
+    getAllDonations(),
+    getAllOrders(),
+    getAllSessions(),
+  ]);
+  const allContributions = getAllContributions();
+
   years.forEach((year) => {
-    const contributions = getAllContributions().filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
+    const contributions = allContributions.filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
     const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
 
-    const donations = getAllDonations().filter(d => new Date(d.date).getFullYear() === year);
+    const donations = allDonations.filter(d => new Date(d.date).getFullYear() === year);
     const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
 
-    const orders = getAllOrders().filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
+    const orders = allOrders.filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
     const ticketRevenue = orders.reduce((sum, o) => sum + (o.subtotal + o.serviceFee), 0);
 
-    const expenses = getAllExpenses().filter(e => new Date(e.date).getFullYear() === year);
+    const expenses = allExpenses.filter(e => new Date(e.date).getFullYear() === year);
     const expenseTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
 
     const net = contributionTotal + donationTotal + ticketRevenue - expenseTotal;
 
-    const attendanceSessions = getAllSessions().filter(s => new Date(s.date).getFullYear() === year).length;
+    const attendanceSessions = allSessions.filter(s => new Date(s.date).getFullYear() === year).length;
 
-    const members = getAllMembers().filter(m => new Date(m.joinedDate).getFullYear() <= year);
+    const members = allMembers.filter(m => new Date(m.joinedDate).getFullYear() <= year);
 
     rows.push([
       year,
@@ -725,8 +771,8 @@ export function exportYearOverYearReport(years: number[]): void {
 }
 
 // Export donations to CSV
-export function exportDonationsToCSV(): void {
-  const donations = getAllDonations();
+export async function exportDonationsToCSV(): Promise<void> {
+  const donations = await getAllDonations();
   
   const headers = [
     "Date",
@@ -790,18 +836,52 @@ function downloadCSV(headers: string[], rows: any[][], filename: string): void {
 }
 
 // Get backup statistics
-export function getBackupStats() {
+export async function getBackupStats(): Promise<{
+  members: number;
+  events: number;
+  gallery: number;
+  orders: number;
+  leaveRequests: number;
+  attendance: number;
+  albums: number;
+  musicVideos: number;
+  promoCodes: number;
+  donations: number;
+}> {
+  const [
+    promoCodes,
+    members,
+    events,
+    gallery,
+    leaveRequests,
+    orders,
+    sessions,
+    albums,
+    musicVideos,
+    donations,
+  ] = await Promise.all([
+    getAllPromoCodes(),
+    getAllMembers(),
+    getAllEvents(),
+    getAllGalleryItems(),
+    getAllLeaveRequests(),
+    getAllOrders(),
+    getAllSessions(),
+    getAllAlbums(),
+    getAllMusicVideos(),
+    getAllDonations(),
+  ]);
   return {
-    members: (getAllMembers() || []).length,
-    events: (getAllEvents() || []).length,
-    gallery: (getAllGalleryItems() || []).length,
-    orders: (getAllOrders() || []).length,
-    leaveRequests: (getAllLeaveRequests() || []).length,
-    attendance: (getAllSessions() || []).length,
-    albums: (getAllAlbums() || []).length,
-    musicVideos: (getAllMusicVideos() || []).length,
-    promoCodes: (getAllPromoCodes() || []).length,
-    donations: (getAllDonations() || []).length,
+    members: (members || []).length,
+    events: (events || []).length,
+    gallery: (gallery || []).length,
+    orders: (orders || []).length,
+    leaveRequests: (leaveRequests || []).length,
+    attendance: (sessions || []).length,
+    albums: (albums || []).length,
+    musicVideos: (musicVideos || []).length,
+    promoCodes: (promoCodes || []).length,
+    donations: (donations || []).length,
   };
 }
 

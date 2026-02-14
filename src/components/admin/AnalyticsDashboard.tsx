@@ -13,13 +13,14 @@ export function AnalyticsDashboard() {
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
 
   useEffect(() => {
-    const loadAnalytics = () => {
-      setAnalytics(getAnalyticsSummary());
+    const loadAnalytics = async () => {
+      const summary = await getAnalyticsSummary();
+      setAnalytics(summary);
     };
 
-    loadAnalytics();
+    void loadAnalytics();
     // Refresh every 30 seconds
-    const interval = setInterval(loadAnalytics, 30000);
+    const interval = setInterval(() => void loadAnalytics(), 30000);
     return () => clearInterval(interval);
   }, []);
 

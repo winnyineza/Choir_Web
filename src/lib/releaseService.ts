@@ -1,5 +1,7 @@
 // Release Service - manages albums and music videos
-// localStorage-based data management
+// Supabase-based data management (via supabaseDB)
+
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
 
 export interface Album {
   id: string;
@@ -8,7 +10,7 @@ export interface Album {
   coverImage: string;
   trackCount: number;
   description?: string;
-  listenUrl?: string; // Single link (YouTube, smart link, etc.)
+  listenUrl?: string;
   isLatest: boolean;
   createdAt: string;
 }
@@ -16,9 +18,9 @@ export interface Album {
 export interface MusicVideo {
   id: string;
   title: string;
-  youtubeId: string; // Just the video ID, not full URL
-  thumbnail?: string; // Auto-generated from YouTube if not provided
-  albumId?: string; // Optional link to album
+  youtubeId: string;
+  thumbnail?: string;
+  albumId?: string;
   isLatest: boolean;
   isFeatured: boolean;
   createdAt: string;
@@ -28,7 +30,7 @@ export interface MusicVideo {
 export interface StreamingPlatform {
   id: string;
   name: string;
-  url: string; // Link to artist profile on this platform
+  url: string;
   isVisible: boolean;
 }
 
@@ -52,223 +54,240 @@ const DEFAULT_PLATFORMS: Omit<StreamingPlatform, "id">[] = [
   { name: "Shazam", url: "", isVisible: false },
 ];
 
-// ============ STREAMING PLATFORMS ============
-
-export function getAllPlatforms(): StreamingPlatform[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(PLATFORMS_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    // Initialize with defaults
-    const platforms = DEFAULT_PLATFORMS.map((p, i) => ({
-      ...p,
-      id: `platform_${i}`,
-    }));
-    localStorage.setItem(PLATFORMS_KEY, JSON.stringify(platforms));
-    return platforms;
-  } catch {
-    return [];
-  }
-}
-
-export function getVisiblePlatforms(): StreamingPlatform[] {
-  return getAllPlatforms().filter(p => p.isVisible);
-}
-
-export function updatePlatform(id: string, updates: Partial<StreamingPlatform>): void {
-  const platforms = getAllPlatforms();
-  const index = platforms.findIndex(p => p.id === id);
-  if (index !== -1) {
-    platforms[index] = { ...platforms[index], ...updates };
-    localStorage.setItem(PLATFORMS_KEY, JSON.stringify(platforms));
-  }
-}
-
-export function updateAllPlatforms(platforms: StreamingPlatform[]): void {
-  localStorage.setItem(PLATFORMS_KEY, JSON.stringify(platforms));
-}
-
 const KEYS = {
   ALBUMS: "sop_albums",
   MUSIC_VIDEOS: "sop_music_videos",
 };
 
-// ============ HELPER FUNCTIONS ============
+// ============ STREAMING PLATFORMS ============
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-function getFromStorage<T>(key: string, defaultValue: T): T {
-  if (typeof window === "undefined") return defaultValue;
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
-  } catch {
-    return defaultValue;
+export async function getAllPlatforms(): Promise<StreamingPlatform[]> {
+  const platforms = await dbGetAll<StreamingPlatform>(PLATFORMS_KEY);
+  if (platforms.length === 0) {
+    for (let i = 0; i < DEFAULT_PLATFORMS.length; i++) {
+      const platform = {
+        ...DEFAULT_PLATFORMS[i],
+        id: `platform_${i}`,
+      };
+      try {
+        await dbInsert<StreamingPlatform>(PLATFORMS_KEY, platform);
+      } catch {
+        // May fail if concurrent init
+      }
+    }
+    return dbGetAll<StreamingPlatform>(PLATFORMS_KEY);
   }
+  return platforms;
 }
 
-function saveToStorage<T>(key: string, data: T): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(data));
+export async function getVisiblePlatforms(): Promise<StreamingPlatform[]> {
+  const platforms = await getAllPlatforms();
+  return platforms.filter((p) => p.isVisible);
+}
+
+export async function updatePlatform(id: string, updates: Partial<StreamingPlatform>): Promise<void> {
+  await dbUpdate<StreamingPlatform>(PLATFORMS_KEY, id, updates);
+}
+
+export async function updateAllPlatforms(platforms: StreamingPlatform[]): Promise<void> {
+  const existing = await dbGetAll<StreamingPlatform>(PLATFORMS_KEY);
+  const newIds = new Set(platforms.map((p) => p.id));
+
+  for (const p of existing) {
+    if (!newIds.has(p.id)) {
+      await dbDelete(PLATFORMS_KEY, p.id);
+    }
+  }
+
+  for (const p of platforms) {
+    const existingPlatform = existing.find((e) => e.id === p.id);
+    if (existingPlatform) {
+      await dbUpdate<StreamingPlatform>(PLATFORMS_KEY, p.id, p);
+    } else {
+      await dbInsert<StreamingPlatform>(PLATFORMS_KEY, p);
+    }
+  }
 }
 
 // ============ ALBUMS ============
 
-export function getAllAlbums(): Album[] {
-  return getFromStorage<Album[]>(KEYS.ALBUMS, []);
+export async function getAllAlbums(): Promise<Album[]> {
+  return dbGetAll<Album>(KEYS.ALBUMS);
 }
 
-export function getAlbumById(id: string): Album | undefined {
-  return getAllAlbums().find((a) => a.id === id);
+export async function getAlbumById(id: string): Promise<Album | undefined> {
+  const album = await dbGetById<Album>(KEYS.ALBUMS, id);
+  return album ?? undefined;
 }
 
-export function getLatestAlbum(): Album | undefined {
-  const albums = getAllAlbums();
+export async function getLatestAlbum(): Promise<Album | undefined> {
+  const albums = await getAllAlbums();
   return albums.find((a) => a.isLatest) || albums[0];
 }
 
-export function addAlbum(album: Omit<Album, "id" | "createdAt">): Album {
-  const albums = getAllAlbums();
-  
-  // If this is marked as latest, unmark others
+export async function addAlbum(album: Omit<Album, "id" | "createdAt">): Promise<Album> {
   if (album.isLatest) {
-    albums.forEach((a) => (a.isLatest = false));
+    const albums = await getAllAlbums();
+    for (const a of albums) {
+      if (a.isLatest) {
+        await dbUpdate<Album>(KEYS.ALBUMS, a.id, { isLatest: false });
+      }
+    }
   }
-  
-  const newAlbum: Album = {
+
+  const newAlbum = {
     ...album,
     id: generateId(),
     createdAt: new Date().toISOString(),
   };
-  
-  albums.unshift(newAlbum); // Add to beginning
-  saveToStorage(KEYS.ALBUMS, albums);
-  return newAlbum;
+  return dbInsert<Album>(KEYS.ALBUMS, newAlbum);
 }
 
-export function updateAlbum(id: string, updates: Partial<Album>): Album | null {
-  const albums = getAllAlbums();
-  const index = albums.findIndex((a) => a.id === id);
-  if (index === -1) return null;
-  
-  // If marking as latest, unmark others
+export async function updateAlbum(id: string, updates: Partial<Album>): Promise<Album | null> {
+  const album = await getAlbumById(id);
+  if (!album) return null;
+
   if (updates.isLatest) {
-    albums.forEach((a) => (a.isLatest = false));
+    const albums = await getAllAlbums();
+    for (const a of albums) {
+      if (a.isLatest && a.id !== id) {
+        await dbUpdate<Album>(KEYS.ALBUMS, a.id, { isLatest: false });
+      }
+    }
   }
-  
-  albums[index] = { ...albums[index], ...updates };
-  saveToStorage(KEYS.ALBUMS, albums);
-  return albums[index];
+
+  try {
+    return await dbUpdate<Album>(KEYS.ALBUMS, id, updates);
+  } catch {
+    return null;
+  }
 }
 
-export function deleteAlbum(id: string): boolean {
-  const albums = getAllAlbums();
-  const filtered = albums.filter((a) => a.id !== id);
-  if (filtered.length === albums.length) return false;
-  saveToStorage(KEYS.ALBUMS, filtered);
-  return true;
+export async function deleteAlbum(id: string): Promise<boolean> {
+  try {
+    await dbDelete(KEYS.ALBUMS, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ MUSIC VIDEOS ============
 
-export function getAllMusicVideos(): MusicVideo[] {
-  return getFromStorage<MusicVideo[]>(KEYS.MUSIC_VIDEOS, []);
+export async function getAllMusicVideos(): Promise<MusicVideo[]> {
+  return dbGetAll<MusicVideo>(KEYS.MUSIC_VIDEOS);
 }
 
-export function getMusicVideoById(id: string): MusicVideo | undefined {
-  return getAllMusicVideos().find((v) => v.id === id);
+export async function getMusicVideoById(id: string): Promise<MusicVideo | undefined> {
+  const video = await dbGetById<MusicVideo>(KEYS.MUSIC_VIDEOS, id);
+  return video ?? undefined;
 }
 
-export function getLatestMusicVideo(): MusicVideo | undefined {
-  const videos = getAllMusicVideos();
+export async function getLatestMusicVideo(): Promise<MusicVideo | undefined> {
+  const videos = await getAllMusicVideos();
   return videos.find((v) => v.isLatest) || videos[0];
 }
 
-export function getFeaturedMusicVideos(): MusicVideo[] {
-  return getAllMusicVideos().filter((v) => v.isFeatured);
+export async function getFeaturedMusicVideos(): Promise<MusicVideo[]> {
+  const videos = await getAllMusicVideos();
+  return videos.filter((v) => v.isFeatured);
 }
 
-export function addMusicVideo(video: Omit<MusicVideo, "id" | "createdAt" | "thumbnail">): MusicVideo {
-  const videos = getAllMusicVideos();
-  
-  // If this is marked as latest, unmark others
+export async function addMusicVideo(
+  video: Omit<MusicVideo, "id" | "createdAt" | "thumbnail">
+): Promise<MusicVideo> {
   if (video.isLatest) {
-    videos.forEach((v) => (v.isLatest = false));
+    const videos = await getAllMusicVideos();
+    for (const v of videos) {
+      if (v.isLatest) {
+        await dbUpdate<MusicVideo>(KEYS.MUSIC_VIDEOS, v.id, { isLatest: false });
+      }
+    }
   }
-  
-  const newVideo: MusicVideo = {
+
+  const newVideo = {
     ...video,
     id: generateId(),
     thumbnail: `https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`,
     createdAt: new Date().toISOString(),
   };
-  
-  videos.unshift(newVideo); // Add to beginning
-  saveToStorage(KEYS.MUSIC_VIDEOS, videos);
-  return newVideo;
+  return dbInsert<MusicVideo>(KEYS.MUSIC_VIDEOS, newVideo);
 }
 
-export function updateMusicVideo(id: string, updates: Partial<MusicVideo>): MusicVideo | null {
-  const videos = getAllMusicVideos();
-  const index = videos.findIndex((v) => v.id === id);
-  if (index === -1) return null;
-  
-  // If marking as latest, unmark others
+export async function updateMusicVideo(
+  id: string,
+  updates: Partial<MusicVideo>
+): Promise<MusicVideo | null> {
+  const video = await getMusicVideoById(id);
+  if (!video) return null;
+
   if (updates.isLatest) {
-    videos.forEach((v) => (v.isLatest = false));
+    const videos = await getAllMusicVideos();
+    for (const v of videos) {
+      if (v.isLatest && v.id !== id) {
+        await dbUpdate<MusicVideo>(KEYS.MUSIC_VIDEOS, v.id, { isLatest: false });
+      }
+    }
   }
-  
-  // Update thumbnail if youtubeId changed
+
   if (updates.youtubeId) {
-    updates.thumbnail = `https://img.youtube.com/vi/${updates.youtubeId}/maxresdefault.jpg`;
+    updates = {
+      ...updates,
+      thumbnail: `https://img.youtube.com/vi/${updates.youtubeId}/maxresdefault.jpg`,
+    };
   }
-  
-  videos[index] = { ...videos[index], ...updates };
-  saveToStorage(KEYS.MUSIC_VIDEOS, videos);
-  return videos[index];
+
+  try {
+    return await dbUpdate<MusicVideo>(KEYS.MUSIC_VIDEOS, id, updates);
+  } catch {
+    return null;
+  }
 }
 
-export function deleteMusicVideo(id: string): boolean {
-  const videos = getAllMusicVideos();
-  const filtered = videos.filter((v) => v.id !== id);
-  if (filtered.length === videos.length) return false;
-  saveToStorage(KEYS.MUSIC_VIDEOS, filtered);
-  return true;
+export async function deleteMusicVideo(id: string): Promise<boolean> {
+  try {
+    await dbDelete(KEYS.MUSIC_VIDEOS, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ STATS ============
 
-export function getReleaseStats() {
-  const albums = getAllAlbums();
-  const videos = getAllMusicVideos();
-  
+export async function getReleaseStats(): Promise<{
+  totalAlbums: number;
+  totalVideos: number;
+  totalTracks: number;
+  latestAlbum: string;
+  latestVideo: string;
+}> {
+  const [albums, videos] = await Promise.all([getAllAlbums(), getAllMusicVideos()]);
+  const latestAlbum = await getLatestAlbum();
+  const latestVideo = await getLatestMusicVideo();
+
   return {
     totalAlbums: albums.length,
     totalVideos: videos.length,
     totalTracks: albums.reduce((sum, a) => sum + a.trackCount, 0),
-    latestAlbum: getLatestAlbum()?.title || "None",
-    latestVideo: getLatestMusicVideo()?.title || "None",
+    latestAlbum: latestAlbum?.title || "None",
+    latestVideo: latestVideo?.title || "None",
   };
 }
 
 // ============ UTILITY ============
 
-// Extract YouTube video ID from various URL formats
+// Extract YouTube video ID from various URL formats (sync - pure computation)
 export function extractYouTubeId(url: string): string | null {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^"&?\/\s]{11})/,
     /^([^"&?\/\s]{11})$/, // Just the ID
   ];
-  
+
   for (const pattern of patterns) {
     const match = url.match(pattern);
     if (match) return match[1];
   }
-  
+
   return null;
 }
-

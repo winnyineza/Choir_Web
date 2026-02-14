@@ -10,9 +10,7 @@ export function MinistryPreview() {
   const [featuredVideo, setFeaturedVideo] = useState<MusicVideo | null>(null);
 
   useEffect(() => {
-    // Load featured video from admin-managed data
-    const latest = getLatestMusicVideo();
-    setFeaturedVideo(latest || null);
+    getLatestMusicVideo().then((latest) => setFeaturedVideo(latest || null));
   }, []);
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 import { addAuditLog, type AdminUser } from "./adminService";
 
 export type QuestionType = "text" | "rating" | "multi";
@@ -32,97 +33,83 @@ const KEYS = {
   RESPONSES: "serenades_survey_responses",
 };
 
-function generateId(prefix = "") {
-  return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export async function getSurveys(): Promise<Survey[]> {
+  return dbGetAll<Survey>(KEYS.SURVEYS);
 }
 
-function getSurveysInternal(): Survey[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(KEYS.SURVEYS);
-  return raw ? JSON.parse(raw) : [];
+export async function getSurveyById(id: string): Promise<Survey | null> {
+  return dbGetById<Survey>(KEYS.SURVEYS, id);
 }
 
-function saveSurveys(list: Survey[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEYS.SURVEYS, JSON.stringify(list));
+export async function getActiveSurveysForMembers(): Promise<Survey[]> {
+  const surveys = await getSurveys();
+  return surveys.filter(s => s.status === "active");
 }
 
-function getResponsesInternal(): SurveyResponse[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(KEYS.RESPONSES);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveResponses(list: SurveyResponse[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEYS.RESPONSES, JSON.stringify(list));
-}
-
-export function getSurveys(): Survey[] {
-  return getSurveysInternal();
-}
-
-export function getSurveyById(id: string): Survey | null {
-  return getSurveysInternal().find(s => s.id === id) || null;
-}
-
-export function getActiveSurveysForMembers(): Survey[] {
-  return getSurveysInternal().filter(s => s.status === "active");
-}
-
-export function hasRespondedToSurvey(surveyId: string, memberId: string): boolean {
-  const responses = getResponsesInternal();
+export async function hasRespondedToSurvey(surveyId: string, memberId: string): Promise<boolean> {
+  const responses = await dbGetAll<SurveyResponse>(KEYS.RESPONSES);
   return responses.some(r => r.surveyId === surveyId && r.memberId === memberId);
 }
 
-export function getMemberSurveyResponse(surveyId: string, memberId: string): SurveyResponse | null {
-  const responses = getResponsesInternal();
-  return responses.find(r => r.surveyId === surveyId && r.memberId === memberId) || null;
+export async function getMemberSurveyResponse(surveyId: string, memberId: string): Promise<SurveyResponse | null> {
+  const responses = await dbGetAll<SurveyResponse>(KEYS.RESPONSES);
+  const found = responses.find(r => r.surveyId === surveyId && r.memberId === memberId);
+  return found || null;
 }
 
-export function createSurvey(input: Omit<Survey, "id" | "createdAt">, actor?: AdminUser): Survey {
-  const survey: Survey = { ...input, id: generateId("svy_"), createdAt: new Date().toISOString() };
-  const list = getSurveysInternal();
-  list.push(survey);
-  saveSurveys(list);
-  if (actor) addAuditLog(actor, "CREATE", `Created survey ${survey.title}`);
+export async function createSurvey(input: Omit<Survey, "id" | "createdAt">, actor?: AdminUser): Promise<Survey> {
+  const survey = await dbInsert<Survey>(KEYS.SURVEYS, {
+    ...input,
+    id: `svy_${generateId()}`,
+    createdAt: new Date().toISOString(),
+  });
+  if (actor) await addAuditLog(actor, "CREATE", `Created survey ${survey.title}`);
   return survey;
 }
 
-export function updateSurvey(id: string, updates: Partial<Survey>, actor?: AdminUser): Survey | null {
-  const list = getSurveysInternal();
-  const idx = list.findIndex(s => s.id === id);
-  if (idx === -1) return null;
-  list[idx] = { ...list[idx], ...updates };
-  saveSurveys(list);
-  if (actor) addAuditLog(actor, "UPDATE", `Updated survey ${id}`);
-  return list[idx];
+export async function updateSurvey(id: string, updates: Partial<Survey>, actor?: AdminUser): Promise<Survey | null> {
+  const existing = await dbGetById<Survey>(KEYS.SURVEYS, id);
+  if (!existing) return null;
+
+  const updated = await dbUpdate<Survey>(KEYS.SURVEYS, id, updates);
+  if (actor) await addAuditLog(actor, "UPDATE", `Updated survey ${id}`);
+  return updated;
 }
 
-export function deleteSurvey(id: string, actor?: AdminUser): void {
-  saveSurveys(getSurveysInternal().filter(s => s.id !== id));
-  if (actor) addAuditLog(actor, "DELETE", `Deleted survey ${id}`);
+export async function deleteSurvey(id: string, actor?: AdminUser): Promise<void> {
+  await dbDelete(KEYS.SURVEYS, id);
+  if (actor) await addAuditLog(actor, "DELETE", `Deleted survey ${id}`);
 }
 
-export function submitSurveyResponse(input: Omit<SurveyResponse, "id" | "submittedAt">): SurveyResponse {
-  const response: SurveyResponse = { ...input, id: generateId("resp_"), submittedAt: new Date().toISOString() };
-  const list = getResponsesInternal();
-  list.push(response);
-  saveResponses(list);
-  return response;
+export async function submitSurveyResponse(input: Omit<SurveyResponse, "id" | "submittedAt">): Promise<SurveyResponse> {
+  return dbInsert<SurveyResponse>(KEYS.RESPONSES, {
+    ...input,
+    id: `resp_${generateId()}`,
+    submittedAt: new Date().toISOString(),
+  });
 }
 
-export function getResponses(surveyId?: string): SurveyResponse[] {
-  const list = getResponsesInternal();
-  if (!surveyId) return list;
-  return list.filter(r => r.surveyId === surveyId);
+export async function getResponses(surveyId?: string): Promise<SurveyResponse[]> {
+  if (!surveyId) return dbGetAll<SurveyResponse>(KEYS.RESPONSES);
+  return dbQuery<SurveyResponse>(KEYS.RESPONSES, "survey_id", surveyId);
 }
 
-export function getSurveyResults(surveyId: string) {
-  const survey = getSurveyById(surveyId);
+export async function getSurveyResults(surveyId: string): Promise<{
+  survey: Survey;
+  totalResponses: number;
+  questionResults: Record<string, {
+    prompt: string;
+    type: QuestionType;
+    options?: string[];
+    counts: Record<string, number>;
+    average?: number;
+    textResponses?: string[];
+  }>;
+} | null> {
+  const survey = await getSurveyById(surveyId);
   if (!survey) return null;
 
-  const responses = getResponses(surveyId);
+  const responses = await getResponses(surveyId);
 
   const questionResults: Record<string, {
     prompt: string;

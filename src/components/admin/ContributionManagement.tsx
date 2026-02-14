@@ -99,6 +99,7 @@ export function ContributionManagement() {
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showFinancialSummary, setShowFinancialSummary] = useState(false);
   const [summaryYear, setSummaryYear] = useState(new Date().getFullYear());
+  const [summaryYearExpenses, setSummaryYearExpenses] = useState<Awaited<ReturnType<typeof getExpensesByYear>>>([]);
   const [showBulkMonthlyDues, setShowBulkMonthlyDues] = useState(false);
   const [editingType, setEditingType] = useState<ContributionType | null>(null);
   
@@ -155,11 +156,17 @@ export function ContributionManagement() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (showFinancialSummary) {
+      getExpensesByYear(summaryYear).then(setSummaryYearExpenses);
+    }
+  }, [showFinancialSummary, summaryYear]);
   
-  const loadData = () => {
+  const loadData = async () => {
     setContributions(getAllContributions());
     setContributionTypes(getAllContributionTypes());
-    setMembers(getAllMembers());
+    setMembers(await getAllMembers());
     setStats(getContributionStats());
   };
   
@@ -1618,11 +1625,11 @@ export function ContributionManagement() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => {
+                onClick={async () => {
                   if (reportType === "monthly") {
                     exportMonthlyDuesReport(filterYear);
                   } else {
-                    exportAnnualFinancialSummary(filterYear);
+                    await exportAnnualFinancialSummary(filterYear);
                   }
                   toast({ title: "Exported", description: "Report exported to CSV" });
                 }}
@@ -1899,7 +1906,7 @@ export function ContributionManagement() {
               const yearContribs = contributions.filter(c => 
                 c.year === summaryYear || new Date(c.createdAt).getFullYear() === summaryYear
               );
-              const yearExpenses = getExpensesByYear(summaryYear);
+              const yearExpenses = summaryYearExpenses;
               
               const totalIncome = yearContribs.reduce((sum, c) => sum + c.amount, 0);
               const monthlyDuesTotal = yearContribs.filter(c => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
@@ -2012,8 +2019,8 @@ export function ContributionManagement() {
           <div className="flex justify-end gap-2 pt-4 border-t border-primary/10">
             <Button 
               variant="outline" 
-              onClick={() => { 
-                exportAnnualFinancialSummary(summaryYear); 
+              onClick={async () => { 
+                await exportAnnualFinancialSummary(summaryYear); 
                 toast({ title: "Exported", description: `${summaryYear} financial summary exported to CSV` }); 
               }}
             >

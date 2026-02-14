@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { 
   Cake, 
   AlertTriangle, 
@@ -161,30 +161,30 @@ export function OverdueContributionsWidget() {
 
 // Attendance Trend Widget
 export function AttendanceTrendWidget() {
-  const { sessions, trend } = useMemo(() => {
-    const recentSessions = getRecentSessions().slice(0, 5);
-    const stats = getOverallAttendanceStats();
-    
-    // Calculate trend (last 3 vs previous 3)
-    let trend = 0;
-    if (recentSessions.length >= 6) {
-      const recent3 = recentSessions.slice(0, 3);
-      const previous3 = recentSessions.slice(3, 6);
-      
-      const recentAvg = recent3.reduce((sum, s) => {
-        const total = s.present + s.absent + s.excused + s.late;
-        return sum + (total > 0 ? (s.present + s.late) / total * 100 : 0);
-      }, 0) / 3;
-      
-      const previousAvg = previous3.reduce((sum, s) => {
-        const total = s.present + s.absent + s.excused + s.late;
-        return sum + (total > 0 ? (s.present + s.late) / total * 100 : 0);
-      }, 0) / 3;
-      
-      trend = recentAvg - previousAvg;
-    }
-    
-    return { sessions: recentSessions, trend, avgAttendance: stats.avgAttendance };
+  const [data, setData] = useState<{ sessions: Awaited<ReturnType<typeof getRecentSessions>>; trend: number }>({ sessions: [], trend: 0 });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const recentSessions = (await getRecentSessions(5)).slice(0, 5);
+      if (cancelled) return;
+      let trend = 0;
+      if (recentSessions.length >= 6) {
+        const recent3 = recentSessions.slice(0, 3);
+        const previous3 = recentSessions.slice(3, 6);
+        const recentAvg = recent3.reduce((sum, s) => {
+          const total = s.totalPresent + s.totalAbsent + s.totalExcused + s.totalLate;
+          return sum + (total > 0 ? (s.totalPresent + s.totalLate) / total * 100 : 0);
+        }, 0) / 3;
+        const previousAvg = previous3.reduce((sum, s) => {
+          const total = s.totalPresent + s.totalAbsent + s.totalExcused + s.totalLate;
+          return sum + (total > 0 ? (s.totalPresent + s.totalLate) / total * 100 : 0);
+        }, 0) / 3;
+        trend = recentAvg - previousAvg;
+      }
+      setData({ sessions: recentSessions, trend });
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   return (
@@ -192,23 +192,23 @@ export function AttendanceTrendWidget() {
       <div className="flex items-center gap-2 mb-3">
         <TrendingUp className="w-5 h-5 text-green-500" />
         <h3 className="font-semibold text-sm">Attendance Trend</h3>
-        {trend !== 0 && (
+        {data.trend !== 0 && (
           <span className={cn(
             "ml-auto text-xs px-2 py-0.5 rounded-full flex items-center gap-1",
-            trend > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+            data.trend > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
           )}>
-            {trend > 0 ? "↑" : "↓"} {Math.abs(trend).toFixed(1)}%
+            {data.trend > 0 ? "↑" : "↓"} {Math.abs(data.trend).toFixed(1)}%
           </span>
         )}
       </div>
       
-      {sessions.length === 0 ? (
+      {data.sessions.length === 0 ? (
         <p className="text-sm text-muted-foreground">No attendance data yet</p>
       ) : (
         <div className="space-y-2">
-          {sessions.slice(0, 4).map(session => {
-            const total = session.present + session.absent + session.excused + session.late;
-            const rate = total > 0 ? ((session.present + session.late) / total) * 100 : 0;
+          {data.sessions.slice(0, 4).map(session => {
+            const total = session.totalPresent + session.totalAbsent + session.totalExcused + session.totalLate;
+            const rate = total > 0 ? ((session.totalPresent + session.totalLate) / total) * 100 : 0;
             
             return (
               <div key={session.date} className="space-y-1">
@@ -241,22 +241,29 @@ export function AttendanceTrendWidget() {
 
 // Quick Stats Widget
 export function QuickStatsWidget() {
-  const stats = useMemo(() => {
-    const members = getAllMembers();
-    const activeMembers = members.filter(m => m.status === "Active");
-    const pendingMembers = members.filter(m => m.status === "Pending");
-    const sessions = getRecentSessions();
-    const lastSession = sessions[0];
-    
-    return {
-      totalMembers: members.length,
-      activeMembers: activeMembers.length,
-      pendingMembers: pendingMembers.length,
-      lastSessionDate: lastSession?.date,
-      lastSessionAttendance: lastSession 
-        ? lastSession.present + lastSession.late 
-        : 0,
-    };
+  const [stats, setStats] = useState({
+    totalMembers: 0,
+    activeMembers: 0,
+    pendingMembers: 0,
+    lastSessionDate: undefined as string | undefined,
+    lastSessionAttendance: 0,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [members, sessions] = await Promise.all([getAllMembers(), getRecentSessions()]);
+      if (cancelled) return;
+      const lastSession = sessions[0];
+      setStats({
+        totalMembers: members.length,
+        activeMembers: members.filter(m => m.status === "Active").length,
+        pendingMembers: members.filter(m => m.status === "Pending").length,
+        lastSessionDate: lastSession?.date,
+        lastSessionAttendance: lastSession ? lastSession.totalPresent + lastSession.totalLate : 0,
+      });
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   return (

@@ -83,13 +83,13 @@ export function AddAlbumModal({ isOpen, onClose, onSuccess, editAlbum }: AddAlbu
       };
 
       if (editAlbum) {
-        updateAlbum(editAlbum.id, albumData);
+        await updateAlbum(editAlbum.id, albumData);
         toast({
           title: "Album Updated",
           description: `"${title}" has been updated.`,
         });
       } else {
-        addAlbum(albumData);
+        await addAlbum(albumData);
         toast({
           title: "Album Added! 🎵",
           description: `"${title}" has been added to releases.`,

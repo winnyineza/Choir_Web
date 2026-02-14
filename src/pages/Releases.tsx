@@ -27,23 +27,23 @@ export default function Releases() {
 
   // Load releases data from admin-managed content only
   useEffect(() => {
-    const loadReleases = () => {
-      const loadedAlbums = getAllAlbums();
-      const loadedVideos = getAllMusicVideos();
-
+    const loadReleases = async () => {
+      const [loadedAlbums, loadedVideos, latestAlbumData, latestVideoData, platformsData] = await Promise.all([
+        getAllAlbums(),
+        getAllMusicVideos(),
+        getLatestAlbum(),
+        getLatestMusicVideo(),
+        getVisiblePlatforms(),
+      ]);
       setAlbums(loadedAlbums);
       setMusicVideos(loadedVideos);
-      setLatestAlbum(getLatestAlbum() || null);
-      setLatestVideo(getLatestMusicVideo() || null);
-      setPlatforms(getVisiblePlatforms());
+      setLatestAlbum(latestAlbumData || null);
+      setLatestVideo(latestVideoData || null);
+      setPlatforms(platformsData);
       setIsLoading(false);
     };
 
     loadReleases();
-
-    // Listen for storage changes
-    window.addEventListener("storage", loadReleases);
-    return () => window.removeEventListener("storage", loadReleases);
   }, []);
 
   const featuredVideos = musicVideos.filter((v) => v.isFeatured && !v.isLatest);

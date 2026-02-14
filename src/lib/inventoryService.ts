@@ -1,5 +1,16 @@
 // Inventory Service - manages choir equipment and assets
 
+import {
+  dbGetAll,
+  dbGetById,
+  dbInsert,
+  dbUpdate,
+  dbDelete,
+  dbQuery,
+  dbDeleteWhere,
+  generateId,
+} from './supabaseDB';
+
 export type ItemCategory = "robes" | "instruments" | "electronics" | "furniture" | "music_stands" | "other";
 export type ItemCondition = "excellent" | "good" | "fair" | "needs_repair" | "unusable";
 
@@ -45,119 +56,98 @@ export interface InventoryStats {
 const INVENTORY_KEY = "choir_inventory";
 const ASSIGNMENTS_KEY = "choir_inventory_assignments";
 
-function generateId(): string {
-  return `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
 // ============ INVENTORY ITEMS ============
 
-export function getAllInventoryItems(): InventoryItem[] {
-  try {
-    const stored = localStorage.getItem(INVENTORY_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+export async function getAllInventoryItems(): Promise<InventoryItem[]> {
+  return dbGetAll<InventoryItem>(INVENTORY_KEY);
 }
 
-function saveItems(items: InventoryItem[]): void {
-  localStorage.setItem(INVENTORY_KEY, JSON.stringify(items));
+export async function getInventoryItemById(id: string): Promise<InventoryItem | undefined> {
+  const item = await dbGetById<InventoryItem>(INVENTORY_KEY, id);
+  return item ?? undefined;
 }
 
-export function getInventoryItemById(id: string): InventoryItem | undefined {
-  return getAllInventoryItems().find(item => item.id === id);
+export async function getInventoryByCategory(category: ItemCategory): Promise<InventoryItem[]> {
+  return dbQuery<InventoryItem>(INVENTORY_KEY, 'category', category);
 }
 
-export function getInventoryByCategory(category: ItemCategory): InventoryItem[] {
-  return getAllInventoryItems().filter(item => item.category === category);
-}
-
-export function createInventoryItem(data: Omit<InventoryItem, "id" | "createdAt" | "available">): InventoryItem {
-  const items = getAllInventoryItems();
-  
-  const newItem: InventoryItem = {
+export async function createInventoryItem(
+  data: Omit<InventoryItem, "id" | "createdAt" | "available">
+): Promise<InventoryItem> {
+  const newItem = {
     ...data,
     id: generateId(),
     available: data.quantity,
     createdAt: new Date().toISOString(),
   };
-  
-  items.push(newItem);
-  saveItems(items);
-  return newItem;
+  return dbInsert<InventoryItem>(INVENTORY_KEY, newItem);
 }
 
-export function updateInventoryItem(id: string, updates: Partial<InventoryItem>): InventoryItem | null {
-  const items = getAllInventoryItems();
-  const index = items.findIndex(item => item.id === id);
-  if (index === -1) return null;
-  
-  // Recalculate available if quantity changed
-  if (updates.quantity !== undefined) {
-    const assignments = getItemAssignments(id);
-    const assignedQty = assignments.reduce((sum, a) => sum + a.quantity, 0);
-    updates.available = updates.quantity - assignedQty;
+export async function updateInventoryItem(
+  id: string,
+  updates: Partial<InventoryItem>
+): Promise<InventoryItem | null> {
+  try {
+    const existing = await dbGetById<InventoryItem>(INVENTORY_KEY, id);
+    if (!existing) return null;
+
+    // Recalculate available if quantity changed
+    if (updates.quantity !== undefined) {
+      const assignments = await getItemAssignments(id);
+      const assignedQty = assignments.reduce((sum, a) => sum + a.quantity, 0);
+      updates.available = updates.quantity - assignedQty;
+    }
+
+    const merged = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    return await dbUpdate<InventoryItem>(INVENTORY_KEY, id, merged);
+  } catch {
+    return null;
   }
-  
-  items[index] = {
-    ...items[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  
-  saveItems(items);
-  return items[index];
 }
 
-export function deleteInventoryItem(id: string): boolean {
-  const items = getAllInventoryItems();
-  const filtered = items.filter(item => item.id !== id);
-  if (filtered.length === items.length) return false;
-  
-  // Also delete assignments for this item
-  const assignments = getAllAssignments().filter(a => a.itemId !== id);
-  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments));
-  
-  saveItems(filtered);
-  return true;
+export async function deleteInventoryItem(id: string): Promise<boolean> {
+  try {
+    const existing = await dbGetById<InventoryItem>(INVENTORY_KEY, id);
+    if (!existing) return false;
+
+    await dbDeleteWhere(ASSIGNMENTS_KEY, 'item_id', id);
+    await dbDelete(INVENTORY_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ ASSIGNMENTS ============
 
-export function getAllAssignments(): ItemAssignment[] {
-  try {
-    const stored = localStorage.getItem(ASSIGNMENTS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+export async function getAllAssignments(): Promise<ItemAssignment[]> {
+  return dbGetAll<ItemAssignment>(ASSIGNMENTS_KEY);
 }
 
-function saveAssignments(assignments: ItemAssignment[]): void {
-  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments));
+export async function getItemAssignments(itemId: string): Promise<ItemAssignment[]> {
+  const assignments = await dbQuery<ItemAssignment>(ASSIGNMENTS_KEY, 'item_id', itemId);
+  return assignments.filter(a => !a.returnedAt);
 }
 
-export function getItemAssignments(itemId: string): ItemAssignment[] {
-  return getAllAssignments().filter(a => a.itemId === itemId && !a.returnedAt);
+export async function getMemberAssignments(memberId: string): Promise<ItemAssignment[]> {
+  const assignments = await dbQuery<ItemAssignment>(ASSIGNMENTS_KEY, 'member_id', memberId);
+  return assignments.filter(a => !a.returnedAt);
 }
 
-export function getMemberAssignments(memberId: string): ItemAssignment[] {
-  return getAllAssignments().filter(a => a.memberId === memberId && !a.returnedAt);
-}
-
-export function assignItem(
+export async function assignItem(
   itemId: string,
   memberId: string,
   memberName: string,
   quantity: number = 1,
   notes?: string
-): ItemAssignment | null {
-  const item = getInventoryItemById(itemId);
+): Promise<ItemAssignment | null> {
+  const item = await getInventoryItemById(itemId);
   if (!item || item.available < quantity) return null;
-  
-  const assignments = getAllAssignments();
-  const newAssignment: ItemAssignment = {
-    id: `asgn_${Date.now()}`,
+
+  const newAssignment: Omit<ItemAssignment, "id"> = {
     itemId,
     memberId,
     memberName,
@@ -165,44 +155,50 @@ export function assignItem(
     assignedAt: new Date().toISOString(),
     notes,
   };
-  
-  assignments.push(newAssignment);
-  saveAssignments(assignments);
-  
-  // Update available count
-  updateInventoryItem(itemId, { available: item.available - quantity });
-  
-  return newAssignment;
+
+  const created = await dbInsert<ItemAssignment>(ASSIGNMENTS_KEY, {
+    ...newAssignment,
+    id: generateId(),
+  });
+
+  await dbUpdate<InventoryItem>(INVENTORY_KEY, itemId, {
+    available: item.available - quantity,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return created;
 }
 
-export function returnItem(assignmentId: string): boolean {
-  const assignments = getAllAssignments();
-  const index = assignments.findIndex(a => a.id === assignmentId);
-  if (index === -1) return false;
-  
-  const assignment = assignments[index];
-  assignments[index] = {
-    ...assignment,
-    returnedAt: new Date().toISOString(),
-  };
-  
-  saveAssignments(assignments);
-  
-  // Update available count
-  const item = getInventoryItemById(assignment.itemId);
-  if (item) {
-    updateInventoryItem(assignment.itemId, { available: item.available + assignment.quantity });
+export async function returnItem(assignmentId: string): Promise<boolean> {
+  try {
+    const assignment = await dbGetById<ItemAssignment>(ASSIGNMENTS_KEY, assignmentId);
+    if (!assignment || assignment.returnedAt) return false;
+
+    await dbUpdate<ItemAssignment>(ASSIGNMENTS_KEY, assignmentId, {
+      returnedAt: new Date().toISOString(),
+    });
+
+    const item = await getInventoryItemById(assignment.itemId);
+    if (item) {
+      await dbUpdate<InventoryItem>(INVENTORY_KEY, assignment.itemId, {
+        available: item.available + assignment.quantity,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    return true;
+  } catch {
+    return false;
   }
-  
-  return true;
 }
 
 // ============ STATS ============
 
-export function getInventoryStats(): InventoryStats {
-  const items = getAllInventoryItems();
-  const assignments = getAllAssignments().filter(a => !a.returnedAt);
-  
+export async function getInventoryStats(): Promise<InventoryStats> {
+  const items = await getAllInventoryItems();
+  const allAssignments = await getAllAssignments();
+  const assignments = allAssignments.filter(a => !a.returnedAt);
+
   const byCategory: Record<ItemCategory, number> = {
     robes: 0,
     instruments: 0,
@@ -211,7 +207,7 @@ export function getInventoryStats(): InventoryStats {
     music_stands: 0,
     other: 0,
   };
-  
+
   const byCondition: Record<ItemCondition, number> = {
     excellent: 0,
     good: 0,
@@ -219,11 +215,11 @@ export function getInventoryStats(): InventoryStats {
     needs_repair: 0,
     unusable: 0,
   };
-  
+
   let totalQuantity = 0;
   let totalValue = 0;
   let needsRepairCount = 0;
-  
+
   items.forEach(item => {
     byCategory[item.category] += item.quantity;
     byCondition[item.condition] += item.quantity;
@@ -231,7 +227,7 @@ export function getInventoryStats(): InventoryStats {
     totalValue += (item.purchasePrice || 0) * item.quantity;
     if (item.condition === "needs_repair") needsRepairCount += item.quantity;
   });
-  
+
   return {
     totalItems: items.length,
     totalQuantity,
@@ -243,7 +239,7 @@ export function getInventoryStats(): InventoryStats {
   };
 }
 
-// ============ UTILITIES ============
+// ============ UTILITIES (pure computation - stay sync) ============
 
 export function getCategoryLabel(category: ItemCategory): string {
   const labels: Record<ItemCategory, string> = {
@@ -279,9 +275,9 @@ export function getConditionColor(condition: ItemCondition): string {
   return colors[condition];
 }
 
-export function exportInventoryToCSV(): string {
-  const items = getAllInventoryItems();
-  
+export async function exportInventoryToCSV(): Promise<string> {
+  const items = await getAllInventoryItems();
+
   const headers = [
     "Name",
     "Category",
@@ -294,7 +290,7 @@ export function exportInventoryToCSV(): string {
     "Serial Number",
     "Notes",
   ];
-  
+
   const rows = items.map(item => [
     item.name,
     getCategoryLabel(item.category),
@@ -307,7 +303,6 @@ export function exportInventoryToCSV(): string {
     item.serialNumber || "",
     item.notes || "",
   ]);
-  
+
   return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 }
-

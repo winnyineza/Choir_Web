@@ -1,5 +1,7 @@
 // Promo Code Service - manages discount codes
 
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
+
 export interface PromoCode {
   id: string;
   code: string;
@@ -17,22 +19,7 @@ export interface PromoCode {
 
 const PROMO_KEY = "sop_promo_codes";
 
-// Get all promo codes
-export function getAllPromoCodes(): PromoCode[] {
-  try {
-    const stored = localStorage.getItem(PROMO_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-// Save promo codes
-function savePromoCodes(codes: PromoCode[]): void {
-  localStorage.setItem(PROMO_KEY, JSON.stringify(codes));
-}
-
-// Generate unique code
+// Generate unique code (pure computation - stays sync)
 function generateCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let code = "SOP";
@@ -42,49 +29,50 @@ function generateCode(): string {
   return code;
 }
 
+// Get all promo codes
+export async function getAllPromoCodes(): Promise<PromoCode[]> {
+  const codes = await dbGetAll<PromoCode>(PROMO_KEY);
+  return codes || [];
+}
+
 // Create new promo code
-export function createPromoCode(
+export async function createPromoCode(
   data: Omit<PromoCode, "id" | "code" | "usedCount" | "createdAt">
-): PromoCode {
-  const codes = getAllPromoCodes();
-  
+): Promise<PromoCode> {
+  const codes = await getAllPromoCodes();
+
   // Generate unique code
   let code = generateCode();
   while (codes.some((c) => c.code === code)) {
     code = generateCode();
   }
 
-  const newCode: PromoCode = {
+  const newCode: Omit<PromoCode, "id" | "createdAt"> = {
     ...data,
-    id: Date.now().toString(),
     code,
     usedCount: 0,
-    createdAt: new Date().toISOString(),
   };
 
-  codes.push(newCode);
-  savePromoCodes(codes);
-  return newCode;
+  return dbInsert<PromoCode>(PROMO_KEY, newCode);
 }
 
 // Update promo code
-export function updatePromoCode(id: string, updates: Partial<PromoCode>): PromoCode | null {
-  const codes = getAllPromoCodes();
-  const index = codes.findIndex((c) => c.id === id);
-  if (index === -1) return null;
-
-  codes[index] = { ...codes[index], ...updates };
-  savePromoCodes(codes);
-  return codes[index];
+export async function updatePromoCode(id: string, updates: Partial<PromoCode>): Promise<PromoCode | null> {
+  try {
+    return await dbUpdate<PromoCode>(PROMO_KEY, id, updates);
+  } catch {
+    return null;
+  }
 }
 
 // Delete promo code
-export function deletePromoCode(id: string): boolean {
-  const codes = getAllPromoCodes();
-  const filtered = codes.filter((c) => c.id !== id);
-  if (filtered.length === codes.length) return false;
-  savePromoCodes(filtered);
-  return true;
+export async function deletePromoCode(id: string): Promise<boolean> {
+  try {
+    await dbDelete(PROMO_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Validate and apply promo code
@@ -95,12 +83,12 @@ export interface PromoValidation {
   message: string;
 }
 
-export function validatePromoCode(
+export async function validatePromoCode(
   codeStr: string,
   subtotal: number,
   eventId?: string
-): PromoValidation {
-  const codes = getAllPromoCodes();
+): Promise<PromoValidation> {
+  const codes = await getAllPromoCodes();
   const code = codes.find((c) => c.code.toUpperCase() === codeStr.toUpperCase());
 
   if (!code) {
@@ -158,27 +146,34 @@ export function validatePromoCode(
 }
 
 // Mark promo code as used (increment usage count)
-export function redeemPromoCode(codeStr: string): boolean {
-  const codes = getAllPromoCodes();
-  const index = codes.findIndex((c) => c.code.toUpperCase() === codeStr.toUpperCase());
-  
-  if (index === -1) return false;
-  
-  codes[index].usedCount++;
-  savePromoCodes(codes);
-  return true;
+export async function redeemPromoCode(codeStr: string): Promise<boolean> {
+  const codes = await getAllPromoCodes();
+  const code = codes.find((c) => c.code.toUpperCase() === codeStr.toUpperCase());
+
+  if (!code) return false;
+
+  try {
+    await dbUpdate<PromoCode>(PROMO_KEY, code.id, {
+      usedCount: code.usedCount + 1,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Get promo code stats
-export function getPromoStats() {
-  const codes = getAllPromoCodes();
+export async function getPromoStats(): Promise<{
+  total: number;
+  active: number;
+  totalUses: number;
+}> {
+  const codes = await getAllPromoCodes();
   const active = codes.filter((c) => c.isActive && new Date(c.validUntil) >= new Date());
-  
+
   return {
     total: codes.length,
     active: active.length,
     totalUses: codes.reduce((sum, c) => sum + c.usedCount, 0),
   };
 }
-
-

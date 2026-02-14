@@ -21,8 +21,8 @@ export interface VerifyCodeResult {
 export async function sendVerificationCode(email: string, memberName: string): Promise<SendCodeResult> {
   const code = generateVerificationCode();
   
-  // Store the code locally
-  storeVerificationCode(email, code);
+  // Store the code
+  await storeVerificationCode(email, code);
   
   if (IS_DEVELOPMENT) {
     // In development, log the code to console and return it
@@ -71,8 +71,8 @@ export async function sendVerificationCode(email: string, memberName: string): P
   }
 }
 
-export function verifyEmailCode(email: string, code: string): VerifyCodeResult {
-  const isValid = verifyCode(email, code);
+export async function verifyEmailCode(email: string, code: string): Promise<VerifyCodeResult> {
+  const isValid = await verifyCode(email, code);
   
   if (isValid) {
     return {

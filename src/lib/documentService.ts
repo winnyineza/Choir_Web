@@ -1,5 +1,7 @@
 // Document Storage Service - manages choir documents and files
 
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbDeleteWhere } from './supabaseDB';
+
 export type DocumentCategory = "constitution" | "financial" | "minutes" | "music" | "policy" | "training" | "other";
 
 export interface Document {
@@ -38,144 +40,123 @@ export interface DocumentStats {
 const DOCUMENTS_KEY = "choir_documents";
 const FOLDERS_KEY = "choir_document_folders";
 
-function generateId(): string {
-  return `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
 // ============ DOCUMENTS ============
 
-export function getAllDocuments(): Document[] {
-  try {
-    const stored = localStorage.getItem(DOCUMENTS_KEY);
-    const docs = stored ? JSON.parse(stored) : [];
-    return docs.sort((a: Document, b: Document) => 
-      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-    );
-  } catch {
-    return [];
-  }
-}
-
-function saveDocuments(documents: Document[]): void {
-  localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
-}
-
-export function getDocumentById(id: string): Document | undefined {
-  return getAllDocuments().find(d => d.id === id);
-}
-
-export function getDocumentsByCategory(category: DocumentCategory): Document[] {
-  return getAllDocuments().filter(d => d.category === category);
-}
-
-export function getPublicDocuments(): Document[] {
-  return getAllDocuments().filter(d => d.isPublic);
-}
-
-export function searchDocuments(query: string): Document[] {
-  const lowerQuery = query.toLowerCase();
-  return getAllDocuments().filter(d =>
-    d.title.toLowerCase().includes(lowerQuery) ||
-    d.description?.toLowerCase().includes(lowerQuery) ||
-    d.tags?.some(t => t.toLowerCase().includes(lowerQuery))
+export async function getAllDocuments(): Promise<Document[]> {
+  const docs = await dbGetAll<Document>(DOCUMENTS_KEY);
+  return (docs || []).sort(
+    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
   );
 }
 
-export function createDocument(data: Omit<Document, "id" | "uploadedAt" | "downloadCount">): Document {
-  const documents = getAllDocuments();
-  
-  const newDoc: Document = {
+export async function getDocumentById(id: string): Promise<Document | null> {
+  return dbGetById<Document>(DOCUMENTS_KEY, id);
+}
+
+export async function getDocumentsByCategory(category: DocumentCategory): Promise<Document[]> {
+  const documents = await getAllDocuments();
+  return documents.filter((d) => d.category === category);
+}
+
+export async function getPublicDocuments(): Promise<Document[]> {
+  const documents = await getAllDocuments();
+  return documents.filter((d) => d.isPublic);
+}
+
+export async function searchDocuments(query: string): Promise<Document[]> {
+  const lowerQuery = query.toLowerCase();
+  const documents = await getAllDocuments();
+  return documents.filter(
+    (d) =>
+      d.title.toLowerCase().includes(lowerQuery) ||
+      d.description?.toLowerCase().includes(lowerQuery) ||
+      d.tags?.some((t) => t.toLowerCase().includes(lowerQuery))
+  );
+}
+
+export async function createDocument(
+  data: Omit<Document, "id" | "uploadedAt" | "downloadCount">
+): Promise<Document> {
+  return dbInsert<Document>(DOCUMENTS_KEY, {
     ...data,
-    id: generateId(),
     uploadedAt: new Date().toISOString(),
     downloadCount: 0,
-  };
-  
-  documents.push(newDoc);
-  saveDocuments(documents);
-  return newDoc;
+  });
 }
 
-export function updateDocument(id: string, updates: Partial<Document>): Document | null {
-  const documents = getAllDocuments();
-  const index = documents.findIndex(d => d.id === id);
-  if (index === -1) return null;
-  
-  documents[index] = {
-    ...documents[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  
-  saveDocuments(documents);
-  return documents[index];
-}
-
-export function incrementDownloadCount(id: string): void {
-  const documents = getAllDocuments();
-  const index = documents.findIndex(d => d.id === id);
-  if (index !== -1) {
-    documents[index].downloadCount++;
-    saveDocuments(documents);
+export async function updateDocument(
+  id: string,
+  updates: Partial<Document>
+): Promise<Document | null> {
+  try {
+    return await dbUpdate<Document>(DOCUMENTS_KEY, id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch {
+    return null;
   }
 }
 
-export function deleteDocument(id: string): boolean {
-  const documents = getAllDocuments();
-  const filtered = documents.filter(d => d.id !== id);
-  if (filtered.length === documents.length) return false;
-  
-  saveDocuments(filtered);
-  return true;
+export async function incrementDownloadCount(id: string): Promise<void> {
+  try {
+    const doc = await getDocumentById(id);
+    if (doc) {
+      await dbUpdate<Document>(DOCUMENTS_KEY, id, {
+        downloadCount: doc.downloadCount + 1,
+      });
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export async function deleteDocument(id: string): Promise<boolean> {
+  try {
+    await dbDelete(DOCUMENTS_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ FOLDERS ============
 
-export function getAllFolders(): DocumentFolder[] {
-  try {
-    const stored = localStorage.getItem(FOLDERS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+export async function getAllFolders(): Promise<DocumentFolder[]> {
+  const folders = await dbGetAll<DocumentFolder>(FOLDERS_KEY);
+  return folders || [];
 }
 
-function saveFolders(folders: DocumentFolder[]): void {
-  localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
-}
-
-export function createFolder(name: string, description?: string, parentId?: string): DocumentFolder {
-  const folders = getAllFolders();
-  
-  const newFolder: DocumentFolder = {
-    id: `folder_${Date.now()}`,
+export async function createFolder(
+  name: string,
+  description?: string,
+  parentId?: string
+): Promise<DocumentFolder> {
+  return dbInsert<DocumentFolder>(FOLDERS_KEY, {
     name,
     description,
     parentId,
     createdAt: new Date().toISOString(),
-  };
-  
-  folders.push(newFolder);
-  saveFolders(folders);
-  return newFolder;
+  });
 }
 
-export function deleteFolder(id: string): boolean {
-  const folders = getAllFolders();
-  const filtered = folders.filter(f => f.id !== id && f.parentId !== id);
-  if (filtered.length === folders.length) return false;
-  
-  saveFolders(filtered);
-  return true;
+export async function deleteFolder(id: string): Promise<boolean> {
+  try {
+    await dbDeleteWhere(FOLDERS_KEY, "parent_id", id);
+    await dbDelete(FOLDERS_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ STATS ============
 
-export function getDocumentStats(): DocumentStats {
-  const documents = getAllDocuments();
+export async function getDocumentStats(): Promise<DocumentStats> {
+  const documents = await getAllDocuments();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
+
   const byCategory: Record<DocumentCategory, number> = {
     constitution: 0,
     financial: 0,
@@ -185,18 +166,18 @@ export function getDocumentStats(): DocumentStats {
     training: 0,
     other: 0,
   };
-  
+
   let totalSize = 0;
   let publicCount = 0;
   let recentUploads = 0;
-  
-  documents.forEach(doc => {
+
+  documents.forEach((doc) => {
     byCategory[doc.category]++;
     totalSize += doc.fileSize;
     if (doc.isPublic) publicCount++;
     if (new Date(doc.uploadedAt) > thirtyDaysAgo) recentUploads++;
   });
-  
+
   return {
     totalDocuments: documents.length,
     totalSize,
@@ -206,7 +187,7 @@ export function getDocumentStats(): DocumentStats {
   };
 }
 
-// ============ UTILITIES ============
+// ============ UTILITIES (pure computation - stay sync) ============
 
 export function getCategoryLabel(category: DocumentCategory): string {
   const labels: Record<DocumentCategory, string> = {
@@ -262,7 +243,7 @@ export function getFileIcon(fileType: string): string {
   return icons[fileType.toLowerCase()] || "📁";
 }
 
-export function downloadDocument(doc: Document): void {
+export async function downloadDocument(doc: Document): Promise<void> {
   try {
     // Convert base64 to blob
     const byteCharacters = atob(doc.fileData.split(",")[1] || doc.fileData);
@@ -272,7 +253,7 @@ export function downloadDocument(doc: Document): void {
     }
     const byteArray = new Uint8Array(byteNumbers);
     const blob = new Blob([byteArray], { type: getMimeType(doc.fileType) });
-    
+
     // Create download link
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -282,9 +263,9 @@ export function downloadDocument(doc: Document): void {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     // Increment download count
-    incrementDownloadCount(doc.id);
+    await incrementDownloadCount(doc.id);
   } catch (error) {
     console.error("Download failed:", error);
     throw error;
@@ -312,9 +293,9 @@ function getMimeType(fileType: string): string {
   return mimeTypes[fileType.toLowerCase()] || "application/octet-stream";
 }
 
-export function exportDocumentListToCSV(): string {
-  const documents = getAllDocuments();
-  
+export async function exportDocumentListToCSV(): Promise<string> {
+  const documents = await getAllDocuments();
+
   const headers = [
     "Title",
     "Category",
@@ -326,8 +307,8 @@ export function exportDocumentListToCSV(): string {
     "Public",
     "Downloads",
   ];
-  
-  const rows = documents.map(d => [
+
+  const rows = documents.map((d) => [
     `"${d.title}"`,
     getCategoryLabel(d.category),
     `"${d.fileName}"`,
@@ -338,7 +319,6 @@ export function exportDocumentListToCSV(): string {
     d.isPublic ? "Yes" : "No",
     d.downloadCount,
   ]);
-  
-  return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-}
 
+  return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+}

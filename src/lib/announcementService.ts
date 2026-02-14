@@ -1,6 +1,6 @@
-// Announcement Service - Manage announcements for members
+// Announcement Service - Manage announcements for members (Supabase)
 
-import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
 
 const ANNOUNCEMENTS_KEY = "choir_announcements";
 
@@ -20,15 +20,15 @@ export interface Announcement {
 }
 
 // Get all announcements
-export function getAllAnnouncements(): Announcement[] {
-  const data = localStorage.getItem(ANNOUNCEMENTS_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllAnnouncements(): Promise<Announcement[]> {
+  return dbGetAll<Announcement>(ANNOUNCEMENTS_KEY);
 }
 
 // Get active announcements (for display)
-export function getActiveAnnouncements(audience: "all" | "members" | "admins" = "all"): Announcement[] {
+export async function getActiveAnnouncements(audience: "all" | "members" | "admins" = "all"): Promise<Announcement[]> {
+  const announcements = await getAllAnnouncements();
   const now = new Date();
-  return getAllAnnouncements()
+  return announcements
     .filter(a => {
       if (!a.isActive) return false;
       if (new Date(a.startDate) > now) return false;
@@ -48,71 +48,63 @@ export function getActiveAnnouncements(audience: "all" | "members" | "admins" = 
 }
 
 // Get announcement by ID
-export function getAnnouncementById(id: string): Announcement | undefined {
-  return getAllAnnouncements().find(a => a.id === id);
+export async function getAnnouncementById(id: string): Promise<Announcement | undefined> {
+  const announcement = await dbGetById<Announcement>(ANNOUNCEMENTS_KEY, id);
+  return announcement ?? undefined;
 }
 
 // Create announcement
-export function createAnnouncement(announcement: Omit<Announcement, "id" | "createdAt">): Announcement {
-  const announcements = getAllAnnouncements();
+export async function createAnnouncement(announcement: Omit<Announcement, "id" | "createdAt">): Promise<Announcement> {
   const newAnnouncement: Announcement = {
     ...announcement,
-    id: `ann-${Date.now()}`,
+    id: generateId(),
     createdAt: new Date().toISOString(),
   };
-  
-  announcements.push(newAnnouncement);
-  localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
-  syncItemToSupabase('choir_announcements', newAnnouncement);
-  return newAnnouncement;
+  return dbInsert<Announcement>(ANNOUNCEMENTS_KEY, newAnnouncement);
 }
 
 // Update announcement
-export function updateAnnouncement(id: string, updates: Partial<Announcement>): Announcement | null {
-  const announcements = getAllAnnouncements();
-  const index = announcements.findIndex(a => a.id === id);
-  
-  if (index === -1) return null;
-  
-  announcements[index] = { ...announcements[index], ...updates };
-  localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
-  syncItemToSupabase('choir_announcements', announcements[index]);
-  return announcements[index];
+export async function updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<Announcement | null> {
+  try {
+    const existing = await dbGetById<Announcement>(ANNOUNCEMENTS_KEY, id);
+    if (!existing) return null;
+    return dbUpdate<Announcement>(ANNOUNCEMENTS_KEY, id, { ...existing, ...updates });
+  } catch {
+    return null;
+  }
 }
 
 // Delete announcement
-export function deleteAnnouncement(id: string): boolean {
-  const announcements = getAllAnnouncements();
-  const filtered = announcements.filter(a => a.id !== id);
-  
-  if (filtered.length === announcements.length) return false;
-  
-  localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(filtered));
-  deleteItemFromSupabase('choir_announcements', id);
-  return true;
+export async function deleteAnnouncement(id: string): Promise<boolean> {
+  try {
+    await dbDelete(ANNOUNCEMENTS_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Toggle pin status
-export function toggleAnnouncementPin(id: string): Announcement | null {
-  const announcement = getAnnouncementById(id);
+export async function toggleAnnouncementPin(id: string): Promise<Announcement | null> {
+  const announcement = await getAnnouncementById(id);
   if (!announcement) return null;
-  
+
   return updateAnnouncement(id, { isPinned: !announcement.isPinned });
 }
 
 // Toggle active status
-export function toggleAnnouncementActive(id: string): Announcement | null {
-  const announcement = getAnnouncementById(id);
+export async function toggleAnnouncementActive(id: string): Promise<Announcement | null> {
+  const announcement = await getAnnouncementById(id);
   if (!announcement) return null;
-  
+
   return updateAnnouncement(id, { isActive: !announcement.isActive });
 }
 
 // Get announcement stats
-export function getAnnouncementStats() {
-  const announcements = getAllAnnouncements();
-  const active = getActiveAnnouncements();
-  
+export async function getAnnouncementStats() {
+  const announcements = await getAllAnnouncements();
+  const active = await getActiveAnnouncements();
+
   return {
     total: announcements.length,
     active: active.length,
@@ -120,5 +112,3 @@ export function getAnnouncementStats() {
     urgent: active.filter(a => a.priority === "urgent").length,
   };
 }
-
-

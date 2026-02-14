@@ -11,10 +11,11 @@ export const ReleasesPreview = () => {
   const [latestVideo, setLatestVideo] = useState<MusicVideo | null>(null);
 
   useEffect(() => {
-    // Load videos from admin-managed data
-    const videos = getAllMusicVideos();
-    setMusicVideos(videos);
-    setLatestVideo(getLatestMusicVideo() || null);
+    (async () => {
+      const [videos, latest] = await Promise.all([getAllMusicVideos(), getLatestMusicVideo()]);
+      setMusicVideos(videos);
+      setLatestVideo(latest || null);
+    })();
   }, []);
 
   useEffect(() => {

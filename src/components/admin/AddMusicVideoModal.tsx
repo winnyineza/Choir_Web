@@ -53,7 +53,7 @@ export function AddMusicVideoModal({
   const { toast } = useToast();
 
   useEffect(() => {
-    setAlbums(getAllAlbums());
+    getAllAlbums().then(setAlbums);
   }, [isOpen]);
 
   useEffect(() => {

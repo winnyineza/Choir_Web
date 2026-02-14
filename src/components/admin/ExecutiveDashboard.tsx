@@ -99,20 +99,25 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = () => {
+  const loadDashboardData = async () => {
     // Load all data
-    const members = getAllMembers();
-    const events = getUpcomingEvents();
-    const orders = getAllOrders();
+    const [members, events, expenses, leaveRequests, birthdays, unreadMessages] = await Promise.all([
+      getAllMembers(),
+      getUpcomingEvents(),
+      getAllExpenses(),
+      getAllLeaveRequests(),
+      getUpcomingBirthdays(7),
+      getUnreadContactCount(),
+    ]);
+    const [orders, donations, attendanceStats, sessions] = await Promise.all([
+      getAllOrders(),
+      getAllDonations(),
+      getOverallAttendanceStats(),
+      getRecentSessions(10),
+    ]);
     const contributions = getAllContributions();
-    const expenses = getAllExpenses();
-    const donations = getAllDonations();
-    const leaveRequests = getAllLeaveRequests();
     const contributionStats = getContributionStats();
-    const attendanceStats = getOverallAttendanceStats();
-    const sessions = getRecentSessions(10);
-    const analyticsStats = getPageViewStats();
-    const birthdays = getUpcomingBirthdays(7);
+    const analyticsStats = await getPageViewStats();
 
     // Set page stats
     setPageStats(analyticsStats);
@@ -120,7 +125,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
 
     // Calculate financials
     const confirmedOrders = orders.filter(o => o.status === "confirmed");
-    const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
     const contributionTotal = contributions.reduce((sum, c) => sum + (c.amount || 0), 0);
     const donationTotal = donations.reduce((sum, d) => sum + (d.amount || 0), 0);
     const expenseTotal = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -164,7 +169,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
       totalTicketsSold,
       avgCheckInRate,
       pendingLeave: leaveRequests.filter(l => l.status === "pending").length,
-      unreadMessages: getUnreadContactCount(),
+      unreadMessages,
       attendanceRate: attendanceStats.avgAttendance || 0,
       recentSessions: sessions.length,
     });

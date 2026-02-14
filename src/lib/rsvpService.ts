@@ -1,4 +1,5 @@
 import { addAuditLog, type AdminUser } from "./adminService";
+import { dbInsert, dbUpdate, dbDeleteWhere, dbQuery, generateId } from './supabaseDB';
 
 export type RsvpStatus = "yes" | "no" | "maybe";
 
@@ -13,41 +14,34 @@ export interface RsvpEntry {
 
 const KEY = "serenades_rsvps";
 
-function generateId() {
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function getAll(): RsvpEntry[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveAll(list: RsvpEntry[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(list));
-}
-
-export function setRsvp(entry: Omit<RsvpEntry, "id" | "updatedAt">, actor?: AdminUser): RsvpEntry {
-  const all = getAll();
-  const existingIdx = all.findIndex(r => r.eventId === entry.eventId && r.memberId === entry.memberId);
+export async function setRsvp(entry: Omit<RsvpEntry, "id" | "updatedAt">, actor?: AdminUser): Promise<RsvpEntry> {
+  const all = await dbQuery<RsvpEntry>(KEY, 'event_id', entry.eventId);
+  const existing = all.find(r => r.memberId === entry.memberId);
   const now = new Date().toISOString();
-  if (existingIdx >= 0) {
-    all[existingIdx] = { ...all[existingIdx], status: entry.status, note: entry.note, updatedAt: now };
+
+  if (existing) {
+    const updated = await dbUpdate<RsvpEntry>(KEY, existing.id, { status: entry.status, note: entry.note, updatedAt: now });
+    if (actor) await addAuditLog(actor, "UPDATE_EVENT", `RSVP ${entry.status} for event ${entry.eventId} by ${entry.memberId}`);
+    return updated;
   } else {
-    all.push({ ...entry, id: generateId(), updatedAt: now });
+    const newEntry = { ...entry, id: generateId(), updatedAt: now };
+    const created = await dbInsert<RsvpEntry>(KEY, newEntry);
+    if (actor) await addAuditLog(actor, "UPDATE_EVENT", `RSVP ${entry.status} for event ${entry.eventId} by ${entry.memberId}`);
+    return created;
   }
-  saveAll(all);
-  if (actor) addAuditLog(actor, "UPDATE_EVENT", `RSVP ${entry.status} for event ${entry.eventId} by ${entry.memberId}`);
-  return existingIdx >= 0 ? all[existingIdx] : all[all.length - 1];
 }
 
-export function getRsvpsForEvent(eventId: string): RsvpEntry[] {
-  return getAll().filter(r => r.eventId === eventId);
+export async function getRsvpsForEvent(eventId: string): Promise<RsvpEntry[]> {
+  return dbQuery<RsvpEntry>(KEY, 'event_id', eventId);
 }
 
-export function getRsvpStats(eventId: string) {
-  const list = getRsvpsForEvent(eventId);
+export async function getRsvpStats(eventId: string): Promise<{
+  yes: number;
+  no: number;
+  maybe: number;
+  total: number;
+}> {
+  const list = await getRsvpsForEvent(eventId);
   return {
     yes: list.filter(r => r.status === "yes").length,
     no: list.filter(r => r.status === "no").length,
@@ -56,9 +50,7 @@ export function getRsvpStats(eventId: string) {
   };
 }
 
-export function clearRsvpsForEvent(eventId: string, actor?: AdminUser) {
-  const remaining = getAll().filter(r => r.eventId !== eventId);
-  saveAll(remaining);
-  if (actor) addAuditLog(actor, "UPDATE_EVENT", `Cleared RSVPs for event ${eventId}`);
+export async function clearRsvpsForEvent(eventId: string, actor?: AdminUser): Promise<void> {
+  await dbDeleteWhere(KEY, 'event_id', eventId);
+  if (actor) await addAuditLog(actor, "UPDATE_EVENT", `Cleared RSVPs for event ${eventId}`);
 }
-

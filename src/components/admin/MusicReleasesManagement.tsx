@@ -81,18 +81,24 @@ export function MusicReleasesManagement() {
     isLatest: false,
     isFeatured: false,
   });
+  const [stats, setStats] = useState({ totalAlbums: 0, totalVideos: 0, totalTracks: 0, latestAlbum: "None", latestVideo: "None" });
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setAlbums(getAllAlbums());
-    setMusicVideos(getAllMusicVideos());
-    setPlatforms(getAllPlatforms());
+  const loadData = async () => {
+    const [albumsData, videosData, platformsData, statsData] = await Promise.all([
+      getAllAlbums(),
+      getAllMusicVideos(),
+      getAllPlatforms(),
+      getReleaseStats(),
+    ]);
+    setAlbums(albumsData);
+    setMusicVideos(videosData);
+    setPlatforms(platformsData);
+    setStats(statsData);
   };
-
-  const stats = getReleaseStats();
 
   // Filter items
   const filteredAlbums = albums.filter(a =>
@@ -103,7 +109,7 @@ export function MusicReleasesManagement() {
   );
 
   // Album handlers
-  const handleAlbumSubmit = () => {
+  const handleAlbumSubmit = async () => {
     if (!albumForm.title || !albumForm.year) {
       toast({
         title: "Error",
@@ -114,13 +120,13 @@ export function MusicReleasesManagement() {
     }
 
     if (selectedAlbum) {
-      updateAlbum(selectedAlbum.id, albumForm);
+      await updateAlbum(selectedAlbum.id, albumForm);
       if (currentUser) {
         addAuditLog(currentUser, "UPDATE_ALBUM", `Updated album: ${albumForm.title}`);
       }
       toast({ title: "Album Updated", description: "Album has been updated." });
     } else {
-      addAlbum(albumForm);
+      await addAlbum(albumForm);
       if (currentUser) {
         addAuditLog(currentUser, "CREATE_ALBUM", `Added album: ${albumForm.title}`);
       }
@@ -132,10 +138,10 @@ export function MusicReleasesManagement() {
     resetAlbumForm();
   };
 
-  const handleAlbumDelete = (id: string) => {
+  const handleAlbumDelete = async (id: string) => {
     if (!confirm("Delete this album?")) return;
     const album = albums.find(a => a.id === id);
-    deleteAlbum(id);
+    await deleteAlbum(id);
     if (currentUser && album) {
       addAuditLog(currentUser, "DELETE_ALBUM", `Deleted album: ${album.title}`);
     }
@@ -171,7 +177,7 @@ export function MusicReleasesManagement() {
   };
 
   // Video handlers
-  const handleVideoSubmit = () => {
+  const handleVideoSubmit = async () => {
     if (!videoForm.title || !videoForm.youtubeId) {
       toast({
         title: "Error",
@@ -185,13 +191,13 @@ export function MusicReleasesManagement() {
     const youtubeId = extractYouTubeId(videoForm.youtubeId) || videoForm.youtubeId;
 
     if (selectedVideo) {
-      updateMusicVideo(selectedVideo.id, { ...videoForm, youtubeId });
+      await updateMusicVideo(selectedVideo.id, { ...videoForm, youtubeId });
       if (currentUser) {
         addAuditLog(currentUser, "UPDATE_VIDEO", `Updated music video: ${videoForm.title}`);
       }
       toast({ title: "Video Updated", description: "Music video has been updated." });
     } else {
-      addMusicVideo({ ...videoForm, youtubeId });
+      await addMusicVideo({ ...videoForm, youtubeId });
       if (currentUser) {
         addAuditLog(currentUser, "CREATE_VIDEO", `Added music video: ${videoForm.title}`);
       }
@@ -203,10 +209,10 @@ export function MusicReleasesManagement() {
     resetVideoForm();
   };
 
-  const handleVideoDelete = (id: string) => {
+  const handleVideoDelete = async (id: string) => {
     if (!confirm("Delete this video?")) return;
     const video = musicVideos.find(v => v.id === id);
-    deleteMusicVideo(id);
+    await deleteMusicVideo(id);
     if (currentUser && video) {
       addAuditLog(currentUser, "DELETE_VIDEO", `Deleted music video: ${video.title}`);
     }
@@ -238,20 +244,20 @@ export function MusicReleasesManagement() {
   };
 
   // Platform handlers
-  const handlePlatformToggle = (id: string, isVisible: boolean) => {
+  const handlePlatformToggle = async (id: string, isVisible: boolean) => {
     const updated = platforms.map(p =>
       p.id === id ? { ...p, isVisible } : p
     );
     setPlatforms(updated);
-    updateAllPlatforms(updated);
+    await updateAllPlatforms(updated);
   };
 
-  const handlePlatformUrlChange = (id: string, url: string) => {
+  const handlePlatformUrlChange = async (id: string, url: string) => {
     const updated = platforms.map(p =>
       p.id === id ? { ...p, url } : p
     );
     setPlatforms(updated);
-    updateAllPlatforms(updated);
+    await updateAllPlatforms(updated);
   };
 
   return (

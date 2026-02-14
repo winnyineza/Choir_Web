@@ -138,12 +138,12 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     loadFinancialData();
   }, []);
 
-  const loadFinancialData = () => {
+  const loadFinancialData = async () => {
     // Ticket Revenue
-    const orders = getAllOrders();
+    const orders = await getAllOrders();
     setAllOrders(orders);
     const confirmedOrders = orders.filter(o => o.status === "confirmed");
-    const ticketRev = confirmedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const ticketRev = confirmedOrders.reduce((sum, o) => sum + o.total, 0);
     setTicketRevenue(ticketRev);
 
     // Contributions
@@ -153,13 +153,13 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     setContributionTotal(contribTotal);
 
     // Donations
-    const allDonations = getAllDonations();
+    const allDonations = await getAllDonations();
     setDonations(allDonations);
     const donTotal = allDonations.reduce((sum, d) => sum + d.amount, 0);
     setDonationTotal(donTotal);
 
     // Expenses
-    const expenses = getAllExpenses();
+    const expenses = await getAllExpenses();
     setAllExpenses(expenses);
     const expTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
     setExpenseTotal(expTotal);
@@ -170,7 +170,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         id: o.id,
         type: "ticket" as const,
         description: `Ticket: ${o.eventTitle}`,
-        amount: o.totalAmount,
+        amount: o.total,
         date: o.createdAt,
         isIncome: true,
       })),

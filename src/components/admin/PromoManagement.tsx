@@ -73,12 +73,17 @@ export function PromoManagement() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setPromoCodes(getAllPromoCodes());
-    setEvents(getAllEvents());
-  };
+  const [stats, setStats] = useState({ total: 0, active: 0, totalUses: 0 });
 
-  const stats = getPromoStats();
+  const loadData = async () => {
+    const [codes, promoStats] = await Promise.all([
+      getAllPromoCodes(),
+      getPromoStats(),
+    ]);
+    setPromoCodes(codes);
+    setEvents(getAllEvents());
+    setStats(promoStats);
+  };
 
   // Filter codes
   const filteredCodes = promoCodes.filter(code => {
@@ -103,7 +108,7 @@ export function PromoManagement() {
     return { label: "Active", color: "text-green-400", bg: "bg-green-400/20" };
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.discountValue || !formData.validFrom || !formData.validUntil) {
       toast({
         title: "Error",
@@ -113,23 +118,26 @@ export function PromoManagement() {
       return;
     }
 
-    if (selectedPromo) {
-      updatePromoCode(selectedPromo.id, formData);
-      if (currentUser) {
-        addAuditLog(currentUser, "UPDATE_PROMO", `Updated promo code: ${selectedPromo.code}`);
+    try {
+      if (selectedPromo) {
+        await updatePromoCode(selectedPromo.id, formData);
+        if (currentUser) {
+          addAuditLog(currentUser, "UPDATE_PROMO", `Updated promo code: ${selectedPromo.code}`);
+        }
+        toast({ title: "Promo Updated", description: "Promo code has been updated." });
+      } else {
+        await createPromoCode(formData);
+        if (currentUser) {
+          addAuditLog(currentUser, "CREATE_PROMO", `Created new promo code`);
+        }
+        toast({ title: "Promo Created", description: "A new promo code has been generated." });
       }
-      toast({ title: "Promo Updated", description: "Promo code has been updated." });
-    } else {
-      createPromoCode(formData);
-      if (currentUser) {
-        addAuditLog(currentUser, "CREATE_PROMO", `Created new promo code`);
-      }
-      toast({ title: "Promo Created", description: "A new promo code has been generated." });
+      await loadData();
+      setShowAddModal(false);
+      resetForm();
+    } catch {
+      toast({ title: "Error", description: "Failed to save promo code", variant: "destructive" });
     }
-
-    loadData();
-    setShowAddModal(false);
-    resetForm();
   };
 
   const handleDelete = (id: string) => {

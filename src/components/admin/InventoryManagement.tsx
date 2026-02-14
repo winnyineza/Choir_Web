@@ -24,7 +24,7 @@ import {
   updateInventoryItem,
   deleteInventoryItem,
   getInventoryStats,
-  getItemAssignments,
+  getAllAssignments,
   assignItem,
   returnItem,
   getCategoryLabel,
@@ -34,6 +34,7 @@ import {
   type InventoryItem,
   type ItemCategory,
   type ItemCondition,
+  type ItemAssignment,
 } from "@/lib/inventoryService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -155,64 +156,86 @@ export function InventoryManagement() {
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Delete this inventory item?")) return;
     const item = items.find(i => i.id === id);
-    deleteInventoryItem(id);
-    if (currentUser && item) {
-      addAuditLog(currentUser, "DELETE_INVENTORY", `Deleted inventory item: ${item.name}`);
+    try {
+      const deleted = await deleteInventoryItem(id);
+      if (deleted) {
+        if (currentUser && item) {
+          addAuditLog(currentUser, "DELETE_INVENTORY", `Deleted inventory item: ${item.name}`);
+        }
+        toast({ title: "Item Deleted", description: "Inventory item has been deleted." });
+        await loadData();
+      } else {
+        toast({ title: "Error", description: "Item not found or could not be deleted", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to delete item", variant: "destructive" });
     }
-    toast({ title: "Item Deleted", description: "Inventory item has been deleted." });
-    loadData();
   };
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selectedItem || !assignMemberId) return;
 
     const member = members.find(m => m.id === assignMemberId);
     if (!member) return;
 
-    const result = assignItem(
-      selectedItem.id,
-      assignMemberId,
-      member.name,
-      assignQuantity,
-      assignNotes
-    );
+    try {
+      const result = await assignItem(
+        selectedItem.id,
+        assignMemberId,
+        member.name,
+        assignQuantity,
+        assignNotes
+      );
 
-    if (result) {
-      if (currentUser) {
-        addAuditLog(currentUser, "ASSIGN_INVENTORY", `Assigned ${selectedItem.name} (qty: ${assignQuantity}) to ${member.name}`);
+      if (result) {
+        if (currentUser) {
+          addAuditLog(currentUser, "ASSIGN_INVENTORY", `Assigned ${selectedItem.name} (qty: ${assignQuantity}) to ${member.name}`);
+        }
+        toast({ title: "Item Assigned", description: `${selectedItem.name} assigned to ${member.name}.` });
+        await loadData();
+        setShowAssignModal(false);
+        resetAssignForm();
+      } else {
+        toast({ title: "Error", description: "Not enough items available.", variant: "destructive" });
       }
-      toast({ title: "Item Assigned", description: `${selectedItem.name} assigned to ${member.name}.` });
-      loadData();
-      setShowAssignModal(false);
-      resetAssignForm();
-    } else {
-      toast({ title: "Error", description: "Not enough items available.", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to assign item", variant: "destructive" });
     }
   };
 
-  const handleReturn = (assignmentId: string) => {
+  const handleReturn = async (assignmentId: string) => {
     if (!confirm("Return this item?")) return;
-    returnItem(assignmentId);
-    if (currentUser) {
-      addAuditLog(currentUser, "RETURN_INVENTORY", `Item returned to inventory`);
+    try {
+      const returned = await returnItem(assignmentId);
+      if (returned) {
+        if (currentUser) {
+          addAuditLog(currentUser, "RETURN_INVENTORY", `Item returned to inventory`);
+        }
+        toast({ title: "Item Returned", description: "Item has been returned to inventory." });
+        await loadData();
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to return item", variant: "destructive" });
     }
-    toast({ title: "Item Returned", description: "Item has been returned to inventory." });
-    loadData();
   };
 
-  const handleExport = () => {
-    const csv = exportInventoryToCSV();
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `inventory_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported", description: "Inventory exported to CSV." });
+  const handleExport = async () => {
+    try {
+      const csv = await exportInventoryToCSV();
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `inventory_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Exported", description: "Inventory exported to CSV." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to export", variant: "destructive" });
+    }
   };
 
   const resetForm = () => {
@@ -389,7 +412,7 @@ export function InventoryManagement() {
             <tbody className="divide-y divide-primary/10">
               {filteredItems.map((item) => {
                 const CategoryIcon = categoryIcons[item.category];
-                const assignments = getItemAssignments(item.id);
+                const itemAssignments = assignments.filter(a => a.itemId === item.id);
                 return (
                   <tr key={item.id} className="hover:bg-primary/5">
                     <td className="p-3">
@@ -443,9 +466,9 @@ export function InventoryManagement() {
                         </Button>
                       </div>
                       {/* Show assignments */}
-                      {assignments.length > 0 && (
+                      {itemAssignments.length > 0 && (
                         <div className="mt-2 space-y-1">
-                          {assignments.map((a) => (
+                          {itemAssignments.map((a) => (
                             <div key={a.id} className="flex items-center justify-between text-xs bg-secondary/50 rounded px-2 py-1">
                               <span className="text-muted-foreground">{a.memberName} ({a.quantity})</span>
                               <button

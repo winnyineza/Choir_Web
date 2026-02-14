@@ -1,5 +1,5 @@
 import { addAuditLog, type AdminUser } from "./adminService";
-import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
+import { dbGetAll, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
 
 export type AuditionStatus = "scheduled" | "completed" | "accepted" | "rejected" | "waitlist";
 
@@ -20,48 +20,48 @@ export interface Audition {
 
 const KEY = "serenades_auditions";
 
-function generateId() {
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export async function getAllAuditions(): Promise<Audition[]> {
+  const list = await dbGetAll<Audition>(KEY);
+  return (list || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-function getAllInternal(): Audition[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveAll(list: Audition[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(list));
-}
-
-export function getAllAuditions(): Audition[] {
-  return getAllInternal().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function createAudition(input: Omit<Audition, "id" | "createdAt" | "updatedAt">, actor?: AdminUser): Audition {
+export async function createAudition(
+  input: Omit<Audition, "id" | "createdAt" | "updatedAt">,
+  actor?: AdminUser
+): Promise<Audition> {
   const now = new Date().toISOString();
-  const audition: Audition = { ...input, id: generateId(), createdAt: now, updatedAt: now };
-  const list = getAllInternal();
-  list.push(audition);
-  saveAll(list);
+  const audition: Omit<Audition, "id"> = {
+    ...input,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const created = await dbInsert<Audition>(KEY, audition);
   if (actor) addAuditLog(actor, "CREATE", `Created audition for ${input.candidateName}`);
-  return audition;
+  return created;
 }
 
-export function updateAudition(id: string, updates: Partial<Audition>, actor?: AdminUser): Audition | null {
-  const list = getAllInternal();
-  const idx = list.findIndex(a => a.id === id);
-  if (idx === -1) return null;
-  list[idx] = { ...list[idx], ...updates, updatedAt: new Date().toISOString() };
-  saveAll(list);
-  if (actor) addAuditLog(actor, "UPDATE", `Updated audition ${id}`);
-  return list[idx];
+export async function updateAudition(
+  id: string,
+  updates: Partial<Audition>,
+  actor?: AdminUser
+): Promise<Audition | null> {
+  try {
+    const updated = await dbUpdate<Audition>(KEY, id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+    if (actor) addAuditLog(actor, "UPDATE", `Updated audition ${id}`);
+    return updated;
+  } catch {
+    return null;
+  }
 }
 
-export function deleteAudition(id: string, actor?: AdminUser) {
-  const list = getAllInternal().filter(a => a.id !== id);
-  saveAll(list);
-  if (actor) addAuditLog(actor, "DELETE", `Deleted audition ${id}`);
+export async function deleteAudition(id: string, actor?: AdminUser): Promise<void> {
+  try {
+    await dbDelete(KEY, id);
+    if (actor) addAuditLog(actor, "DELETE", `Deleted audition ${id}`);
+  } catch {
+    // ignore
+  }
 }
-

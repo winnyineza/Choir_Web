@@ -33,13 +33,13 @@ function AnalyticsTracker() {
 
   useEffect(() => {
     // Track session on app load
-    trackSession();
+    void trackSession();
   }, []);
 
   useEffect(() => {
     // Track page views on route change
     const title = document.title || "Serenades of Praise";
-    trackPageView(location.pathname, title);
+    void trackPageView(location.pathname, title);
   }, [location]);
 
   return null;

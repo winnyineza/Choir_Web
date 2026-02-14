@@ -1,5 +1,7 @@
 // Meeting Minutes Service - manages choir meeting records
 
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
+
 export type MeetingType = "general" | "committee" | "rehearsal" | "emergency" | "agm";
 
 export interface MeetingAgendaItem {
@@ -46,72 +48,66 @@ export interface MeetingStats {
 
 const MEETINGS_KEY = "choir_meeting_minutes";
 
-function generateId(): string {
-  return `mtg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
 // ============ CRUD OPERATIONS ============
 
-export function getAllMeetings(): MeetingMinutes[] {
-  try {
-    const stored = localStorage.getItem(MEETINGS_KEY);
-    const meetings = stored ? JSON.parse(stored) : [];
-    return meetings.sort((a: MeetingMinutes, b: MeetingMinutes) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  } catch {
-    return [];
-  }
+export async function getAllMeetings(): Promise<MeetingMinutes[]> {
+  const meetings = await dbGetAll<MeetingMinutes>(MEETINGS_KEY);
+  return meetings.sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 }
 
-function saveMeetings(meetings: MeetingMinutes[]): void {
-  localStorage.setItem(MEETINGS_KEY, JSON.stringify(meetings));
+export async function getMeetingById(id: string): Promise<MeetingMinutes | undefined> {
+  const meeting = await dbGetById<MeetingMinutes>(MEETINGS_KEY, id);
+  return meeting ?? undefined;
 }
 
-export function getMeetingById(id: string): MeetingMinutes | undefined {
-  return getAllMeetings().find(m => m.id === id);
+export async function getMeetingsByType(type: MeetingType): Promise<MeetingMinutes[]> {
+  const meetings = await dbQuery<MeetingMinutes>(MEETINGS_KEY, 'type', type);
+  return meetings.sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 }
 
-export function getMeetingsByType(type: MeetingType): MeetingMinutes[] {
-  return getAllMeetings().filter(m => m.type === type);
+export async function getMeetingsByDateRange(startDate: string, endDate: string): Promise<MeetingMinutes[]> {
+  const meetings = await dbGetAll<MeetingMinutes>(MEETINGS_KEY);
+  return meetings
+    .filter(m => m.date >= startDate && m.date <= endDate)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-export function getMeetingsByDateRange(startDate: string, endDate: string): MeetingMinutes[] {
-  return getAllMeetings().filter(m => m.date >= startDate && m.date <= endDate);
-}
-
-export function createMeeting(data: Omit<MeetingMinutes, "id" | "createdAt" | "status">): MeetingMinutes {
-  const meetings = getAllMeetings();
-  
-  const newMeeting: MeetingMinutes = {
+export async function createMeeting(
+  data: Omit<MeetingMinutes, "id" | "createdAt" | "status">
+): Promise<MeetingMinutes> {
+  const newMeeting = {
     ...data,
     id: generateId(),
-    status: "draft",
+    status: "draft" as const,
     createdAt: new Date().toISOString(),
     agenda: data.agenda || [],
   };
-  
-  meetings.push(newMeeting);
-  saveMeetings(meetings);
-  return newMeeting;
+  return dbInsert<MeetingMinutes>(MEETINGS_KEY, newMeeting);
 }
 
-export function updateMeeting(id: string, updates: Partial<MeetingMinutes>): MeetingMinutes | null {
-  const meetings = getAllMeetings();
-  const index = meetings.findIndex(m => m.id === id);
-  if (index === -1) return null;
-  
-  meetings[index] = {
-    ...meetings[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  
-  saveMeetings(meetings);
-  return meetings[index];
+export async function updateMeeting(
+  id: string,
+  updates: Partial<MeetingMinutes>
+): Promise<MeetingMinutes | null> {
+  try {
+    const existing = await dbGetById<MeetingMinutes>(MEETINGS_KEY, id);
+    if (!existing) return null;
+
+    const merged = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    return await dbUpdate<MeetingMinutes>(MEETINGS_KEY, id, merged);
+  } catch {
+    return null;
+  }
 }
 
-export function approveMeeting(id: string, approvedBy: string): MeetingMinutes | null {
+export async function approveMeeting(id: string, approvedBy: string): Promise<MeetingMinutes | null> {
   return updateMeeting(id, {
     status: "approved",
     approvedBy,
@@ -119,65 +115,70 @@ export function approveMeeting(id: string, approvedBy: string): MeetingMinutes |
   });
 }
 
-export function deleteMeeting(id: string): boolean {
-  const meetings = getAllMeetings();
-  const filtered = meetings.filter(m => m.id !== id);
-  if (filtered.length === meetings.length) return false;
-  
-  saveMeetings(filtered);
-  return true;
+export async function deleteMeeting(id: string): Promise<boolean> {
+  try {
+    const existing = await dbGetById<MeetingMinutes>(MEETINGS_KEY, id);
+    if (!existing) return false;
+    await dbDelete(MEETINGS_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ AGENDA ITEMS ============
 
-export function addAgendaItem(meetingId: string, item: Omit<MeetingAgendaItem, "id">): MeetingAgendaItem | null {
-  const meeting = getMeetingById(meetingId);
+export async function addAgendaItem(
+  meetingId: string,
+  item: Omit<MeetingAgendaItem, "id">
+): Promise<MeetingAgendaItem | null> {
+  const meeting = await getMeetingById(meetingId);
   if (!meeting) return null;
-  
+
   const newItem: MeetingAgendaItem = {
     ...item,
     id: `agenda_${Date.now()}`,
   };
-  
-  updateMeeting(meetingId, {
+
+  await updateMeeting(meetingId, {
     agenda: [...meeting.agenda, newItem],
   });
-  
+
   return newItem;
 }
 
-export function updateAgendaItem(
+export async function updateAgendaItem(
   meetingId: string,
   itemId: string,
   updates: Partial<MeetingAgendaItem>
-): boolean {
-  const meeting = getMeetingById(meetingId);
+): Promise<boolean> {
+  const meeting = await getMeetingById(meetingId);
   if (!meeting) return false;
-  
+
   const updatedAgenda = meeting.agenda.map(item =>
     item.id === itemId ? { ...item, ...updates } : item
   );
-  
-  updateMeeting(meetingId, { agenda: updatedAgenda });
+
+  await updateMeeting(meetingId, { agenda: updatedAgenda });
   return true;
 }
 
-export function deleteAgendaItem(meetingId: string, itemId: string): boolean {
-  const meeting = getMeetingById(meetingId);
+export async function deleteAgendaItem(meetingId: string, itemId: string): Promise<boolean> {
+  const meeting = await getMeetingById(meetingId);
   if (!meeting) return false;
-  
+
   const filteredAgenda = meeting.agenda.filter(item => item.id !== itemId);
-  updateMeeting(meetingId, { agenda: filteredAgenda });
+  await updateMeeting(meetingId, { agenda: filteredAgenda });
   return true;
 }
 
 // ============ STATS ============
 
-export function getMeetingStats(): MeetingStats {
-  const meetings = getAllMeetings();
+export async function getMeetingStats(): Promise<MeetingStats> {
+  const meetings = await dbGetAll<MeetingMinutes>(MEETINGS_KEY);
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  
+
   const byType: Record<MeetingType, number> = {
     general: 0,
     committee: 0,
@@ -185,18 +186,18 @@ export function getMeetingStats(): MeetingStats {
     emergency: 0,
     agm: 0,
   };
-  
+
   let drafts = 0;
   let approved = 0;
   let thisMonthCount = 0;
-  
+
   meetings.forEach(m => {
     byType[m.type]++;
     if (m.status === "draft") drafts++;
     else approved++;
     if (m.date.startsWith(thisMonth)) thisMonthCount++;
   });
-  
+
   return {
     totalMeetings: meetings.length,
     thisMonth: thisMonthCount,
@@ -206,7 +207,7 @@ export function getMeetingStats(): MeetingStats {
   };
 }
 
-// ============ UTILITIES ============
+// ============ UTILITIES (pure computation - stay sync) ============
 
 export function getMeetingTypeLabel(type: MeetingType): string {
   const labels: Record<MeetingType, string> = {
@@ -270,9 +271,9 @@ Status: ${meeting.status === "approved" ? `Approved by ${meeting.approvedBy} on 
   return text.trim();
 }
 
-export function exportMeetingsToCSV(): string {
-  const meetings = getAllMeetings();
-  
+export async function exportMeetingsToCSV(): Promise<string> {
+  const meetings = await getAllMeetings();
+
   const headers = [
     "Date",
     "Title",
@@ -284,7 +285,7 @@ export function exportMeetingsToCSV(): string {
     "Agenda Items",
     "Status",
   ];
-  
+
   const rows = meetings.map(m => [
     m.date,
     `"${m.title}"`,
@@ -296,7 +297,6 @@ export function exportMeetingsToCSV(): string {
     m.agenda.length,
     m.status,
   ]);
-  
+
   return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
 }
-

@@ -50,7 +50,7 @@ export function ExpenseManagement() {
   const { currentUser } = useAuth();
   
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [stats, setStats] = useState(getExpenseStats());
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getExpenseStats>> | null>(null);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,9 +77,10 @@ export function ExpenseManagement() {
     loadData();
   }, []);
   
-  const loadData = () => {
-    setExpenses(getAllExpenses());
-    setStats(getExpenseStats());
+  const loadData = async () => {
+    const [expensesData, statsData] = await Promise.all([getAllExpenses(), getExpenseStats()]);
+    setExpenses(expensesData);
+    setStats(statsData);
   };
   
   const filteredExpenses = expenses
@@ -116,7 +117,7 @@ export function ExpenseManagement() {
     });
   };
   
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.description || !form.amount) {
       toast({ title: "Error", description: "Description and amount are required.", variant: "destructive" });
       return;
@@ -129,7 +130,7 @@ export function ExpenseManagement() {
     }
     
     if (editingExpense) {
-      updateExpense(editingExpense.id, {
+      await updateExpense(editingExpense.id, {
         date: form.date,
         category: form.category,
         description: form.description,
@@ -144,7 +145,7 @@ export function ExpenseManagement() {
       }
       toast({ title: "Updated", description: "Expense updated successfully." });
     } else {
-      createExpense({
+      await createExpense({
         date: form.date,
         category: form.category,
         description: form.description,
@@ -238,7 +239,7 @@ export function ExpenseManagement() {
               <TrendingDown className="w-5 h-5 text-red-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-red-500">{formatCurrency(stats.totalExpenses)}</p>
+              <p className="text-2xl font-bold text-red-500">{formatCurrency(stats?.totalExpenses ?? 0)}</p>
               <p className="text-xs text-muted-foreground">Total Expenses</p>
             </div>
           </div>
@@ -249,7 +250,7 @@ export function ExpenseManagement() {
               <Calendar className="w-5 h-5 text-orange-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-orange-500">{formatCurrency(stats.thisMonthExpenses)}</p>
+              <p className="text-2xl font-bold text-orange-500">{formatCurrency(stats?.thisMonthExpenses ?? 0)}</p>
               <p className="text-xs text-muted-foreground">This Month</p>
             </div>
           </div>
@@ -260,7 +261,7 @@ export function ExpenseManagement() {
               <TrendingDown className="w-5 h-5 text-yellow-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats.thisYearExpenses)}</p>
+              <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats?.thisYearExpenses ?? 0)}</p>
               <p className="text-xs text-muted-foreground">This Year</p>
             </div>
           </div>
@@ -271,7 +272,7 @@ export function ExpenseManagement() {
               <Receipt className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.expenseCount}</p>
+              <p className="text-2xl font-bold">{stats?.expenseCount ?? 0}</p>
               <p className="text-xs text-muted-foreground">Total Records</p>
             </div>
           </div>

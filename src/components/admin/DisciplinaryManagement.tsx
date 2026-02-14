@@ -27,6 +27,7 @@ import {
   getDisciplinaryStats,
   exportDisciplinaryToCSV,
   type DisciplinaryRecord,
+  type DisciplinaryStats,
 } from "@/lib/disciplinaryService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,17 +108,21 @@ export function DisciplinaryManagement() {
   const [selectedWitnesses, setSelectedWitnesses] = useState<string[]>([]);
   const [showWitnessDropdown, setShowWitnessDropdown] = useState(false);
   const [resolution, setResolution] = useState("");
+  const [stats, setStats] = useState<DisciplinaryStats>({ total: 0, active: 0, resolved: 0, warnings: 0, suspensions: 0, fines: 0, commendations: 0, byMember: [] });
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setRecords(getAllDisciplinaryRecords());
+  const loadData = async () => {
+    const [recordsData, statsData] = await Promise.all([
+      getAllDisciplinaryRecords(),
+      getDisciplinaryStats(),
+    ]);
+    setRecords(recordsData);
+    setStats(statsData);
     setMembers(getAllMembers());
   };
-
-  const stats = getDisciplinaryStats();
 
   // Filter records
   const filteredRecords = records.filter(r => {
@@ -138,7 +143,7 @@ export function DisciplinaryManagement() {
     return acc;
   }, {} as Record<string, { memberName: string; records: DisciplinaryRecord[] }>);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.memberId || !formData.reason || !formData.description) {
       toast({
         title: "Error",
@@ -151,44 +156,45 @@ export function DisciplinaryManagement() {
     const member = members.find(m => m.id === formData.memberId);
     if (!member) return;
 
-    if (selectedRecord) {
-      // Update
-      updateDisciplinaryRecord(selectedRecord.id, {
-        ...formData,
-        memberName: member.name,
-        witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
-          const w = members.find(m => m.id === id);
-          return w?.name || id;
-        }) : undefined,
-      });
-      if (currentUser) {
-        addAuditLog(currentUser, "UPDATE_DISCIPLINARY", `Updated disciplinary record for ${member.name}`);
+    try {
+      if (selectedRecord) {
+        await updateDisciplinaryRecord(selectedRecord.id, {
+          ...formData,
+          memberName: member.name,
+          witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
+            const w = members.find(m => m.id === id);
+            return w?.name || id;
+          }) : undefined,
+        });
+        if (currentUser) {
+          addAuditLog(currentUser, "UPDATE_DISCIPLINARY", `Updated disciplinary record for ${member.name}`);
+        }
+        toast({ title: "Record Updated", description: "Disciplinary record has been updated." });
+      } else {
+        await createDisciplinaryRecord({
+          ...formData,
+          memberName: member.name,
+          issuedBy: currentUser?.id || "",
+          issuedByName: currentUser?.name || "Admin",
+          witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
+            const w = members.find(m => m.id === id);
+            return w?.name || id;
+          }) : undefined,
+        });
+        if (currentUser) {
+          addAuditLog(currentUser, "CREATE_DISCIPLINARY", `Created disciplinary record for ${member.name}: ${formData.type}`);
+        }
+        toast({ title: "Record Created", description: "Disciplinary record has been created." });
       }
-      toast({ title: "Record Updated", description: "Disciplinary record has been updated." });
-    } else {
-      // Create
-      createDisciplinaryRecord({
-        ...formData,
-        memberName: member.name,
-        issuedBy: currentUser?.id || "",
-        issuedByName: currentUser?.name || "Admin",
-        witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
-          const w = members.find(m => m.id === id);
-          return w?.name || id;
-        }) : undefined,
-      });
-      if (currentUser) {
-        addAuditLog(currentUser, "CREATE_DISCIPLINARY", `Created disciplinary record for ${member.name}: ${formData.type}`);
-      }
-      toast({ title: "Record Created", description: "Disciplinary record has been created." });
+      await loadData();
+      setShowAddModal(false);
+      resetForm();
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to save record", variant: "destructive" });
     }
-
-    loadData();
-    setShowAddModal(false);
-    resetForm();
   };
 
-  const handleResolve = () => {
+  const handleResolve = async () => {
     if (!selectedRecord || !resolution) {
       toast({
         title: "Error",
@@ -198,38 +204,54 @@ export function DisciplinaryManagement() {
       return;
     }
 
-    resolveDisciplinaryRecord(selectedRecord.id, resolution, currentUser?.name || "Admin");
-    if (currentUser) {
-      addAuditLog(currentUser, "RESOLVE_DISCIPLINARY", `Resolved disciplinary record for ${selectedRecord.memberName}`);
+    try {
+      await resolveDisciplinaryRecord(selectedRecord.id, resolution, currentUser?.name || "Admin");
+      if (currentUser) {
+        addAuditLog(currentUser, "RESOLVE_DISCIPLINARY", `Resolved disciplinary record for ${selectedRecord.memberName}`);
+      }
+      toast({ title: "Record Resolved", description: "Disciplinary record has been resolved." });
+      await loadData();
+      setShowResolveModal(false);
+      setResolution("");
+      setSelectedRecord(null);
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to resolve record", variant: "destructive" });
     }
-    toast({ title: "Record Resolved", description: "Disciplinary record has been resolved." });
-    loadData();
-    setShowResolveModal(false);
-    setResolution("");
-    setSelectedRecord(null);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
     const record = records.find(r => r.id === id);
-    deleteDisciplinaryRecord(id);
-    if (currentUser && record) {
-      addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Deleted disciplinary record for ${record.memberName}`);
+    try {
+      const deleted = await deleteDisciplinaryRecord(id);
+      if (deleted) {
+        if (currentUser && record) {
+          addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Deleted disciplinary record for ${record.memberName}`);
+        }
+        toast({ title: "Record Deleted", description: "Disciplinary record has been deleted." });
+        await loadData();
+      } else {
+        toast({ title: "Error", description: "Record not found or could not be deleted", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to delete record", variant: "destructive" });
     }
-    toast({ title: "Record Deleted", description: "Disciplinary record has been deleted." });
-    loadData();
   };
 
-  const handleExport = () => {
-    const csv = exportDisciplinaryToCSV();
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `disciplinary_records_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported", description: "Disciplinary records exported to CSV." });
+  const handleExport = async () => {
+    try {
+      const csv = await exportDisciplinaryToCSV();
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `disciplinary_records_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Exported", description: "Disciplinary records exported to CSV." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to export", variant: "destructive" });
+    }
   };
 
   const resetForm = () => {

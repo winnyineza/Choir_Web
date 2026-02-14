@@ -2,6 +2,7 @@
 // Sends welcome emails to new choir members with portal access instructions
 
 import { getSettings, type Member } from "./dataService";
+import { dbGetAll, dbInsert, dbQuery, generateId } from './supabaseDB';
 
 const INVITE_LOG_KEY = "choir_member_invites";
 
@@ -148,7 +149,7 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           
           <!-- Security Notice -->
           <tr>
-            <td style="padding: 0 30px 20px;">
+            <td style="padding: 0 20px 20px;">
               <p style="margin: 0; color: #666; font-size: 12px; text-align: center; line-height: 1.6;">
                 Keep your Portal PIN private. Do not share it with non-members.<br>
                 If you did not expect this email, please ignore it.
@@ -177,34 +178,31 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
 }
 
 /**
- * Log an invite attempt to localStorage
+ * Log an invite attempt to Supabase
  */
-function logInvite(entry: MemberInviteLog): void {
-  const existing = JSON.parse(localStorage.getItem(INVITE_LOG_KEY) || "[]");
-  existing.push(entry);
-  localStorage.setItem(INVITE_LOG_KEY, JSON.stringify(existing));
+async function logInvite(entry: MemberInviteLog): Promise<void> {
+  await dbInsert<MemberInviteLog>(INVITE_LOG_KEY, { ...entry, id: entry.id || generateId() });
 }
 
 /**
  * Get invite history for a member
  */
-export function getInviteHistory(memberId: string): MemberInviteLog[] {
-  const all: MemberInviteLog[] = JSON.parse(localStorage.getItem(INVITE_LOG_KEY) || "[]");
-  return all.filter(log => log.memberId === memberId);
+export async function getInviteHistory(memberId: string): Promise<MemberInviteLog[]> {
+  return dbQuery<MemberInviteLog>(INVITE_LOG_KEY, 'member_id', memberId);
 }
 
 /**
  * Get all invite logs
  */
-export function getAllInviteLogs(): MemberInviteLog[] {
-  return JSON.parse(localStorage.getItem(INVITE_LOG_KEY) || "[]");
+export async function getAllInviteLogs(): Promise<MemberInviteLog[]> {
+  return dbGetAll<MemberInviteLog>(INVITE_LOG_KEY);
 }
 
 /**
  * Send welcome/invite email to a member
  */
 export async function sendMemberInvite(member: Partial<Member> & { id: string; email: string; name: string }): Promise<{ success: boolean; message: string }> {
-  const settings = getSettings();
+  const settings = await getSettings();
   const portalPin = settings.memberPortalPin || "2024";
   const portalUrl = getPortalUrl();
   
@@ -218,11 +216,11 @@ export async function sendMemberInvite(member: Partial<Member> & { id: string; e
   };
 
   // Check if we're in development (no Netlify functions)
-  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const isDev = typeof window !== 'undefined' && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   
   if (isDev) {
     // In development, log the email content instead of sending
-    const html = generateWelcomeEmailHtml(member, portalPin, portalUrl);
+    generateWelcomeEmailHtml(member, portalPin, portalUrl);
     console.info(
       `[DEV] Member invite email for ${member.name} (${member.email}):\n` +
       `Portal URL: ${portalUrl}\n` +
@@ -231,7 +229,7 @@ export async function sendMemberInvite(member: Partial<Member> & { id: string; e
     );
     
     inviteLog.status = "sent";
-    logInvite(inviteLog);
+    await logInvite(inviteLog);
     
     return {
       success: true,
@@ -255,7 +253,7 @@ export async function sendMemberInvite(member: Partial<Member> & { id: string; e
 
     if (response.ok) {
       inviteLog.status = "sent";
-      logInvite(inviteLog);
+      await logInvite(inviteLog);
       return {
         success: true,
         message: `Welcome email sent to ${member.email}`,
@@ -264,7 +262,7 @@ export async function sendMemberInvite(member: Partial<Member> & { id: string; e
       const error = await response.json().catch(() => ({ error: "Unknown error" }));
       inviteLog.status = "failed";
       inviteLog.error = error.error || "Failed to send";
-      logInvite(inviteLog);
+      await logInvite(inviteLog);
       return {
         success: false,
         message: `Failed to send email: ${error.error || "Unknown error"}`,
@@ -273,7 +271,7 @@ export async function sendMemberInvite(member: Partial<Member> & { id: string; e
   } catch (err: any) {
     inviteLog.status = "failed";
     inviteLog.error = err.message;
-    logInvite(inviteLog);
+    await logInvite(inviteLog);
     return {
       success: false,
       message: `Error sending email: ${err.message}`,

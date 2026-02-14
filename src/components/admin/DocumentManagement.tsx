@@ -81,18 +81,23 @@ export function DocumentManagement() {
     data: string;
   } | null>(null);
 
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getDocumentStats>> | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setDocuments(getAllDocuments());
+  const loadData = async () => {
+    const [docs, docStats] = await Promise.all([
+      getAllDocuments(),
+      getDocumentStats(),
+    ]);
+    setDocuments(docs);
+    setStats(docStats);
   };
 
-  const stats = getDocumentStats();
-
   // Filter documents
-  const filteredDocuments = documents.filter(doc => {
+  const filteredDocuments = documents.filter((doc) => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.fileName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -102,6 +107,14 @@ export function DocumentManagement() {
       (filterVisibility === "private" && !doc.isPublic);
     return matchesSearch && matchesCategory && matchesVisibility;
   });
+
+  const statsValue = stats ?? {
+    totalDocuments: 0,
+    totalSize: 0,
+    byCategory: { constitution: 0, financial: 0, minutes: 0, music: 0, policy: 0, training: 0, other: 0 },
+    publicCount: 0,
+    recentUploads: 0,
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -135,7 +148,7 @@ export function DocumentManagement() {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title) {
       toast({
         title: "Error",
@@ -156,77 +169,79 @@ export function DocumentManagement() {
 
     const tags = formData.tags
       .split(",")
-      .map(t => t.trim())
-      .filter(t => t.length > 0);
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
 
-    if (selectedDocument) {
-      // Update existing document
-      updateDocument(selectedDocument.id, {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        isPublic: formData.isPublic,
-        tags,
-        // Update file data only if new file selected
-        ...(fileData && {
-          fileName: fileData.name,
-          fileType: fileData.type,
-          fileSize: fileData.size,
-          fileData: fileData.data,
-        }),
-      });
-      if (user) {
-        addAuditLog(user, "UPDATE_DOCUMENT", `Updated document: ${formData.title}`);
-      }
-      toast({ title: "Document Updated", description: "Document has been updated." });
-    } else {
-      // Create new document
-      createDocument({
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        fileName: fileData!.name,
-        fileType: fileData!.type,
-        fileSize: fileData!.size,
-        fileData: fileData!.data,
-        uploadedBy: user?.name || "Admin",
-        isPublic: formData.isPublic,
-        tags,
-      });
-      if (user) {
-        addAuditLog(user, "UPLOAD_DOCUMENT", `Uploaded document: ${formData.title}`);
-      }
-      toast({ title: "Document Uploaded", description: "Document has been uploaded successfully." });
-    }
-
-    loadData();
-    setShowUploadModal(false);
-    resetForm();
-  };
-
-  const handleDelete = (id: string) => {
-    if (!confirm("Delete this document?")) return;
-    const doc = documents.find(d => d.id === id);
-    deleteDocument(id);
-    if (user && doc) {
-      addAuditLog(user, "DELETE_DOCUMENT", `Deleted document: ${doc.title}`);
-    }
-    toast({ title: "Document Deleted", description: "Document has been deleted." });
-    loadData();
-  };
-
-  const handleDownload = (doc: Document) => {
     try {
-      downloadDocument(doc);
-      loadData(); // Refresh to update download count
+      if (selectedDocument) {
+        await updateDocument(selectedDocument.id, {
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          isPublic: formData.isPublic,
+          tags,
+          ...(fileData && {
+            fileName: fileData.name,
+            fileType: fileData.type,
+            fileSize: fileData.size,
+            fileData: fileData.data,
+          }),
+        });
+        if (user) {
+          addAuditLog(user, "UPDATE_DOCUMENT", `Updated document: ${formData.title}`);
+        }
+        toast({ title: "Document Updated", description: "Document has been updated." });
+      } else {
+        await createDocument({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          fileName: fileData!.name,
+          fileType: fileData!.type,
+          fileSize: fileData!.size,
+          fileData: fileData!.data,
+          uploadedBy: user?.name || "Admin",
+          isPublic: formData.isPublic,
+          tags,
+        });
+        if (user) {
+          addAuditLog(user, "UPLOAD_DOCUMENT", `Uploaded document: ${formData.title}`);
+        }
+        toast({ title: "Document Uploaded", description: "Document has been uploaded successfully." });
+      }
+      await loadData();
+      setShowUploadModal(false);
+      resetForm();
+    } catch {
+      toast({ title: "Error", description: "Failed to save document", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this document?")) return;
+    const doc = documents.find((d) => d.id === id);
+    const ok = await deleteDocument(id);
+    if (ok) {
+      if (user && doc) {
+        addAuditLog(user, "DELETE_DOCUMENT", `Deleted document: ${doc.title}`);
+      }
+      toast({ title: "Document Deleted", description: "Document has been deleted." });
+      await loadData();
+    }
+  };
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      await downloadDocument(doc);
+      await loadData(); // Refresh to update download count
       toast({ title: "Download Started", description: `Downloading ${doc.fileName}` });
     } catch {
       toast({ title: "Error", description: "Failed to download document", variant: "destructive" });
     }
   };
 
-  const handleExportList = () => {
-    const csv = exportDocumentListToCSV();
+  const handleExportList = async () => {
+    const csv = await exportDocumentListToCSV();
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -264,16 +279,18 @@ export function DocumentManagement() {
     setShowUploadModal(true);
   };
 
-  const toggleVisibility = (doc: Document) => {
-    updateDocument(doc.id, { isPublic: !doc.isPublic });
-    if (user) {
-      addAuditLog(user, "TOGGLE_DOCUMENT_VISIBILITY", `${doc.isPublic ? "Made private" : "Made public"}: ${doc.title}`);
+  const toggleVisibility = async (doc: Document) => {
+    const updated = await updateDocument(doc.id, { isPublic: !doc.isPublic });
+    if (updated) {
+      if (user) {
+        addAuditLog(user, "TOGGLE_DOCUMENT_VISIBILITY", `${doc.isPublic ? "Made private" : "Made public"}: ${doc.title}`);
+      }
+      toast({
+        title: doc.isPublic ? "Made Private" : "Made Public",
+        description: `${doc.title} is now ${doc.isPublic ? "private" : "visible to members"}.`,
+      });
+      await loadData();
     }
-    toast({
-      title: doc.isPublic ? "Made Private" : "Made Public",
-      description: `${doc.title} is now ${doc.isPublic ? "private" : "visible to members"}.`,
-    });
-    loadData();
   };
 
   return (
@@ -283,35 +300,35 @@ export function DocumentManagement() {
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <FileText className="w-4 h-4 text-primary" />
-            <span className="text-xl font-bold">{stats.totalDocuments}</span>
+            <span className="text-xl font-bold">{statsValue.totalDocuments}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Documents</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <HardDrive className="w-4 h-4 text-blue-400" />
-            <span className="text-xl font-bold">{formatFileSize(stats.totalSize)}</span>
+            <span className="text-xl font-bold">{formatFileSize(statsValue.totalSize)}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Total Size</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Globe className="w-4 h-4 text-green-400" />
-            <span className="text-xl font-bold">{stats.publicCount}</span>
+            <span className="text-xl font-bold">{statsValue.publicCount}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Public</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Lock className="w-4 h-4 text-orange-400" />
-            <span className="text-xl font-bold">{stats.totalDocuments - stats.publicCount}</span>
+            <span className="text-xl font-bold">{statsValue.totalDocuments - statsValue.publicCount}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Private</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Clock className="w-4 h-4 text-purple-400" />
-            <span className="text-xl font-bold">{stats.recentUploads}</span>
+            <span className="text-xl font-bold">{statsValue.recentUploads}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Last 30 Days</p>
         </div>
@@ -319,7 +336,7 @@ export function DocumentManagement() {
           <div className="flex items-center justify-between">
             <FolderOpen className="w-4 h-4 text-cyan-400" />
             <span className="text-xl font-bold">
-              {Object.values(stats.byCategory).filter(v => v > 0).length}
+              {Object.values(statsValue.byCategory).filter((v) => v > 0).length}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Categories</p>

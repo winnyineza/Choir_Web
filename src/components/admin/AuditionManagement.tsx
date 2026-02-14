@@ -41,7 +41,7 @@ export function AuditionManagement() {
   });
 
   useEffect(() => {
-    setAuditions(getAllAuditions());
+    getAllAuditions().then(setAuditions);
   }, []);
 
   const filtered = useMemo(() => {
@@ -69,48 +69,55 @@ export function AuditionManagement() {
     setEditing(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.candidateName || !form.scheduledAt) {
       toast({ title: "Missing info", description: "Name and schedule are required", variant: "destructive" });
       return;
     }
     const actor = currentUser as AdminUser | undefined;
-    if (editing) {
-      const updated = updateAudition(editing.id, {
-        ...form,
-        panelists: form.panelists ? form.panelists.split(",").map((p) => p.trim()) : [],
-        rating: form.rating ? Number(form.rating) : undefined,
-        recommendedVoice: form.recommendedVoice ? (form.recommendedVoice as any) : undefined,
-        status: form.status,
-      }, actor);
-      if (updated) {
-        addAuditLog(actor!, "UPDATE", `Updated audition for ${updated.candidateName}`);
-        setAuditions(getAllAuditions());
+    try {
+      if (editing) {
+        const updated = await updateAudition(editing.id, {
+          ...form,
+          panelists: form.panelists ? form.panelists.split(",").map((p) => p.trim()) : [],
+          rating: form.rating ? Number(form.rating) : undefined,
+          recommendedVoice: form.recommendedVoice ? (form.recommendedVoice as any) : undefined,
+          status: form.status,
+        }, actor);
+        if (updated) {
+          addAuditLog(actor!, "UPDATE", `Updated audition for ${updated.candidateName}`);
+          const list = await getAllAuditions();
+          setAuditions(list);
+        }
+      } else {
+        const created = await createAudition({
+          candidateName: form.candidateName,
+          candidateEmail: form.candidateEmail,
+          candidatePhone: form.candidatePhone,
+          scheduledAt: form.scheduledAt,
+          panelists: form.panelists ? form.panelists.split(",").map((p) => p.trim()) : [],
+          notes: form.notes,
+          rating: form.rating ? Number(form.rating) : undefined,
+          recommendedVoice: form.recommendedVoice ? (form.recommendedVoice as any) : undefined,
+          status: form.status,
+        }, actor);
+        addAuditLog(actor!, "CREATE", `Created audition for ${created.candidateName}`);
+        const list = await getAllAuditions();
+        setAuditions(list);
       }
-    } else {
-      const created = createAudition({
-        candidateName: form.candidateName,
-        candidateEmail: form.candidateEmail,
-        candidatePhone: form.candidatePhone,
-        scheduledAt: form.scheduledAt,
-        panelists: form.panelists ? form.panelists.split(",").map((p) => p.trim()) : [],
-        notes: form.notes,
-        rating: form.rating ? Number(form.rating) : undefined,
-        recommendedVoice: form.recommendedVoice ? (form.recommendedVoice as any) : undefined,
-        status: form.status,
-      }, actor);
-      addAuditLog(actor!, "CREATE", `Created audition for ${created.candidateName}`);
-      setAuditions(getAllAuditions());
+      resetForm();
+      setShowModal(false);
+      toast({ title: "Saved", description: "Audition saved successfully" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save audition", variant: "destructive" });
     }
-    resetForm();
-    setShowModal(false);
-    toast({ title: "Saved", description: "Audition saved successfully" });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Delete this audition?")) return;
-    deleteAudition(id, currentUser || undefined);
-    setAuditions(getAllAuditions());
+    await deleteAudition(id, currentUser || undefined);
+    const list = await getAllAuditions();
+    setAuditions(list);
   };
 
   return (

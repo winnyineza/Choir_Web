@@ -1,4 +1,5 @@
 import { addAuditLog, type AdminUser } from "./adminService";
+import { dbGetAll, dbInsert, dbDelete, generateId } from './supabaseDB';
 
 export interface Receipt {
   id: string;
@@ -18,41 +19,29 @@ export interface Receipt {
 
 const KEY = "serenades_receipts";
 
-function generateId() {
-  return `rcpt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+export async function getAllReceipts(): Promise<Receipt[]> {
+  const list = await dbGetAll<Receipt>(KEY);
+  return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-function getAllReceiptsInternal(): Receipt[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
+export async function createReceipt(data: Omit<Receipt, "id" | "createdAt">, actor?: AdminUser): Promise<Receipt> {
+  const receipt: Receipt = {
+    ...data,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
+  const created = await dbInsert<Receipt>(KEY, receipt);
+  if (actor) await addAuditLog(actor, "CREATE", `Issued receipt for ${created.memberName} - ${created.amount}`);
+  return created;
 }
 
-function saveAll(list: Receipt[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(list));
+export async function deleteReceipt(id: string, actor?: AdminUser): Promise<void> {
+  await dbDelete(KEY, id);
+  if (actor) await addAuditLog(actor, "DELETE", `Deleted receipt ${id}`);
 }
 
-export function getAllReceipts(): Receipt[] {
-  return getAllReceiptsInternal().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function createReceipt(data: Omit<Receipt, "id" | "createdAt">, actor?: AdminUser): Receipt {
-  const receipt: Receipt = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-  const list = getAllReceiptsInternal();
-  list.push(receipt);
-  saveAll(list);
-  if (actor) addAuditLog(actor, "CREATE", `Issued receipt for ${receipt.memberName} - ${receipt.amount}`);
-  return receipt;
-}
-
-export function deleteReceipt(id: string, actor?: AdminUser) {
-  saveAll(getAllReceiptsInternal().filter(r => r.id !== id));
-  if (actor) addAuditLog(actor, "DELETE", `Deleted receipt ${id}`);
-}
-
-export function exportReceiptsToCSV(): void {
-  const receipts = getAllReceipts();
+export async function exportReceiptsToCSV(): Promise<void> {
+  const receipts = await getAllReceipts();
   const headers = ["Date", "Member", "Email", "Category", "Type", "Amount", "Method", "Reference", "Period", "Recorded By"];
   const rows = receipts.map(r => [
     r.createdAt,
@@ -76,4 +65,3 @@ export function exportReceiptsToCSV(): void {
   a.click();
   URL.revokeObjectURL(url);
 }
-

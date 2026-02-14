@@ -99,7 +99,6 @@ import {
   getRecentSessions,
   saveAttendance,
   deleteAttendanceForDate,
-  hasAttendanceForDate,
   getMembersToExcuse,
   getOverallAttendanceStats,
   type AttendanceRecord,
@@ -245,12 +244,17 @@ export default function Admin() {
     balance: 0,
   });
   
+  // Order & attendance stats (loaded async)
+  const [orderStats, setOrderStats] = useState({ total: 0, pending: 0, confirmed: 0, cancelled: 0, used: 0, revenue: 0 });
+  const [overallAttendanceStats, setOverallAttendanceStats] = useState({ totalSessions: 0, avgAttendance: 0, recentTrend: 'stable' as 'up' | 'down' | 'stable' });
+  
   // Attendance state
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
   const [attendanceRecords, setAttendanceRecords] = useState<{ [memberId: string]: AttendanceStatus }>({});
   const [sessionTitle, setSessionTitle] = useState("Regular Practice");
   const [isTakingAttendance, setIsTakingAttendance] = useState(false);
+  const [membersOnLeave, setMembersOnLeave] = useState<{ memberId: string; memberName: string; reason: string }[]>([]);
   const [dashboardStats, setDashboardStats] = useState({
     totalMembers: 0,
     newMembersThisMonth: 0,
@@ -281,36 +285,55 @@ export default function Admin() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   // Settings state
-  const [settings, setSettingsState] = useState(getSettings());
+  const [settings, setSettingsState] = useState<Awaited<ReturnType<typeof getSettings>> | null>(null);
+  const [backupStats, setBackupStats] = useState<Awaited<ReturnType<typeof getBackupStats>> | null>(null);
 
   // Load data
-  const loadData = () => {
-    setMembers(getAllMembers());
-    setEvents(getAllEvents());
-    setGallery(getAllGalleryItems());
-    const allOrders = getAllOrders();
+  const loadData = async () => {
+    const [
+      membersData,
+      eventsData,
+      galleryData,
+      leaveData,
+      dashboardData,
+      expensesData,
+      unreadCount,
+    ] = await Promise.all([
+      getAllMembers(),
+      getAllEvents(),
+      getAllGalleryItems(),
+      getAllLeaveRequests(),
+      getDashboardStats(),
+      getAllExpenses(),
+      getUnreadContactCount(),
+    ]);
+    setMembers(membersData);
+    setEvents(eventsData);
+    setGallery(galleryData);
+    setLeaveRequests(leaveData);
+    setDashboardStats(dashboardData);
+    setUnreadMessages(unreadCount);
+
+    const [allOrders, contributions, donations] = await Promise.all([
+      getAllOrders(),
+      getAllContributions(),
+      getAllDonations(),
+    ]);
     setOrders(allOrders);
-    setPromoCodes(getAllPromoCodes());
-    setAlbums(getAllAlbums());
-    setMusicVideos(getAllMusicVideos());
-    setStreamingPlatforms(getAllPlatforms());
-    setLeaveRequests(getAllLeaveRequests());
-    setAttendanceSessions(getRecentSessions(20));
-    setDashboardStats(getDashboardStats());
-    setUnreadMessages(getUnreadContactCount());
-    
-    // Calculate financial totals
-    const contributions = getAllContributions();
-    const donations = getAllDonations();
-    const expenses = getAllExpenses();
+    setPromoCodes(await getAllPromoCodes());
+    setAlbums(await getAllAlbums());
+    setMusicVideos(await getAllMusicVideos());
+    setStreamingPlatforms(await getAllPlatforms());
+    setAttendanceSessions(await getRecentSessions(20));
+
     const confirmedOrders = allOrders.filter(o => o.status === "confirmed");
-    
+
     const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
     const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
-    const expenseTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const expenseTotal = expensesData.reduce((sum, e) => sum + e.amount, 0);
+    const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + o.total, 0);
     const totalIncome = contributionTotal + donationTotal + ticketRevenue;
-    
+
     setFinancialTotals({
       contributions: contributionTotal,
       donations: donationTotal,
@@ -319,7 +342,21 @@ export default function Admin() {
       totalIncome,
       balance: totalIncome - expenseTotal,
     });
+
+    const [stats, orderStatsData, attendanceStatsData] = await Promise.all([
+      getBackupStats(),
+      getOrderStats(),
+      getOverallAttendanceStats(),
+    ]);
+    setBackupStats(stats);
+    setOrderStats(orderStatsData);
+    setOverallAttendanceStats(attendanceStatsData);
   };
+
+  // Load settings on mount
+  useEffect(() => {
+    getSettings().then(setSettingsState);
+  }, []);
 
   // Load data on mount
   useEffect(() => {
@@ -484,9 +521,9 @@ export default function Admin() {
   };
 
   // Order actions
-  const handleConfirmOrder = (orderId: string) => {
+  const handleConfirmOrder = async (orderId: string) => {
     // Use confirmOrder which also reduces ticket availability
-    const updated = confirmOrder(orderId);
+    const updated = await confirmOrder(orderId);
     if (updated) {
       // Dispatch event to update Events page
       window.dispatchEvent(new Event("eventsUpdated"));
@@ -495,16 +532,16 @@ export default function Admin() {
     }
   };
 
-  const handleCancelOrder = (orderId: string) => {
-    const updated = updateOrderStatus(orderId, "cancelled");
+  const handleCancelOrder = async (orderId: string) => {
+    const updated = await updateOrderStatus(orderId, "cancelled");
     if (updated) {
       loadData();
       toast({ title: "Order Cancelled", description: `Order ${updated.txRef} has been cancelled.` });
     }
   };
 
-  const handleMarkUsed = (orderId: string) => {
-    const updated = updateOrderStatus(orderId, "used");
+  const handleMarkUsed = async (orderId: string) => {
+    const updated = await updateOrderStatus(orderId, "used");
     if (updated) {
       loadData();
       toast({ title: "Ticket Used", description: `Order ${updated.txRef} marked as used.` });
@@ -659,15 +696,14 @@ export default function Admin() {
   };
 
   // Settings save
-  const handleSaveSettings = () => {
-    updateSettings(settings);
+  const handleSaveSettings = async () => {
+    if (!settings) return;
+    await updateSettings(settings);
     if (currentUser) {
       addAuditLog(currentUser, "UPDATE_SETTINGS", "Updated system settings");
     }
     toast({ title: "Settings Saved", description: "Your changes have been saved." });
   };
-
-  const orderStats = getOrderStats();
 
   // Loading state
   if (isLoading) {
@@ -1597,8 +1633,8 @@ export default function Admin() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          const count = cleanupOldPendingOrders(24);
+                        onClick={async () => {
+                          const count = await cleanupOldPendingOrders(24);
                           if (count > 0) {
                             toast({
                               title: "Cleanup Complete",
@@ -1620,9 +1656,9 @@ export default function Admin() {
                         variant="outline"
                         size="sm"
                         className="text-red-400 hover:text-red-300"
-                        onClick={() => {
+                        onClick={async () => {
                           if (confirm("This will permanently delete all pending orders older than 24 hours. This cannot be undone. Continue?")) {
-                            const count = deletePendingOrders(24);
+                            const count = await deletePendingOrders(24);
                             if (count > 0) {
                               toast({
                                 title: "Deleted",
@@ -1977,7 +2013,7 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">Total Sessions</p>
                 </div>
                 <div className="card-glass rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-primary">{getOverallAttendanceStats().avgAttendance}%</p>
+                  <p className="text-2xl font-bold text-primary">{overallAttendanceStats.avgAttendance}%</p>
                   <p className="text-xs text-muted-foreground">Avg. Attendance</p>
                 </div>
                 <div className="card-glass rounded-xl p-4 text-center">
@@ -2082,7 +2118,7 @@ export default function Admin() {
                     {!isTakingAttendance ? (
                       <Button
                         variant="gold"
-                        onClick={() => {
+                        onClick={async () => {
                           if (members.length === 0) {
                             toast({
                               title: "No Members",
@@ -2093,14 +2129,15 @@ export default function Admin() {
                           }
                           
                           // Pre-fill with existing attendance if any
-                          const existing = getAttendanceByDate(attendanceDate);
+                          const existing = await getAttendanceByDate(attendanceDate);
                           const existingMap: { [key: string]: AttendanceStatus } = {};
                           existing.forEach(r => {
                             existingMap[r.memberId] = r.status;
                           });
                           
                           // Also check for members on leave
-                          const onLeave = getMembersToExcuse(attendanceDate);
+                          const onLeave = await getMembersToExcuse(attendanceDate);
+                          setMembersOnLeave(onLeave);
                           onLeave.forEach(l => {
                             if (!existingMap[l.memberId]) {
                               existingMap[l.memberId] = 'excused';
@@ -2112,22 +2149,22 @@ export default function Admin() {
                         }}
                       >
                         <UserCheck className="w-4 h-4 mr-2" />
-                        {hasAttendanceForDate(attendanceDate) ? 'Edit Attendance' : 'Start Attendance'}
+                        {attendanceSessions.some(s => s.date === attendanceDate) ? 'Edit Attendance' : 'Start Attendance'}
                       </Button>
                     ) : (
                       <div className="flex gap-2">
                         <Button
                           variant="gold"
-                          onClick={() => {
-                            const records = members.map(m => ({
-                              memberId: m.id,
-                              memberName: m.name,
-                              memberEmail: m.email,
-                              memberVoice: m.voice,
-                              status: attendanceRecords[m.id] || 'absent' as AttendanceStatus,
-                            }));
+                        onClick={async () => {
+                          const records = members.map(m => ({
+                            memberId: m.id,
+                            memberName: m.name,
+                            memberEmail: m.email,
+                            memberVoice: m.voice,
+                            status: attendanceRecords[m.id] || 'absent' as AttendanceStatus,
+                          }));
                             
-                            saveAttendance(attendanceDate, records, sessionTitle, 'Admin');
+                            await saveAttendance(attendanceDate, records, sessionTitle, 'Admin');
                             loadData();
                             setIsTakingAttendance(false);
                             toast({
@@ -2144,6 +2181,7 @@ export default function Admin() {
                           onClick={() => {
                             setIsTakingAttendance(false);
                             setAttendanceRecords({});
+                            setMembersOnLeave([]);
                           }}
                         >
                           Cancel
@@ -2188,7 +2226,7 @@ export default function Admin() {
                     {/* Members List */}
                     <div className="grid gap-2">
                       {members.map((member) => {
-                        const onLeave = getMembersToExcuse(attendanceDate).find(l => l.memberId === member.id);
+                        const onLeave = membersOnLeave.find(l => l.memberId === member.id);
                         
                         return (
                           <div
@@ -2251,7 +2289,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                {!isTakingAttendance && hasAttendanceForDate(attendanceDate) && (
+                {!isTakingAttendance && attendanceSessions.some(s => s.date === attendanceDate) && (
                   <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                     <p className="text-sm text-foreground">
                       ✅ Attendance already recorded for {new Date(attendanceDate).toLocaleDateString()}
@@ -2307,12 +2345,17 @@ export default function Admin() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
+                              onClick={async () => {
                                 setAttendanceDate(session.date);
                                 setSessionTitle(session.title);
-                                const existing = getAttendanceByDate(session.date);
+                                const existing = await getAttendanceByDate(session.date);
                                 const existingMap: { [key: string]: AttendanceStatus } = {};
                                 existing.forEach(r => { existingMap[r.memberId] = r.status; });
+                                const onLeave = await getMembersToExcuse(session.date);
+                                setMembersOnLeave(onLeave);
+                                onLeave.forEach(l => {
+                                  if (!existingMap[l.memberId]) existingMap[l.memberId] = 'excused';
+                                });
                                 setAttendanceRecords(existingMap);
                                 setIsTakingAttendance(true);
                               }}
@@ -2322,9 +2365,9 @@ export default function Admin() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
+                              onClick={async () => {
                                 if (confirm(`Delete attendance for ${new Date(session.date).toLocaleDateString()}?`)) {
-                                  deleteAttendanceForDate(session.date);
+                                  await deleteAttendanceForDate(session.date);
                                   loadData();
                                   toast({ title: "Attendance Deleted" });
                                 }
@@ -2710,7 +2753,7 @@ export default function Admin() {
           )}
 
           {/* Settings */}
-          {activeTab === "settings" && (
+          {activeTab === "settings" && settings && (
             <div className="space-y-6">
               <h2 className="font-display text-lg font-semibold">Settings</h2>
               <div className="card-glass rounded-2xl p-6 max-w-2xl">
@@ -2840,7 +2883,7 @@ export default function Admin() {
                   Download your data as CSV files or create a full backup.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" size="sm" onClick={() => { exportFullBackup(); toast({ title: "Backup Created" }); }}>
+                  <Button variant="outline" size="sm" onClick={async () => { await exportFullBackup(); toast({ title: "Backup Created" }); }}>
                     <Download className="w-4 h-4 mr-2" />
                     Full Backup (JSON)
                   </Button>
@@ -2860,10 +2903,10 @@ export default function Admin() {
                 <div className="mt-4 p-3 rounded-lg bg-secondary/50 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground mb-1">Current data:</p>
                   <div className="flex flex-wrap gap-3">
-                    <span>{getBackupStats().members} members</span>
-                    <span>{getBackupStats().events} events</span>
-                    <span>{getBackupStats().orders} orders</span>
-                    <span>{getBackupStats().attendance} attendance sessions</span>
+                    <span>{backupStats?.members ?? 0} members</span>
+                    <span>{backupStats?.events ?? 0} events</span>
+                    <span>{backupStats?.orders ?? 0} orders</span>
+                    <span>{backupStats?.attendance ?? 0} attendance sessions</span>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,7 @@
-// Leave Request Service - Manages member leave requests
+// Leave Request Service - Manages member leave requests (Supabase)
+
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbDeleteWhere } from './supabaseDB';
+import { getSettings } from './dataService';
 
 // Approval vote from an admin
 export interface ApprovalVote {
@@ -30,6 +33,7 @@ export interface LeaveRequest {
 }
 
 export interface VerificationCode {
+  id?: string;
   email: string;
   code: string;
   expiresAt: number;
@@ -41,53 +45,55 @@ export const REQUIRED_APPROVALS = 3;
 export const REQUIRED_DENIALS = 2;
 export const MINIMUM_NOTICE_DAYS = 2;
 
-import { getSettings } from './dataService';
-import { syncItemToSupabase, deleteItemFromSupabase } from './supabaseSync';
-
 const LEAVE_REQUESTS_KEY = 'choir_leave_requests';
 const VERIFICATION_CODES_KEY = 'choir_verification_codes';
 
 // PIN Verification - gets PIN from settings (configurable in admin)
-export function verifyPortalPin(pin: string): boolean {
-  const settings = getSettings();
+export async function verifyPortalPin(pin: string): Promise<boolean> {
+  const settings = await getSettings();
   return pin === settings.memberPortalPin;
 }
 
 // Leave Request CRUD
-export function getAllLeaveRequests(): LeaveRequest[] {
-  const data = localStorage.getItem(LEAVE_REQUESTS_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
+  return dbGetAll<LeaveRequest>(LEAVE_REQUESTS_KEY);
 }
 
-export function getPendingLeaveRequests(): LeaveRequest[] {
-  return getAllLeaveRequests().filter(r => r.status === 'pending' || r.status === 'partial');
+export async function getPendingLeaveRequests(): Promise<LeaveRequest[]> {
+  const requests = await getAllLeaveRequests();
+  return requests.filter(r => r.status === 'pending' || r.status === 'partial');
 }
 
-export function getApprovedLeaveRequests(): LeaveRequest[] {
-  return getAllLeaveRequests().filter(r => r.status === 'approved');
+export async function getApprovedLeaveRequests(): Promise<LeaveRequest[]> {
+  const requests = await getAllLeaveRequests();
+  return requests.filter(r => r.status === 'approved');
 }
 
-export function getPartiallyApprovedRequests(): LeaveRequest[] {
-  return getAllLeaveRequests().filter(r => r.status === 'partial');
+export async function getPartiallyApprovedRequests(): Promise<LeaveRequest[]> {
+  const requests = await getAllLeaveRequests();
+  return requests.filter(r => r.status === 'partial');
 }
 
-export function getLeaveRequestById(id: string): LeaveRequest | undefined {
-  return getAllLeaveRequests().find(r => r.id === id);
+export async function getLeaveRequestById(id: string): Promise<LeaveRequest | undefined> {
+  const request = await dbGetById<LeaveRequest>(LEAVE_REQUESTS_KEY, id);
+  return request ?? undefined;
 }
 
-export function getLeaveRequestsByMember(memberId: string): LeaveRequest[] {
-  return getAllLeaveRequests().filter(r => r.memberId === memberId);
+export async function getLeaveRequestsByMember(memberId: string): Promise<LeaveRequest[]> {
+  const requests = await getAllLeaveRequests();
+  return requests.filter(r => r.memberId === memberId);
 }
 
-export function getLeaveRequestsByEmail(email: string): LeaveRequest[] {
-  return getAllLeaveRequests().filter(r => r.memberEmail.toLowerCase() === email.toLowerCase());
+export async function getLeaveRequestsByEmail(email: string): Promise<LeaveRequest[]> {
+  const requests = await getAllLeaveRequests();
+  return requests.filter(r => r.memberEmail.toLowerCase() === email.toLowerCase());
 }
 
 // Check if a member has approved leave for a specific date
-export function hasApprovedLeaveForDate(memberId: string, date: string): boolean {
-  const approvedRequests = getApprovedLeaveRequests().filter(r => r.memberId === memberId);
+export async function hasApprovedLeaveForDate(memberId: string, date: string): Promise<boolean> {
+  const approvedRequests = (await getApprovedLeaveRequests()).filter(r => r.memberId === memberId);
   const checkDate = new Date(date);
-  
+
   return approvedRequests.some(request => {
     const startDate = new Date(request.startDate);
     const endDate = new Date(request.endDate);
@@ -96,27 +102,28 @@ export function hasApprovedLeaveForDate(memberId: string, date: string): boolean
 }
 
 // Get all members with approved leave for a specific date
-export function getMembersOnLeaveForDate(date: string): LeaveRequest[] {
+export async function getMembersOnLeaveForDate(date: string): Promise<LeaveRequest[]> {
+  const approvedRequests = await getApprovedLeaveRequests();
   const checkDate = new Date(date);
-  
-  return getApprovedLeaveRequests().filter(request => {
+
+  return approvedRequests.filter(request => {
     const startDate = new Date(request.startDate);
     const endDate = new Date(request.endDate);
     return checkDate >= startDate && checkDate <= endDate;
   });
 }
 
-// Validate minimum notice period (2 days)
+// Validate minimum notice period (2 days) - pure helper, stays sync
 export function validateLeaveRequestDate(startDate: string): { valid: boolean; error?: string } {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const minDate = new Date(today);
   minDate.setDate(minDate.getDate() + MINIMUM_NOTICE_DAYS);
-  
+
   if (start < minDate) {
     const minDateStr = minDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
     return {
@@ -124,18 +131,18 @@ export function validateLeaveRequestDate(startDate: string): { valid: boolean; e
       error: `Leave requests must be submitted at least ${MINIMUM_NOTICE_DAYS} days in advance. Earliest available date: ${minDateStr}`,
     };
   }
-  
+
   return { valid: true };
 }
 
-export function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'createdAt' | 'votes' | 'approvalCount' | 'denialCount'>): LeaveRequest | { error: string } {
-  // Validate minimum notice period
+export async function createLeaveRequest(
+  request: Omit<LeaveRequest, 'id' | 'status' | 'createdAt' | 'votes' | 'approvalCount' | 'denialCount'>
+): Promise<LeaveRequest | { error: string }> {
   const validation = validateLeaveRequestDate(request.startDate);
   if (!validation.valid) {
     return { error: validation.error! };
   }
-  
-  const requests = getAllLeaveRequests();
+
   const newRequest: LeaveRequest = {
     ...request,
     id: `leave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -145,22 +152,16 @@ export function createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' |
     denialCount: 0,
     createdAt: new Date().toISOString(),
   };
-  
-  requests.push(newRequest);
-  localStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(requests));
-  
-  // Trigger storage event for other tabs
-  window.dispatchEvent(new Event('storage'));
-  
-  return newRequest;
+
+  return dbInsert<LeaveRequest>(LEAVE_REQUESTS_KEY, newRequest);
 }
 
-// Check if an admin has already voted on a request
+// Check if an admin has already voted on a request - pure helper, stays sync
 export function hasAdminVoted(request: LeaveRequest, adminId: string): boolean {
   return request.votes?.some(v => v.adminId === adminId) || false;
 }
 
-// Get approval progress for display
+// Get approval progress for display - pure helper, stays sync
 export function getApprovalProgress(request: LeaveRequest): {
   approvals: number;
   denials: number;
@@ -178,38 +179,28 @@ export function getApprovalProgress(request: LeaveRequest): {
 }
 
 // Cast a vote (approve or deny) on a leave request
-export function castVote(
-  id: string, 
-  adminId: string, 
-  adminName: string, 
-  vote: 'approve' | 'deny', 
+export async function castVote(
+  id: string,
+  adminId: string,
+  adminName: string,
+  vote: 'approve' | 'deny',
   notes?: string
-): LeaveRequest | { error: string } | null {
-  const requests = getAllLeaveRequests();
-  const index = requests.findIndex(r => r.id === id);
-  
-  if (index === -1) return null;
-  
-  const request = requests[index];
-  
-  // Check if request is already finalized
+): Promise<LeaveRequest | { error: string } | null> {
+  const request = await getLeaveRequestById(id);
+  if (!request) return null;
+
   if (request.status === 'approved' || request.status === 'denied') {
     return { error: 'This leave request has already been finalized.' };
   }
-  
-  // Initialize votes array if not present (backward compatibility)
-  if (!request.votes) {
-    request.votes = [];
-    request.approvalCount = 0;
-    request.denialCount = 0;
-  }
-  
-  // Check if admin has already voted
+
+  let votes = request.votes || [];
+  let approvalCount = request.approvalCount || 0;
+  let denialCount = request.denialCount || 0;
+
   if (hasAdminVoted(request, adminId)) {
     return { error: 'You have already voted on this leave request.' };
   }
-  
-  // Add the vote
+
   const newVote: ApprovalVote = {
     adminId,
     adminName,
@@ -217,56 +208,66 @@ export function castVote(
     votedAt: new Date().toISOString(),
     notes,
   };
-  request.votes.push(newVote);
-  
-  // Update counts
+  votes = [...votes, newVote];
+
   if (vote === 'approve') {
-    request.approvalCount = (request.approvalCount || 0) + 1;
+    approvalCount += 1;
   } else {
-    request.denialCount = (request.denialCount || 0) + 1;
+    denialCount += 1;
   }
-  
-  // Determine new status
-  if (request.denialCount >= REQUIRED_DENIALS) {
-    // 2+ denials = automatic rejection
-    request.status = 'denied';
-    request.reviewedAt = new Date().toISOString();
-  } else if (request.approvalCount >= REQUIRED_APPROVALS) {
-    // 3 approvals = fully approved
-    request.status = 'approved';
-    request.reviewedAt = new Date().toISOString();
-  } else if (request.approvalCount > 0) {
-    // Has some approvals but not enough yet
-    request.status = 'partial';
+
+  let newStatus = request.status;
+  let reviewedAt = request.reviewedAt;
+
+  if (denialCount >= REQUIRED_DENIALS) {
+    newStatus = 'denied';
+    reviewedAt = new Date().toISOString();
+  } else if (approvalCount >= REQUIRED_APPROVALS) {
+    newStatus = 'approved';
+    reviewedAt = new Date().toISOString();
+  } else if (approvalCount > 0) {
+    newStatus = 'partial';
   }
-  // Otherwise stays 'pending'
-  
-  requests[index] = request;
-  localStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(requests));
-  window.dispatchEvent(new Event('storage'));
-  
-  return request;
+
+  try {
+    return dbUpdate<LeaveRequest>(LEAVE_REQUESTS_KEY, id, {
+      votes,
+      approvalCount,
+      denialCount,
+      status: newStatus,
+      reviewedAt,
+    });
+  } catch {
+    return null;
+  }
 }
 
 // Legacy functions for backward compatibility (now use castVote internally)
-export function approveLeaveRequest(id: string, adminId: string, adminName: string, notes?: string): LeaveRequest | { error: string } | null {
+export async function approveLeaveRequest(
+  id: string,
+  adminId: string,
+  adminName: string,
+  notes?: string
+): Promise<LeaveRequest | { error: string } | null> {
   return castVote(id, adminId, adminName, 'approve', notes);
 }
 
-export function denyLeaveRequest(id: string, adminId: string, adminName: string, notes?: string): LeaveRequest | { error: string } | null {
+export async function denyLeaveRequest(
+  id: string,
+  adminId: string,
+  adminName: string,
+  notes?: string
+): Promise<LeaveRequest | { error: string } | null> {
   return castVote(id, adminId, adminName, 'deny', notes);
 }
 
-export function deleteLeaveRequest(id: string): boolean {
-  const requests = getAllLeaveRequests();
-  const filtered = requests.filter(r => r.id !== id);
-  
-  if (filtered.length === requests.length) return false;
-  
-  localStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(filtered));
-  deleteItemFromSupabase('choir_leave_requests', id);
-  window.dispatchEvent(new Event('storage'));
-  return true;
+export async function deleteLeaveRequest(id: string): Promise<boolean> {
+  try {
+    await dbDelete(LEAVE_REQUESTS_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Verification Code Management
@@ -274,60 +275,45 @@ export function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export function storeVerificationCode(email: string, code: string): void {
-  const codes = getStoredVerificationCodes();
-  
-  // Remove any existing codes for this email
-  const filtered = codes.filter(c => c.email.toLowerCase() !== email.toLowerCase());
-  
-  // Add new code (expires in 10 minutes)
-  filtered.push({
+export async function storeVerificationCode(email: string, code: string): Promise<void> {
+  await dbDeleteWhere(VERIFICATION_CODES_KEY, 'email', email.toLowerCase());
+
+  const newCode: VerificationCode & { id: string } = {
+    id: crypto.randomUUID(),
     email: email.toLowerCase(),
     code,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    expiresAt: Date.now() + 10 * 60 * 1000,
     used: false,
-  });
-  
-  localStorage.setItem(VERIFICATION_CODES_KEY, JSON.stringify(filtered));
+  };
+  await dbInsert(VERIFICATION_CODES_KEY, newCode);
 }
 
-export function verifyCode(email: string, code: string): boolean {
-  const codes = getStoredVerificationCodes();
-  const storedCode = codes.find(
-    c => c.email.toLowerCase() === email.toLowerCase() && 
-         c.code === code && 
-         !c.used && 
-         c.expiresAt > Date.now()
+export async function verifyCode(email: string, code: string): Promise<boolean> {
+  const codes = await dbQuery<VerificationCode & { id: string }>(
+    VERIFICATION_CODES_KEY,
+    'email',
+    email.toLowerCase()
   );
-  
-  if (storedCode) {
-    // Mark as used
-    storedCode.used = true;
-    localStorage.setItem(VERIFICATION_CODES_KEY, JSON.stringify(codes));
+
+  const storedCode = codes.find(
+    c =>
+      c.email.toLowerCase() === email.toLowerCase() &&
+      c.code === code &&
+      !c.used &&
+      (typeof c.expiresAt === 'number' ? c.expiresAt : new Date(c.expiresAt).getTime()) > Date.now()
+  );
+
+  if (storedCode && storedCode.id) {
+    await dbUpdate(VERIFICATION_CODES_KEY, storedCode.id, { used: true });
     return true;
   }
-  
+
   return false;
 }
 
-function getStoredVerificationCodes(): VerificationCode[] {
-  const data = localStorage.getItem(VERIFICATION_CODES_KEY);
-  if (!data) return [];
-  
-  // Clean up expired codes
-  const codes: VerificationCode[] = JSON.parse(data);
-  const validCodes = codes.filter(c => c.expiresAt > Date.now());
-  
-  if (validCodes.length !== codes.length) {
-    localStorage.setItem(VERIFICATION_CODES_KEY, JSON.stringify(validCodes));
-  }
-  
-  return validCodes;
-}
-
 // Statistics
-export function getLeaveRequestStats() {
-  const requests = getAllLeaveRequests();
+export async function getLeaveRequestStats() {
+  const requests = await getAllLeaveRequests();
   return {
     total: requests.length,
     pending: requests.filter(r => r.status === 'pending').length,
@@ -337,4 +323,3 @@ export function getLeaveRequestStats() {
     denied: requests.filter(r => r.status === 'denied').length,
   };
 }
-

@@ -1,5 +1,7 @@
 // Contact Form Service - Store and manage contact form submissions
 
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete } from './supabaseDB';
+
 const CONTACT_KEY = "choir_contact_submissions";
 
 export interface ContactSubmission {
@@ -15,98 +17,94 @@ export interface ContactSubmission {
 }
 
 // Get all submissions
-export function getAllContactSubmissions(): ContactSubmission[] {
-  const data = localStorage.getItem(CONTACT_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllContactSubmissions(): Promise<ContactSubmission[]> {
+  const data = await dbGetAll<ContactSubmission>(CONTACT_KEY);
+  return data || [];
 }
 
 // Get unread count
-export function getUnreadCount(): number {
-  return getAllContactSubmissions().filter(s => !s.isRead).length;
+export async function getUnreadCount(): Promise<number> {
+  const submissions = await getAllContactSubmissions();
+  return submissions.filter((s) => !s.isRead).length;
 }
 
 // Get submission by ID
-export function getContactSubmissionById(id: string): ContactSubmission | undefined {
-  return getAllContactSubmissions().find(s => s.id === id);
+export async function getContactSubmissionById(id: string): Promise<ContactSubmission | null> {
+  return dbGetById<ContactSubmission>(CONTACT_KEY, id);
 }
 
 // Create submission
-export function createContactSubmission(
+export async function createContactSubmission(
   data: Omit<ContactSubmission, "id" | "createdAt" | "isRead">
-): ContactSubmission {
-  const submissions = getAllContactSubmissions();
-  
-  const newSubmission: ContactSubmission = {
+): Promise<ContactSubmission> {
+  const newSubmission: Omit<ContactSubmission, "id" | "createdAt"> = {
     ...data,
-    id: `contact-${Date.now()}`,
-    createdAt: new Date().toISOString(),
     isRead: false,
   };
-  
-  submissions.unshift(newSubmission); // Add to beginning (newest first)
-  localStorage.setItem(CONTACT_KEY, JSON.stringify(submissions));
-  
-  return newSubmission;
+
+  return dbInsert<ContactSubmission>(CONTACT_KEY, newSubmission);
 }
 
 // Mark as read
-export function markAsRead(id: string): ContactSubmission | null {
-  const submissions = getAllContactSubmissions();
-  const index = submissions.findIndex(s => s.id === id);
-  
-  if (index === -1) return null;
-  
-  submissions[index].isRead = true;
-  localStorage.setItem(CONTACT_KEY, JSON.stringify(submissions));
-  
-  return submissions[index];
+export async function markAsRead(id: string): Promise<ContactSubmission | null> {
+  try {
+    return await dbUpdate<ContactSubmission>(CONTACT_KEY, id, { isRead: true });
+  } catch {
+    return null;
+  }
 }
 
 // Mark as replied
-export function markAsReplied(id: string, notes?: string): ContactSubmission | null {
-  const submissions = getAllContactSubmissions();
-  const index = submissions.findIndex(s => s.id === id);
-  
-  if (index === -1) return null;
-  
-  submissions[index].isRead = true;
-  submissions[index].repliedAt = new Date().toISOString();
-  if (notes) submissions[index].notes = notes;
-  localStorage.setItem(CONTACT_KEY, JSON.stringify(submissions));
-  
-  return submissions[index];
+export async function markAsReplied(id: string, notes?: string): Promise<ContactSubmission | null> {
+  try {
+    const updates: Partial<ContactSubmission> = {
+      isRead: true,
+      repliedAt: new Date().toISOString(),
+    };
+    if (notes) updates.notes = notes;
+    return await dbUpdate<ContactSubmission>(CONTACT_KEY, id, updates);
+  } catch {
+    return null;
+  }
 }
 
 // Delete submission
-export function deleteContactSubmission(id: string): boolean {
-  const submissions = getAllContactSubmissions();
-  const filtered = submissions.filter(s => s.id !== id);
-  
-  if (filtered.length === submissions.length) return false;
-  
-  localStorage.setItem(CONTACT_KEY, JSON.stringify(filtered));
-  return true;
+export async function deleteContactSubmission(id: string): Promise<boolean> {
+  try {
+    await dbDelete(CONTACT_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Mark all as read
-export function markAllAsRead(): void {
-  const submissions = getAllContactSubmissions();
-  submissions.forEach(s => s.isRead = true);
-  localStorage.setItem(CONTACT_KEY, JSON.stringify(submissions));
+export async function markAllAsRead(): Promise<void> {
+  const submissions = await getAllContactSubmissions();
+  const unread = submissions.filter((s) => !s.isRead);
+  for (const s of unread) {
+    try {
+      await dbUpdate<ContactSubmission>(CONTACT_KEY, s.id, { isRead: true });
+    } catch {
+      // continue
+    }
+  }
 }
 
 // Get stats
-export function getContactStats() {
-  const submissions = getAllContactSubmissions();
+export async function getContactStats(): Promise<{
+  total: number;
+  unread: number;
+  replied: number;
+  thisWeek: number;
+}> {
+  const submissions = await getAllContactSubmissions();
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
   return {
     total: submissions.length,
-    unread: submissions.filter(s => !s.isRead).length,
-    replied: submissions.filter(s => s.repliedAt).length,
-    thisWeek: submissions.filter(s => {
-      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      return new Date(s.createdAt).getTime() > weekAgo;
-    }).length,
+    unread: submissions.filter((s) => !s.isRead).length,
+    replied: submissions.filter((s) => s.repliedAt).length,
+    thisWeek: submissions.filter((s) => new Date(s.createdAt).getTime() > weekAgo).length,
   };
 }
-
-

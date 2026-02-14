@@ -279,7 +279,7 @@ export default function Scanner() {
     setIsScanning(false);
   };
 
-  const verifyTicket = (input: string): ScanResult => {
+  const verifyTicket = async (input: string): Promise<ScanResult> => {
     // Try to parse as JSON (from QR code) or use as direct txRef
     let txRef = input;
     try {
@@ -291,7 +291,7 @@ export default function Scanner() {
       // Not JSON, use input directly as txRef
     }
     
-    const order = getOrderByTxRef(txRef);
+    const order = await getOrderByTxRef(txRef);
 
     if (!order) {
       return {
@@ -341,25 +341,25 @@ export default function Scanner() {
     };
   };
 
-  const handleManualSearch = (e: React.FormEvent) => {
+  const handleManualSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
 
     setScanResult(null);
     setIsProcessing(true);
 
-    // Simulate processing delay
-    setTimeout(() => {
-      const result = verifyTicket(manualCode.trim().toUpperCase());
+    try {
+      const result = await verifyTicket(manualCode.trim().toUpperCase());
       setScanResult(result);
+    } finally {
       setIsProcessing(false);
-    }, 500);
+    }
   };
 
-  const handleAdmitEntry = () => {
+  const handleAdmitEntry = async () => {
     if (scanResult?.order && scanResult.status === "valid" && session) {
       // Update order status
-      updateOrderStatus(scanResult.order.id, "used");
+      await updateOrderStatus(scanResult.order.id, "used");
       
       // Record the scan
       addScanRecord({

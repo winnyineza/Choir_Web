@@ -2,11 +2,13 @@
 // Handles multi-user admin authentication with roles
 
 import bcrypt from "bcryptjs";
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 
 const ADMIN_USERS_KEY = "choir_admin_users";
 const SALT_ROUNDS = 10;
 const ADMIN_INVITES_KEY = "choir_admin_invites";
 const AUDIT_LOG_KEY = "choir_audit_log";
+const PASSWORD_RESET_KEY = "choir_password_resets";
 
 export type AdminRole = "super_admin" | "main_admin" | "finance" | "secretary" | "disciplinary" | "reviewer";
 
@@ -71,13 +73,15 @@ export interface PasswordResetToken {
   used: boolean;
 }
 
-const PASSWORD_RESET_KEY = "choir_password_resets";
+// Lazy initialization - ensure default admin exists when Supabase is empty
+let adminUsersInitialized = false;
 
-// Initialize admin users - seed super admin for local development
-function initializeAdminUsers(): void {
-  const existing = localStorage.getItem(ADMIN_USERS_KEY);
-  if (!existing) {
-    // Seed with default super admin for local development
+async function ensureAdminUsersInitialized(): Promise<void> {
+  if (adminUsersInitialized) return;
+
+  const users = await dbGetAll<AdminUser>(ADMIN_USERS_KEY);
+
+  if (users.length === 0) {
     const defaultSuperAdmin: AdminUser = {
       id: "super-admin-winny",
       email: "w.ineza@alustudent.com",
@@ -88,21 +92,21 @@ function initializeAdminUsers(): void {
       isActive: true,
       createdAt: new Date().toISOString(),
     };
-    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([defaultSuperAdmin]));
+    await dbInsert<AdminUser>(ADMIN_USERS_KEY, defaultSuperAdmin);
   } else {
-    // Parse existing users
-    let users: AdminUser[] = JSON.parse(existing);
     let needsUpdate = false;
-    
-    // Remove old hardcoded super-admin-001 if it exists (cleanup)
-    const oldHardcodedIndex = users.findIndex(u => u.id === "super-admin-001");
+    let usersToUpdate = [...users];
+
+    // Remove old hardcoded super-admin-001 if it exists
+    const oldHardcodedIndex = usersToUpdate.findIndex(u => u.id === "super-admin-001");
     if (oldHardcodedIndex !== -1) {
-      users.splice(oldHardcodedIndex, 1);
+      await dbDelete(ADMIN_USERS_KEY, "super-admin-001");
+      usersToUpdate = usersToUpdate.filter(u => u.id !== "super-admin-001");
       needsUpdate = true;
     }
-    
-    // Ensure super admin exists (add if missing)
-    const superAdminExists = users.some(u => u.email.toLowerCase() === "w.ineza@alustudent.com");
+
+    // Ensure super admin exists
+    const superAdminExists = usersToUpdate.some(u => u.email.toLowerCase() === "w.ineza@alustudent.com");
     if (!superAdminExists) {
       const defaultSuperAdmin: AdminUser = {
         id: "super-admin-winny",
@@ -114,143 +118,122 @@ function initializeAdminUsers(): void {
         isActive: true,
         createdAt: new Date().toISOString(),
       };
-      users.push(defaultSuperAdmin);
+      await dbInsert<AdminUser>(ADMIN_USERS_KEY, defaultSuperAdmin);
       needsUpdate = true;
     }
-    
-    // Migrate unhashed passwords for any remaining users
-    users.forEach((user, index) => {
+
+    // Migrate unhashed passwords
+    for (const user of usersToUpdate) {
       if (!user.passwordHashed && !user.password.startsWith("$2")) {
-        users[index] = {
-          ...user,
+        await dbUpdate<AdminUser>(ADMIN_USERS_KEY, user.id, {
           password: hashPassword(user.password),
           passwordHashed: true,
-        };
-        needsUpdate = true;
+        });
       }
-    });
-    
-    if (needsUpdate) {
-      localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(users));
     }
   }
+
+  adminUsersInitialized = true;
 }
 
 // Get all admin users
-export function getAllAdminUsers(): AdminUser[] {
-  initializeAdminUsers();
-  const data = localStorage.getItem(ADMIN_USERS_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllAdminUsers(): Promise<AdminUser[]> {
+  await ensureAdminUsersInitialized();
+  return dbGetAll<AdminUser>(ADMIN_USERS_KEY);
 }
 
 // Get admin user by email
-export function getAdminByEmail(email: string): AdminUser | null {
-  const users = getAllAdminUsers();
+export async function getAdminByEmail(email: string): Promise<AdminUser | null> {
+  const users = await getAllAdminUsers();
   return users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
 }
 
 // Get admin user by ID
-export function getAdminById(id: string): AdminUser | null {
-  const users = getAllAdminUsers();
-  return users.find(u => u.id === id) || null;
+export async function getAdminById(id: string): Promise<AdminUser | null> {
+  return dbGetById<AdminUser>(ADMIN_USERS_KEY, id);
 }
 
 // Authenticate admin user
-export function authenticateAdmin(email: string, password: string): AdminUser | null {
-  const user = getAdminByEmail(email);
+export async function authenticateAdmin(email: string, password: string): Promise<AdminUser | null> {
+  const user = await getAdminByEmail(email);
   if (!user) return null;
   if (!user.isActive) return null;
   if (!comparePassword(password, user.password)) return null;
-  
-  // Update last login
-  updateAdminUser(user.id, { lastLogin: new Date().toISOString() });
-  
-  // Log the action
-  addAuditLog(user, "LOGIN", "Admin logged in");
-  
+
+  await updateAdminUser(user.id, { lastLogin: new Date().toISOString() });
+  await addAuditLog(user, "LOGIN", "Admin logged in");
+
   return user;
 }
 
 // Create admin user (only super_admin can do this)
-export function createAdminUser(
+export async function createAdminUser(
   data: Omit<AdminUser, "id" | "createdAt" | "isActive">,
   createdBy: string
-): AdminUser {
-  const users = getAllAdminUsers();
-  
-  // Check if email already exists
+): Promise<AdminUser> {
+  const users = await getAllAdminUsers();
+
   if (users.some(u => u.email.toLowerCase() === data.email.toLowerCase())) {
     throw new Error("An admin with this email already exists");
   }
-  
-  const newUser: AdminUser = {
+
+  const newUser = {
     ...data,
     id: `admin-${Date.now()}`,
-    password: hashPassword(data.password), // Hash the password
+    password: hashPassword(data.password),
     createdAt: new Date().toISOString(),
     createdBy,
     isActive: true,
     passwordHashed: true,
   };
-  
-  users.push(newUser);
-  localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(users));
-  
-  return newUser;
+
+  return dbInsert<AdminUser>(ADMIN_USERS_KEY, newUser);
 }
 
 // Update admin user
-export function updateAdminUser(id: string, updates: Partial<AdminUser>): AdminUser | null {
-  const users = getAllAdminUsers();
-  const index = users.findIndex(u => u.id === id);
-  if (index === -1) return null;
-  
-  // Prevent changing super_admin role
-  if (users[index].role === "super_admin" && updates.role && updates.role !== "super_admin") {
+export async function updateAdminUser(id: string, updates: Partial<AdminUser>): Promise<AdminUser | null> {
+  const user = await dbGetById<AdminUser>(ADMIN_USERS_KEY, id);
+  if (!user) return null;
+
+  if (user.role === "super_admin" && updates.role && updates.role !== "super_admin") {
     throw new Error("Cannot change super admin role");
   }
-  
-  users[index] = { ...users[index], ...updates };
-  localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(users));
-  
-  return users[index];
+
+  return dbUpdate<AdminUser>(ADMIN_USERS_KEY, id, updates);
 }
 
 // Deactivate admin user (soft delete)
-export function deactivateAdminUser(id: string): boolean {
-  const users = getAllAdminUsers();
-  const user = users.find(u => u.id === id);
-  
-  // Cannot deactivate super admin
+export async function deactivateAdminUser(id: string): Promise<boolean> {
+  const user = await dbGetById<AdminUser>(ADMIN_USERS_KEY, id);
+
   if (user?.role === "super_admin") {
     throw new Error("Cannot deactivate super admin");
   }
-  
-  return updateAdminUser(id, { isActive: false }) !== null;
+
+  const updated = await updateAdminUser(id, { isActive: false });
+  return updated !== null;
 }
 
 // Reactivate admin user
-export function reactivateAdminUser(id: string): boolean {
-  return updateAdminUser(id, { isActive: true }) !== null;
+export async function reactivateAdminUser(id: string): Promise<boolean> {
+  const updated = await updateAdminUser(id, { isActive: true });
+  return updated !== null;
 }
 
 // Delete admin user permanently (only super_admin)
-export function deleteAdminUser(id: string): boolean {
-  const users = getAllAdminUsers();
-  const user = users.find(u => u.id === id);
-  
+export async function deleteAdminUser(id: string): Promise<boolean> {
+  const user = await dbGetById<AdminUser>(ADMIN_USERS_KEY, id);
+
   if (user?.role === "super_admin") {
     throw new Error("Cannot delete super admin");
   }
-  
-  const filtered = users.filter(u => u.id !== id);
-  localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(filtered));
+
+  await dbDelete(ADMIN_USERS_KEY, id);
   return true;
 }
 
 // ============ INVITE SYSTEM ============
 
-// Generate invite code
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -261,71 +244,66 @@ function generateInviteCode(): string {
 }
 
 // Get all invites
-export function getAllInvites(): AdminInvite[] {
-  const data = localStorage.getItem(ADMIN_INVITES_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllInvites(): Promise<AdminInvite[]> {
+  return dbGetAll<AdminInvite>(ADMIN_INVITES_KEY);
 }
 
 // Create invite
-export function createInvite(
+export async function createInvite(
   email: string,
   name: string,
   role: AdminRole,
   createdBy: string,
   memberId?: string
-): AdminInvite {
-  // Check if user already exists
-  if (getAdminByEmail(email)) {
+): Promise<AdminInvite> {
+  const existingAdmin = await getAdminByEmail(email);
+  if (existingAdmin) {
     throw new Error("An admin with this email already exists");
   }
-  
-  const invites = getAllInvites();
-  
-  // Check if invite already exists for this email
+
+  const invites = await getAllInvites();
   const existingInvite = invites.find(
     i => i.email.toLowerCase() === email.toLowerCase() && !i.used
   );
   if (existingInvite) {
     throw new Error("An active invite already exists for this email");
   }
-  
-  const invite: AdminInvite = {
-    id: `invite-${Date.now()}`,
+
+  const invite: Omit<AdminInvite, "id" | "createdAt" | "expiresAt"> = {
     email,
     name,
     role,
     inviteCode: generateInviteCode(),
-    createdAt: new Date().toISOString(),
     createdBy,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
     used: false,
     memberId,
   };
-  
-  invites.push(invite);
-  localStorage.setItem(ADMIN_INVITES_KEY, JSON.stringify(invites));
-  
-  return invite;
+
+  return dbInsert<AdminInvite>(ADMIN_INVITES_KEY, {
+    ...invite,
+    id: `invite-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  });
 }
 
 // Validate invite code
-export function validateInvite(code: string): AdminInvite | null {
-  const invites = getAllInvites();
+export async function validateInvite(code: string): Promise<AdminInvite | null> {
+  const invites = await getAllInvites();
   const invite = invites.find(i => i.inviteCode === code && !i.used);
-  
+
   if (!invite) return null;
   if (new Date(invite.expiresAt) < new Date()) return null;
-  
+
   return invite;
 }
 
 // Use invite to create account
-export function redeemInvite(code: string, password: string): AdminUser | null {
-  const invite = validateInvite(code);
+export async function redeemInvite(code: string, password: string): Promise<AdminUser | null> {
+  const invite = await validateInvite(code);
   if (!invite) return null;
-  
-  // Create the user
-  const user = createAdminUser(
+
+  const user = await createAdminUser(
     {
       email: invite.email,
       name: invite.name,
@@ -336,44 +314,37 @@ export function redeemInvite(code: string, password: string): AdminUser | null {
     },
     invite.createdBy
   );
-  
-  // Mark invite as used
-  const invites = getAllInvites();
-  const index = invites.findIndex(i => i.id === invite.id);
-  if (index !== -1) {
-    invites[index].used = true;
-    localStorage.setItem(ADMIN_INVITES_KEY, JSON.stringify(invites));
-  }
-  
+
+  await dbUpdate<AdminInvite>(ADMIN_INVITES_KEY, invite.id, { used: true });
+
   return user;
 }
 
 // Delete invite
-export function deleteInvite(id: string): boolean {
-  const invites = getAllInvites().filter(i => i.id !== id);
-  localStorage.setItem(ADMIN_INVITES_KEY, JSON.stringify(invites));
-  return true;
+export async function deleteInvite(id: string): Promise<boolean> {
+  try {
+    await dbDelete(ADMIN_INVITES_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============ AUDIT LOG ============
 
 // Get audit log
-export function getAuditLog(limit: number = 100): AuditLogEntry[] {
-  const data = localStorage.getItem(AUDIT_LOG_KEY);
-  const logs: AuditLogEntry[] = data ? JSON.parse(data) : [];
+export async function getAuditLog(limit: number = 100): Promise<AuditLogEntry[]> {
+  const logs = await dbGetAll<AuditLogEntry>(AUDIT_LOG_KEY);
   return logs.slice(0, limit);
 }
 
 // Add audit log entry
-export function addAuditLog(
+export async function addAuditLog(
   user: { id: string; email: string; name: string },
   action: string,
   details: string
-): void {
-  const logs = getAuditLog(1000); // Keep last 1000 entries
-  
-  const entry: AuditLogEntry = {
-    id: `log-${Date.now()}`,
+): Promise<void> {
+  const entry: Omit<AuditLogEntry, "id"> = {
     userId: user.id,
     userEmail: user.email,
     userName: user.name,
@@ -381,23 +352,26 @@ export function addAuditLog(
     details,
     timestamp: new Date().toISOString(),
   };
-  
-  logs.unshift(entry); // Add to beginning
-  
-  // Keep only last 1000 entries
-  const trimmed = logs.slice(0, 1000);
-  localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(trimmed));
+
+  await dbInsert<AuditLogEntry>(AUDIT_LOG_KEY, {
+    ...entry,
+    id: `log-${Date.now()}`,
+  });
 }
 
 // Clear old audit logs (older than 90 days)
-export function cleanupAuditLog(): void {
-  const logs = getAuditLog(10000);
+export async function cleanupAuditLog(): Promise<void> {
+  const logs = await dbGetAll<AuditLogEntry>(AUDIT_LOG_KEY);
   const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-  const filtered = logs.filter(l => new Date(l.timestamp).getTime() > cutoff);
-  localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(filtered));
+  const toDelete = logs.filter(l => new Date(l.timestamp).getTime() <= cutoff);
+
+  for (const log of toDelete) {
+    await dbDelete(AUDIT_LOG_KEY, log.id);
+  }
 }
 
 // ============ ROLE HELPERS ============
+// These operate on passed data - stay sync
 
 export function isSuperAdmin(user: AdminUser | null): boolean {
   return user?.role === "super_admin";
@@ -433,8 +407,7 @@ export function getRoleLabel(role: AdminRole): string {
 
 // ============ PERMISSION SYSTEM ============
 
-// Define what each role can access
-export type Permission = 
+export type Permission =
   | "dashboard"
   | "members"
   | "members_edit"
@@ -490,53 +463,43 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   ],
 };
 
-// Check if user has a specific permission
 export function hasPermission(user: AdminUser | null, permission: Permission): boolean {
   if (!user) return false;
   const permissions = ROLE_PERMISSIONS[user.role] || [];
   return permissions.includes(permission);
 }
 
-// Get all permissions for a user
 export function getUserPermissions(user: AdminUser | null): Permission[] {
   if (!user) return [];
   return ROLE_PERMISSIONS[user.role] || [];
 }
 
-// Check if user can edit (not just view) members
 export function canEditMembers(user: AdminUser | null): boolean {
   return hasPermission(user, "members_edit");
 }
 
-// Check if user is a reviewer (read-only except leave approvals)
 export function isReviewer(user: AdminUser | null): boolean {
   return user?.role === "reviewer";
 }
 
-// Check if user can approve leave requests
 export function canApproveLeave(user: AdminUser | null): boolean {
   if (!user) return false;
-  // Reviewers, disciplinary, secretaries, and admins can approve leave
   return ["super_admin", "main_admin", "secretary", "disciplinary", "reviewer"].includes(user.role);
 }
 
-// Check if user has write access (not read-only)
 export function hasWriteAccess(user: AdminUser | null, area: string): boolean {
   if (!user) return false;
-  
-  // Reviewers can only write to leave requests
+
   if (user.role === "reviewer") {
     return area === "leave";
   }
-  
-  // Other roles have full write access to their permitted areas
+
   return true;
 }
 
-// Get accessible tabs for sidebar filtering
 export function getAccessibleTabs(user: AdminUser | null): string[] {
   if (!user) return [];
-  
+
   const tabPermissionMap: Record<string, Permission> = {
     "dashboard": "dashboard",
     "members": "members",
@@ -564,7 +527,7 @@ export function getAccessibleTabs(user: AdminUser | null): string[] {
     "audit": "audit",
     "settings": "settings",
   };
-  
+
   const userPermissions = getUserPermissions(user);
   return Object.entries(tabPermissionMap)
     .filter(([_, permission]) => userPermissions.includes(permission))
@@ -572,21 +535,21 @@ export function getAccessibleTabs(user: AdminUser | null): string[] {
 }
 
 // Get admin by member ID
-export function getAdminByMemberId(memberId: string): AdminUser | null {
-  const users = getAllAdminUsers();
+export async function getAdminByMemberId(memberId: string): Promise<AdminUser | null> {
+  const users = await getAllAdminUsers();
   return users.find(u => u.memberId === memberId) || null;
 }
 
 // Check if a member is already an admin
-export function isMemberAdmin(memberId: string): boolean {
-  return getAdminByMemberId(memberId) !== null;
+export async function isMemberAdmin(memberId: string): Promise<boolean> {
+  const admin = await getAdminByMemberId(memberId);
+  return admin !== null;
 }
 
 // ============ PASSWORD RESET ============
 
-function getAllPasswordResets(): PasswordResetToken[] {
-  const data = localStorage.getItem(PASSWORD_RESET_KEY);
-  return data ? JSON.parse(data) : [];
+async function getAllPasswordResets(): Promise<PasswordResetToken[]> {
+  return dbGetAll<PasswordResetToken>(PASSWORD_RESET_KEY);
 }
 
 function generateResetToken(): string {
@@ -599,84 +562,70 @@ function generateResetToken(): string {
 }
 
 // Request password reset - generates token
-export function requestPasswordReset(email: string): PasswordResetToken | null {
-  const user = getAdminByEmail(email);
+export async function requestPasswordReset(email: string): Promise<PasswordResetToken | null> {
+  const user = await getAdminByEmail(email);
   if (!user) return null;
-  
-  const resets = getAllPasswordResets();
-  
-  // Invalidate any existing tokens for this email
+
+  const resets = await getAllPasswordResets();
   const filtered = resets.filter(r => r.email.toLowerCase() !== email.toLowerCase());
-  
-  const resetToken: PasswordResetToken = {
+
+  const resetToken = await dbInsert<PasswordResetToken>(PASSWORD_RESET_KEY, {
     id: `reset-${Date.now()}`,
     userId: user.id,
     email: user.email,
     token: generateResetToken(),
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     used: false,
-  };
-  
-  filtered.push(resetToken);
-  localStorage.setItem(PASSWORD_RESET_KEY, JSON.stringify(filtered));
-  
+  });
+
   return resetToken;
 }
 
 // Validate reset token
-export function validateResetToken(token: string): PasswordResetToken | null {
-  const resets = getAllPasswordResets();
+export async function validateResetToken(token: string): Promise<PasswordResetToken | null> {
+  const resets = await getAllPasswordResets();
   const resetToken = resets.find(r => r.token === token && !r.used);
-  
+
   if (!resetToken) return null;
   if (new Date(resetToken.expiresAt) < new Date()) return null;
-  
+
   return resetToken;
 }
 
 // Reset password using token
-export function resetPassword(token: string, newPassword: string): boolean {
-  const resetToken = validateResetToken(token);
+export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
+  const resetToken = await validateResetToken(token);
   if (!resetToken) return false;
-  
-  // Update password with hashed version
-  const updated = updateAdminUser(resetToken.userId, { 
+
+  const updated = await updateAdminUser(resetToken.userId, {
     password: hashPassword(newPassword),
-    passwordHashed: true 
+    passwordHashed: true
   });
   if (!updated) return false;
-  
-  // Mark token as used
-  const resets = getAllPasswordResets();
-  const index = resets.findIndex(r => r.id === resetToken.id);
-  if (index !== -1) {
-    resets[index].used = true;
-    localStorage.setItem(PASSWORD_RESET_KEY, JSON.stringify(resets));
-  }
-  
-  // Log the action
-  addAuditLog(updated, "PASSWORD_RESET", "Password was reset via reset link");
-  
+
+  await dbUpdate<PasswordResetToken>(PASSWORD_RESET_KEY, resetToken.id, { used: true });
+  await addAuditLog(updated, "PASSWORD_RESET", "Password was reset via reset link");
+
   return true;
 }
 
 // Change password (when logged in)
-export function changePassword(userId: string, currentPassword: string, newPassword: string): boolean {
-  const user = getAdminById(userId);
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+  const user = await getAdminById(userId);
   if (!user) return false;
   if (!comparePassword(currentPassword, user.password)) return false;
-  
-  const updated = updateAdminUser(userId, { 
+
+  const updated = await updateAdminUser(userId, {
     password: hashPassword(newPassword),
-    passwordHashed: true 
+    passwordHashed: true
   });
   if (!updated) return false;
-  
-  addAuditLog(updated, "PASSWORD_CHANGE", "Password was changed");
+
+  await addAuditLog(updated, "PASSWORD_CHANGE", "Password was changed");
   return true;
 }
 
-// Password strength checker
+// Password strength checker - pure computation, stay sync
 export function checkPasswordStrength(password: string): {
   score: number;
   label: string;
@@ -685,27 +634,27 @@ export function checkPasswordStrength(password: string): {
 } {
   let score = 0;
   const suggestions: string[] = [];
-  
+
   if (password.length >= 8) score++;
   else suggestions.push("Use at least 8 characters");
-  
+
   if (password.length >= 12) score++;
-  
+
   if (/[a-z]/.test(password)) score++;
   else suggestions.push("Add lowercase letters");
-  
+
   if (/[A-Z]/.test(password)) score++;
   else suggestions.push("Add uppercase letters");
-  
+
   if (/[0-9]/.test(password)) score++;
   else suggestions.push("Add numbers");
-  
+
   if (/[^a-zA-Z0-9]/.test(password)) score++;
   else suggestions.push("Add special characters (!@#$%...)");
-  
+
   const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong", "Very Strong"];
   const colors = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e", "#10b981"];
-  
+
   return {
     score,
     label: labels[Math.min(score, 5)],
@@ -713,7 +662,3 @@ export function checkPasswordStrength(password: string): {
     suggestions,
   };
 }
-
-// Initialize on load
-initializeAdminUsers();
-

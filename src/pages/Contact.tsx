@@ -39,8 +39,8 @@ export default function Contact() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Always save to localStorage for admin panel viewing (works locally and in production)
-    createContactSubmission({
+    // Always save to Supabase for admin panel viewing (works locally and in production)
+    await createContactSubmission({
       name: `${formData.firstName} ${formData.lastName}`,
       email: formData.email,
       subject: formData.subject || "General Inquiry",

@@ -80,8 +80,8 @@ export function AnnouncementManagement() {
   const { currentUser } = useAuth();
   const { toast } = useToast();
 
-  const loadData = () => {
-    setAnnouncements(getAllAnnouncements());
+  const loadData = async () => {
+    setAnnouncements(await getAllAnnouncements());
   };
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export function AnnouncementManagement() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.title || !formData.content) {
       toast({
         title: "Missing Information",
@@ -140,13 +140,13 @@ export function AnnouncementManagement() {
     };
 
     if (editingAnnouncement) {
-      updateAnnouncement(editingAnnouncement.id, data);
+      await updateAnnouncement(editingAnnouncement.id, data);
       if (currentUser) {
         addAuditLog(currentUser, "UPDATE_ANNOUNCEMENT", `Updated announcement: ${data.title}`);
       }
       toast({ title: "Announcement Updated", description: "The announcement has been updated" });
     } else {
-      createAnnouncement(data);
+      await createAnnouncement(data);
       if (currentUser) {
         addAuditLog(currentUser, "CREATE_ANNOUNCEMENT", `Created announcement: ${data.title}`);
       }
@@ -158,10 +158,10 @@ export function AnnouncementManagement() {
     loadData();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this announcement?")) {
       const announcement = announcements.find(a => a.id === id);
-      deleteAnnouncement(id);
+      await deleteAnnouncement(id);
       if (currentUser && announcement) {
         addAuditLog(currentUser, "DELETE_ANNOUNCEMENT", `Deleted announcement: ${announcement.title}`);
       }
@@ -170,18 +170,18 @@ export function AnnouncementManagement() {
     }
   };
 
-  const handleTogglePin = (id: string) => {
+  const handleTogglePin = async (id: string) => {
     const announcement = announcements.find(a => a.id === id);
-    toggleAnnouncementPin(id);
+    await toggleAnnouncementPin(id);
     if (currentUser && announcement) {
       addAuditLog(currentUser, "TOGGLE_ANNOUNCEMENT_PIN", `${announcement.isPinned ? "Unpinned" : "Pinned"} announcement: ${announcement.title}`);
     }
     loadData();
   };
 
-  const handleToggleActive = (id: string) => {
+  const handleToggleActive = async (id: string) => {
     const announcement = announcements.find(a => a.id === id);
-    toggleAnnouncementActive(id);
+    await toggleAnnouncementActive(id);
     if (currentUser && announcement) {
       addAuditLog(currentUser, "TOGGLE_ANNOUNCEMENT_ACTIVE", `${announcement.isActive ? "Deactivated" : "Activated"} announcement: ${announcement.title}`);
     }
@@ -194,7 +194,10 @@ export function AnnouncementManagement() {
     return true;
   });
 
-  const stats = getAnnouncementStats();
+  const [stats, setStats] = useState({ total: 0, active: 0, pinned: 0, urgent: 0 });
+  useEffect(() => {
+    getAnnouncementStats().then(setStats);
+  }, [announcements]);
 
   return (
     <div className="space-y-6">

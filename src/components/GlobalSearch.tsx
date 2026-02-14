@@ -37,7 +37,10 @@ export function GlobalSearch({ open, onOpenChange, onResultClick }: GlobalSearch
   const members = useMemo(() => getAllMembers(), []);
   const events = useMemo(() => getAllEvents(), []);
   const contributions = useMemo(() => getAllContributions(), []);
-  const documents = useMemo(() => getAllDocuments(), []);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  useEffect(() => {
+    getAllDocuments().then(setDocuments);
+  }, []);
 
   // Search results
   const results = useMemo<SearchResult[]>(() => {

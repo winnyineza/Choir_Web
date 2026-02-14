@@ -50,11 +50,16 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
   const [stats, setStats] = useState({ total: 0, unread: 0, replied: 0, thisWeek: 0 });
 
   useEffect(() => {
-    const data = getAllContactSubmissions();
-    setSubmissions(data);
-    const newStats = getContactStats();
-    setStats(newStats);
-    onUnreadCountChange?.(newStats.unread);
+    const load = async () => {
+      const [data, newStats] = await Promise.all([
+        getAllContactSubmissions(),
+        getContactStats(),
+      ]);
+      setSubmissions(data);
+      setStats(newStats);
+      onUnreadCountChange?.(newStats.unread);
+    };
+    load();
   }, [onUnreadCountChange]);
 
   useEffect(() => {
@@ -75,16 +80,18 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
     if (filter === "unread") {
       filtered = filtered.filter((s) => !s.isRead);
     } else if (filter === "replied") {
-      filtered = filtered.filter((s) => s.isReplied);
+      filtered = filtered.filter((s) => s.repliedAt);
     }
 
     setFilteredSubmissions(filtered);
   }, [submissions, searchQuery, filter]);
 
-  const loadSubmissions = () => {
-    const data = getAllContactSubmissions();
+  const loadSubmissions = async () => {
+    const [data, newStats] = await Promise.all([
+      getAllContactSubmissions(),
+      getContactStats(),
+    ]);
     setSubmissions(data);
-    const newStats = getContactStats();
     setStats(newStats);
     onUnreadCountChange?.(newStats.unread);
   };
@@ -114,41 +121,43 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
     setFilteredSubmissions(filtered);
   };
 
-  const handleView = (submission: ContactSubmission) => {
+  const handleView = async (submission: ContactSubmission) => {
     setSelectedSubmission(submission);
     setIsViewModalOpen(true);
 
     // Mark as read
     if (!submission.isRead) {
-      markAsRead(submission.id);
-      loadSubmissions();
+      await markAsRead(submission.id);
+      await loadSubmissions();
     }
   };
 
-  const handleMarkReplied = (id: string) => {
-    markAsReplied(id);
-    loadSubmissions();
+  const handleMarkReplied = async (id: string) => {
+    await markAsReplied(id);
+    await loadSubmissions();
     toast({
       title: "Marked as replied",
       description: "This submission has been marked as replied.",
     });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this submission?")) {
-      deleteContactSubmission(id);
-      loadSubmissions();
-      setIsViewModalOpen(false);
-      toast({
-        title: "Deleted",
-        description: "Submission has been deleted.",
-      });
+      const ok = await deleteContactSubmission(id);
+      if (ok) {
+        await loadSubmissions();
+        setIsViewModalOpen(false);
+        toast({
+          title: "Deleted",
+          description: "Submission has been deleted.",
+        });
+      }
     }
   };
 
-  const handleMarkAllRead = () => {
-    markAllAsRead();
-    loadSubmissions();
+  const handleMarkAllRead = async () => {
+    await markAllAsRead();
+    await loadSubmissions();
     toast({
       title: "All marked as read",
       description: "All submissions have been marked as read.",

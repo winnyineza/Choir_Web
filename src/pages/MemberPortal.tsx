@@ -162,7 +162,7 @@ export default function MemberPortal() {
   // Load announcements when PIN is verified
   useEffect(() => {
     if (view !== "pin") {
-      setAnnouncements(getActiveAnnouncements("members"));
+      getActiveAnnouncements("members").then(setAnnouncements);
     }
   }, [view]);
 
@@ -315,8 +315,8 @@ export default function MemberPortal() {
   };
 
   // Login with email to see personal data
-  const handleEmailLogin = () => {
-    const members = getAllMembers();
+  const handleEmailLogin = async () => {
+    const members = await getAllMembers();
     const member = members.find(
       (m) => m.email?.toLowerCase() === email.toLowerCase()
     );
@@ -331,9 +331,14 @@ export default function MemberPortal() {
     }
 
     setMemberInfo(member);
-    setMyAttendance(getAttendanceByMemberEmail(email));
-    setAttendanceStats(getMemberAttendanceStatsByEmail(email));
-    setMyRequests(getLeaveRequestsByEmail(email));
+    const [attendance, attStats, requests] = await Promise.all([
+      getAttendanceByMemberEmail(email),
+      getMemberAttendanceStatsByEmail(email),
+      getLeaveRequestsByEmail(email),
+    ]);
+    setMyAttendance(attendance);
+    setAttendanceStats(attStats);
+    setMyRequests(requests);
     
     toast({
       title: `Welcome, ${member.name}! 👋`,
@@ -344,9 +349,15 @@ export default function MemberPortal() {
   // Refresh data when email changes
   useEffect(() => {
     if (memberInfo && email) {
-      setMyAttendance(getAttendanceByMemberEmail(email));
-      setAttendanceStats(getMemberAttendanceStatsByEmail(email));
-      setMyRequests(getLeaveRequestsByEmail(email));
+      Promise.all([
+        getAttendanceByMemberEmail(email),
+        getMemberAttendanceStatsByEmail(email),
+        getLeaveRequestsByEmail(email),
+      ]).then(([att, attStats, reqs]) => {
+        setMyAttendance(att);
+        setAttendanceStats(attStats);
+        setMyRequests(reqs);
+      });
     }
   }, [memberInfo, email]);
 
@@ -434,7 +445,7 @@ export default function MemberPortal() {
   };
 
   // Verify code and submit
-  const handleVerifyAndSubmit = () => {
+  const handleVerifyAndSubmit = async () => {
     const code = verificationCode.join("");
     if (code.length !== 6) {
       toast({
@@ -445,10 +456,10 @@ export default function MemberPortal() {
       return;
     }
 
-    const result = verifyEmailCode(email, code);
+    const result = await verifyEmailCode(email, code);
 
     if (result.success) {
-      const leaveResult = createLeaveRequest({
+      const leaveResult = await createLeaveRequest({
         memberId: memberInfo?.id || "",
         memberName: memberInfo?.name || "",
         memberEmail: email,
@@ -493,7 +504,7 @@ export default function MemberPortal() {
     setView("dashboard");
     // Refresh requests
     if (email) {
-      setMyRequests(getLeaveRequestsByEmail(email));
+      getLeaveRequestsByEmail(email).then(setMyRequests);
     }
   };
 

@@ -1,7 +1,8 @@
 // Ticket Order Service
-// Manages ticket orders with localStorage (replace with backend later)
+// Manages ticket orders with Supabase (via supabaseDB)
 
-import { reduceTicketAvailability, checkTicketAvailability } from "./dataService";
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
+import { reduceTicketAvailability, checkTicketAvailability } from './dataService';
 
 export interface TicketTier {
   id: string;
@@ -17,7 +18,7 @@ export interface TicketTier {
 export interface TicketOrder {
   id: string;
   txRef: string;
-  eventId: string; // Changed to string to match dataService
+  eventId: string;
   eventTitle: string;
   eventDate: string;
   eventLocation: string;
@@ -30,9 +31,9 @@ export interface TicketOrder {
   }[];
   subtotal: number;
   serviceFee: number;
-  discount: number; // Added for promo codes
+  discount: number;
   total: number;
-  promoCode?: string; // Track applied promo code
+  promoCode?: string;
   customer: {
     name: string;
     email: string;
@@ -41,7 +42,7 @@ export interface TicketOrder {
   status: "pending" | "confirmed" | "cancelled" | "used";
   paymentMethod: "momo" | "card" | "bank";
   transactionId?: string;
-  qrCodeData: string; // QR code data for scanning
+  qrCodeData: string;
   createdAt: string;
   confirmedAt?: string;
 }
@@ -49,57 +50,49 @@ export interface TicketOrder {
 const ORDERS_KEY = "sop_ticket_orders";
 const SERVICE_FEE = 500; // RWF
 
-// Get all orders from localStorage
-export function getAllOrders(): TicketOrder[] {
-  try {
-    const stored = localStorage.getItem(ORDERS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+// Get all orders from Supabase
+export async function getAllOrders(): Promise<TicketOrder[]> {
+  return dbGetAll<TicketOrder>(ORDERS_KEY);
 }
 
 // Get orders by status
-export function getOrdersByStatus(status: TicketOrder["status"]): TicketOrder[] {
-  return getAllOrders().filter((order) => order.status === status);
+export async function getOrdersByStatus(status: TicketOrder["status"]): Promise<TicketOrder[]> {
+  const orders = await getAllOrders();
+  return orders.filter((order) => order.status === status);
 }
 
 // Get order by ID
-export function getOrderById(id: string): TicketOrder | undefined {
-  return getAllOrders().find((order) => order.id === id);
+export async function getOrderById(id: string): Promise<TicketOrder | undefined> {
+  const order = await dbGetById<TicketOrder>(ORDERS_KEY, id);
+  return order ?? undefined;
 }
 
 // Get order by transaction reference
-export function getOrderByTxRef(txRef: string): TicketOrder | undefined {
-  return getAllOrders().find((order) => order.txRef === txRef);
+export async function getOrderByTxRef(txRef: string): Promise<TicketOrder | undefined> {
+  const orders = await dbQuery<TicketOrder>(ORDERS_KEY, 'tx_ref', txRef);
+  return orders[0] ?? undefined;
 }
 
 // Create new order with availability validation
-export function createOrder(
+export async function createOrder(
   order: Omit<TicketOrder, "id" | "createdAt" | "status" | "serviceFee" | "total" | "qrCodeData">
-): { success: boolean; order?: TicketOrder; error?: string } {
-  // Check ticket availability first
+): Promise<{ success: boolean; order?: TicketOrder; error?: string }> {
   const ticketRequests = order.tickets.map((t) => ({
     tierId: t.tierId,
     quantity: t.quantity,
   }));
-  
-  const availability = checkTicketAvailability(order.eventId, ticketRequests);
+
+  const availability = await checkTicketAvailability(order.eventId, ticketRequests);
   if (!availability.available) {
     return { success: false, error: availability.message };
   }
-  
-  const orders = getAllOrders();
-  
-  // Generate unique reference for QR code
+
   const txRef = order.txRef;
-  const qrCodeData = txRef; // QR code contains the transaction reference
-  
-  // Calculate total with discount
+  const qrCodeData = txRef;
   const discount = order.discount || 0;
   const finalSubtotal = Math.max(0, order.subtotal - discount);
-  
-  const newOrder: TicketOrder = {
+
+  const newOrder: Omit<TicketOrder, "id" | "createdAt"> & { id?: string; createdAt?: string } = {
     ...order,
     id: `ORD-${Date.now()}`,
     status: "pending",
@@ -109,77 +102,78 @@ export function createOrder(
     qrCodeData,
     createdAt: new Date().toISOString(),
   };
-  
-  orders.push(newOrder);
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-  
-  return { success: true, order: newOrder };
+
+  try {
+    const inserted = await dbInsert<TicketOrder>(ORDERS_KEY, newOrder);
+    return { success: true, order: inserted };
+  } catch (e: any) {
+    return { success: false, error: e?.message || 'Failed to create order' };
+  }
 }
 
 // Confirm order and reduce ticket availability
-export function confirmOrder(
+export async function confirmOrder(
   orderId: string,
   transactionId?: string
-): TicketOrder | null {
-  const orders = getAllOrders();
-  const index = orders.findIndex((o) => o.id === orderId);
-  
-  if (index === -1) return null;
-  
-  const order = orders[index];
-  
-  // Reduce ticket availability in the event
+): Promise<TicketOrder | null> {
+  const order = await getOrderById(orderId);
+  if (!order) return null;
+
   const ticketPurchases = order.tickets.map((t) => ({
     tierId: t.tierId,
     quantity: t.quantity,
   }));
-  
-  reduceTicketAvailability(order.eventId, ticketPurchases);
-  
-  // Update order status
-  orders[index] = {
-    ...orders[index],
-    status: "confirmed",
-    transactionId: transactionId || orders[index].transactionId,
-    confirmedAt: new Date().toISOString(),
-  };
-  
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-  return orders[index];
+
+  await reduceTicketAvailability(order.eventId, ticketPurchases);
+
+  try {
+    return await dbUpdate<TicketOrder>(ORDERS_KEY, orderId, {
+      status: "confirmed",
+      transactionId: transactionId || order.transactionId,
+      confirmedAt: new Date().toISOString(),
+    });
+  } catch {
+    return null;
+  }
 }
 
 // Update order status
-export function updateOrderStatus(
+export async function updateOrderStatus(
   id: string,
   status: TicketOrder["status"],
   transactionId?: string
-): TicketOrder | null {
-  const orders = getAllOrders();
-  const index = orders.findIndex((o) => o.id === id);
-  
-  if (index === -1) return null;
-  
-  orders[index] = {
-    ...orders[index],
-    status,
-    transactionId: transactionId || orders[index].transactionId,
-    confirmedAt: status === "confirmed" ? new Date().toISOString() : orders[index].confirmedAt,
-  };
-  
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-  return orders[index];
+): Promise<TicketOrder | null> {
+  const order = await getOrderById(id);
+  if (!order) return null;
+
+  try {
+    return await dbUpdate<TicketOrder>(ORDERS_KEY, id, {
+      status,
+      transactionId: transactionId ?? order.transactionId,
+      confirmedAt: status === "confirmed" ? new Date().toISOString() : order.confirmedAt,
+    });
+  } catch {
+    return null;
+  }
 }
 
 // Confirm order by transaction reference (called by webhook/callback)
-export function confirmOrderByTxRef(txRef: string, transactionId: string): TicketOrder | null {
-  const order = getOrderByTxRef(txRef);
+export async function confirmOrderByTxRef(txRef: string, transactionId: string): Promise<TicketOrder | null> {
+  const order = await getOrderByTxRef(txRef);
   if (!order) return null;
   return updateOrderStatus(order.id, "confirmed", transactionId);
 }
 
 // Get order statistics
-export function getOrderStats() {
-  const orders = getAllOrders();
+export async function getOrderStats(): Promise<{
+  total: number;
+  pending: number;
+  confirmed: number;
+  cancelled: number;
+  used: number;
+  revenue: number;
+}> {
+  const orders = await getAllOrders();
   return {
     total: orders.length,
     pending: orders.filter((o) => o.status === "pending").length,
@@ -192,37 +186,45 @@ export function getOrderStats() {
   };
 }
 
-// Calculate service fee
+// Calculate service fee (sync - no storage access)
 export function getServiceFee(): number {
   return SERVICE_FEE;
 }
 
 // Delete order (admin only)
-export function deleteOrder(id: string): boolean {
-  const orders = getAllOrders();
-  const filtered = orders.filter((o) => o.id !== id);
-  
-  if (filtered.length === orders.length) return false;
-  
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(filtered));
-  return true;
+export async function deleteOrder(id: string): Promise<boolean> {
+  try {
+    await dbDelete(ORDERS_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Clear all orders (admin only - for fresh start)
-export function clearAllOrders(): void {
-  localStorage.removeItem(ORDERS_KEY);
+export async function clearAllOrders(): Promise<void> {
+  const orders = await getAllOrders();
+  for (const order of orders) {
+    await dbDelete(ORDERS_KEY, order.id);
+  }
 }
 
 // Get pending order stats
-export function getPendingOrderStats() {
-  const orders = getAllOrders();
+export async function getPendingOrderStats(): Promise<{
+  total: number;
+  olderThan1Hour: number;
+  olderThan24Hours: number;
+  olderThan7Days: number;
+  potentialRevenue: number;
+}> {
+  const orders = await getAllOrders();
   const pendingOrders = orders.filter((o) => o.status === "pending");
-  
+
   const now = Date.now();
   const oneHour = 60 * 60 * 1000;
   const oneDay = 24 * oneHour;
   const oneWeek = 7 * oneDay;
-  
+
   return {
     total: pendingOrders.length,
     olderThan1Hour: pendingOrders.filter((o) => now - new Date(o.createdAt).getTime() > oneHour).length,
@@ -232,53 +234,42 @@ export function getPendingOrderStats() {
   };
 }
 
-// Clean up old pending orders
-// Returns the number of orders cancelled
-export function cleanupOldPendingOrders(maxAgeHours: number = 24): number {
-  const orders = getAllOrders();
+// Clean up old pending orders - Returns the number of orders cancelled
+export async function cleanupOldPendingOrders(maxAgeHours: number = 24): Promise<number> {
+  const orders = await getAllOrders();
   const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
   const now = Date.now();
-  
   let cleanedCount = 0;
-  
-  const updatedOrders = orders.map((order) => {
+
+  for (const order of orders) {
     if (order.status === "pending") {
       const orderAge = now - new Date(order.createdAt).getTime();
       if (orderAge > maxAgeMs) {
+        await dbUpdate<TicketOrder>(ORDERS_KEY, order.id, { status: "cancelled" });
         cleanedCount++;
-        return { ...order, status: "cancelled" as const };
       }
     }
-    return order;
-  });
-  
-  if (cleanedCount > 0) {
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(updatedOrders));
   }
-  
+
   return cleanedCount;
 }
 
 // Delete pending orders completely (not just cancel)
-export function deletePendingOrders(maxAgeHours: number = 24): number {
-  const orders = getAllOrders();
+export async function deletePendingOrders(maxAgeHours: number = 24): Promise<number> {
+  const orders = await getAllOrders();
   const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
   const now = Date.now();
-  
-  const filteredOrders = orders.filter((order) => {
+  let deletedCount = 0;
+
+  for (const order of orders) {
     if (order.status === "pending") {
       const orderAge = now - new Date(order.createdAt).getTime();
-      return orderAge <= maxAgeMs; // Keep only recent pending orders
+      if (orderAge > maxAgeMs) {
+        await dbDelete(ORDERS_KEY, order.id);
+        deletedCount++;
+      }
     }
-    return true; // Keep all non-pending orders
-  });
-  
-  const deletedCount = orders.length - filteredOrders.length;
-  
-  if (deletedCount > 0) {
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(filteredOrders));
   }
-  
+
   return deletedCount;
 }
-
