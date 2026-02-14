@@ -2920,7 +2920,7 @@ export default function Admin() {
               </div>
 
               {/* System settings - only for super_admin and main_admin */}
-              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
+              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (<>
               <div className="card-glass rounded-2xl p-6 max-w-2xl">
                 <h3 className="font-semibold text-foreground mb-4">Choir Information</h3>
                 <div className="space-y-4">
@@ -3080,7 +3080,7 @@ export default function Admin() {
               <div className="max-w-2xl">
                 <BackupRestore />
               </div>
-              )}
+              </>)}
 
             </div>
           )}
