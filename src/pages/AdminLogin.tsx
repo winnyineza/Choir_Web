@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,9 +36,25 @@ export default function AdminLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Validate invite code if present
-  const invite = inviteCode ? validateInvite(inviteCode) : null;
-  const validReset = resetToken ? validateResetToken(resetToken) : null;
+  // Validate invite code and reset token asynchronously
+  const [invite, setInvite] = useState<any>(null);
+  const [validReset, setValidReset] = useState<any>(null);
+  const [validationLoading, setValidationLoading] = useState(!!(inviteCode || resetToken));
+
+  useEffect(() => {
+    async function validate() {
+      if (inviteCode) {
+        const result = await validateInvite(inviteCode);
+        setInvite(result);
+      }
+      if (resetToken) {
+        const result = await validateResetToken(resetToken);
+        setValidReset(result);
+      }
+      setValidationLoading(false);
+    }
+    validate();
+  }, [inviteCode, resetToken]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +137,7 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const user = redeemInvite(inviteCode!, password);
+      const user = await redeemInvite(inviteCode!, password);
       if (user) {
         setSignupSuccess(true);
         setTimeout(async () => {
@@ -147,15 +163,51 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const result = requestPasswordReset(email);
+      const result = await requestPasswordReset(email);
       if (result) {
-        // In production, this would send an email
-        // For now, show the reset link (dev mode)
         const resetLink = `${window.location.origin}/admin/login?reset=${result.token}`;
-        setSuccess(`DEV MODE: Reset link generated. In production, this would be emailed.\n\nReset Link: ${resetLink}`);
-        
-        // Copy to clipboard
-        navigator.clipboard.writeText(resetLink);
+        const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+        if (isDev) {
+          // Development: show link directly
+          setSuccess(`DEV MODE: Reset link generated.\n\nReset Link: ${resetLink}`);
+          navigator.clipboard.writeText(resetLink).catch(() => {});
+        } else {
+          // Production: send email via Netlify function
+          try {
+            const emailRes = await fetch("/.netlify/functions/send-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: [{ email, name: email }],
+                subject: "Password Reset - Serenades of Praise Admin",
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; color: #fff;">
+                    <h1 style="color: #d4a537;">Password Reset</h1>
+                    <p>You requested a password reset for your admin account.</p>
+                    <p>Click the button below to reset your password. This link expires in 1 hour.</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #d4a537, #b8860b); color: #000; font-weight: bold; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px;">Reset Password</a>
+                    </div>
+                    <p style="color: #888; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
+                    <p style="color: #666; font-size: 11px; margin-top: 20px;">Serenades of Praise Choir</p>
+                  </div>
+                `,
+              }),
+            });
+
+            if (emailRes.ok) {
+              setSuccess("A password reset link has been sent to your email. Check your inbox.");
+            } else {
+              // Email failed, show link as fallback
+              setSuccess(`Reset link generated but email failed to send.\n\nReset Link: ${resetLink}`);
+              navigator.clipboard.writeText(resetLink).catch(() => {});
+            }
+          } catch {
+            setSuccess(`Reset link generated but email failed to send.\n\nReset Link: ${resetLink}`);
+            navigator.clipboard.writeText(resetLink).catch(() => {});
+          }
+        }
       } else {
         setError("No account found with this email address");
       }
@@ -183,7 +235,7 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const success = resetPassword(resetToken!, password);
+      const success = await resetPassword(resetToken!, password);
       if (success) {
         setSuccess("Password reset successfully! Redirecting to login...");
         setTimeout(() => {
@@ -219,6 +271,18 @@ export default function AdminLogin() {
           <p className="text-sm text-muted-foreground">
             Redirecting to dashboard...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while validating invite/reset tokens
+  if (validationLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Validating...</p>
         </div>
       </div>
     );
