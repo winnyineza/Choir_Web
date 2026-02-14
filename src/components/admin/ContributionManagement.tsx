@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +47,6 @@ import { addAuditLog } from "@/lib/adminService";
 import {
   getAllContributions,
   getAllContributionTypes,
-  getActiveContributionTypes,
   createContribution,
   deleteContribution,
   createContributionType,
@@ -83,7 +82,8 @@ export function ContributionManagement() {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [contributionTypes, setContributionTypes] = useState<ContributionType[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [stats, setStats] = useState(getContributionStats());
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getContributionStats>> | null>(null);
+  const [monthlyReport, setMonthlyReport] = useState<Awaited<ReturnType<typeof getMonthlyDuesReport>>>([]);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -107,6 +107,7 @@ export function ContributionManagement() {
   const [bulkMemberId, setBulkMemberId] = useState("");
   const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
+  const [bulkPaidMonths, setBulkPaidMonths] = useState<number[]>([]);
   
   // Cell click payment state (for monthly)
   const [cellPayment, setCellPayment] = useState<{
@@ -162,13 +163,68 @@ export function ContributionManagement() {
       getExpensesByYear(summaryYear).then(setSummaryYearExpenses);
     }
   }, [showFinancialSummary, summaryYear]);
+
+  useEffect(() => {
+    if (members.length === 0) return;
+    getMonthlyDuesReport(filterMonth, filterYear, members.map(m => ({ id: m.id, name: m.name, email: m.email })))
+      .then(setMonthlyReport);
+  }, [filterMonth, filterYear, members]);
   
   const loadData = async () => {
-    setContributions(getAllContributions());
-    setContributionTypes(getAllContributionTypes());
-    setMembers(await getAllMembers());
-    setStats(getContributionStats());
+    const [contribs, types, memb] = await Promise.all([
+      getAllContributions(),
+      getAllContributionTypes(),
+      getAllMembers(),
+    ]);
+    setContributions(contribs);
+    setContributionTypes(types);
+    setMembers(memb);
+    const [st, report] = await Promise.all([
+      getContributionStats(),
+      getMonthlyDuesReport(filterMonth, filterYear, memb.map(m => ({ id: m.id, name: m.name, email: m.email }))),
+    ]);
+    setStats(st);
+    setMonthlyReport(report);
   };
+
+  // Pre-computed payment details for bulk modal table (member x month x bulkYear)
+  const paymentDetailsMap = useMemo(() => {
+    const getRateForPeriod = (month: number, year: number): number => {
+      const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
+      if (!monthlyType) return 0;
+      const rateHistory = monthlyType.rateHistory;
+      if (!rateHistory || rateHistory.length === 0) return monthlyType.amount;
+      const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+      const sortedHistory = [...rateHistory].sort(
+        (a, b) => new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime()
+      );
+      let applicableRate = sortedHistory[0].amount;
+      for (const entry of sortedHistory) {
+        const effectiveDate = new Date(entry.effectiveFrom);
+        if (effectiveDate <= endOfMonth) applicableRate = entry.amount;
+        else break;
+      }
+      return applicableRate;
+    };
+    const map: Record<string, { amountPaid: number; expectedAmount: number; hasHistoricalRate: boolean }> = {};
+    for (const m of members) {
+      for (let month = 1; month <= 12; month++) {
+        const key = `${m.id}-${month}-${bulkYear}`;
+        const monthlyContribs = contributions.filter(
+          c => c.memberId === m.id && c.month === month && c.year === bulkYear && c.category === "monthly"
+        );
+        const amountPaid = monthlyContribs.reduce((sum, c) => sum + c.amount, 0);
+        const storedExpected = monthlyContribs.find(c => c.expectedAmount)?.expectedAmount;
+        const rateForMonth = getRateForPeriod(month, bulkYear);
+        map[key] = {
+          amountPaid,
+          expectedAmount: storedExpected ?? rateForMonth,
+          hasHistoricalRate: !!storedExpected || rateForMonth > 0,
+        };
+      }
+    }
+    return map;
+  }, [contributions, contributionTypes, members, bulkYear]);
   
   // Filter contributions
   const filteredContributions = contributions
@@ -186,8 +242,8 @@ export function ContributionManagement() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Get paid months for a member in a specific year
-  const getPaidMonthsForMember = (memberId: string, year: number): number[] => {
-    const memberContribs = getContributionsByMember(memberId);
+  const getPaidMonthsForMember = async (memberId: string, year: number): Promise<number[]> => {
+    const memberContribs = await getContributionsByMember(memberId);
     return memberContribs
       .filter(c => c.category === "monthly" && c.year === year && c.month)
       .map(c => c.month!)
@@ -197,13 +253,17 @@ export function ContributionManagement() {
   // Load paid months when member or year changes in bulk modal
   useEffect(() => {
     if (bulkMemberId && showBulkMonthlyDues) {
-      const paidMonths = getPaidMonthsForMember(bulkMemberId, bulkYear);
-      setSelectedMonths([]); // Reset selection, only show already paid
+      getPaidMonthsForMember(bulkMemberId, bulkYear).then((paid) => {
+        setBulkPaidMonths(paid);
+        setSelectedMonths([]);
+      });
+    } else {
+      setBulkPaidMonths([]);
     }
   }, [bulkMemberId, bulkYear, showBulkMonthlyDues]);
 
   // Handle bulk monthly dues save
-  const handleBulkMonthlyDuesSave = () => {
+  const handleBulkMonthlyDuesSave = async () => {
     const member = members.find(m => m.id === bulkMemberId);
     const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
     
@@ -222,11 +282,8 @@ export function ContributionManagement() {
       return;
     }
     
-    // Get already paid months
-    const alreadyPaid = getPaidMonthsForMember(bulkMemberId, bulkYear);
-    
     // Only add contributions for newly selected months (not already paid)
-    const newMonths = selectedMonths.filter(m => !alreadyPaid.includes(m));
+    const newMonths = selectedMonths.filter(m => !bulkPaidMonths.includes(m));
     
     if (newMonths.length === 0) {
       toast({ title: "No new months", description: "All selected months are already paid.", variant: "destructive" });
@@ -234,7 +291,7 @@ export function ContributionManagement() {
     }
     
     // Create contribution for each new month
-    newMonths.forEach(month => {
+    await Promise.all(newMonths.map(month =>
       createContribution({
         memberId: member.id,
         memberName: member.name,
@@ -247,8 +304,8 @@ export function ContributionManagement() {
         year: bulkYear,
         paymentMethod: "cash",
         recordedBy: currentUser?.name || "Admin",
-      });
-    });
+      })
+    ));
     
     if (currentUser) {
       addAuditLog(currentUser, "RECORD_CONTRIBUTIONS", `Recorded ${newMonths.length} month(s) for ${member.name}`);
@@ -267,8 +324,7 @@ export function ContributionManagement() {
 
   // Toggle month selection for bulk entry
   const toggleMonthSelection = (month: number) => {
-    const alreadyPaid = getPaidMonthsForMember(bulkMemberId, bulkYear);
-    if (alreadyPaid.includes(month)) return; // Can't unselect already paid months
+    if (bulkPaidMonths.includes(month)) return; // Can't unselect already paid months
     
     setSelectedMonths(prev => 
       prev.includes(month) 
@@ -278,11 +334,11 @@ export function ContributionManagement() {
   };
 
   // Handle cell click in the overview table
-  const handleCellClick = (member: Member, month: number, year: number) => {
-    const paymentDetails = getMemberMonthlyPaymentDetails(member.id, month, year);
+  const handleCellClick = async (member: Member, month: number, year: number) => {
+    const paymentDetails = await getMemberMonthlyPaymentDetails(member.id, month, year);
     
     // Use historical rate if payment exists, otherwise use the rate for that month
-    const rateForMonth = getMonthlyRateForPeriod(month, year);
+    const rateForMonth = await getMonthlyRateForPeriod(month, year);
     const effectiveExpected = paymentDetails.amountPaid > 0 && paymentDetails.expectedAmount > 0
       ? paymentDetails.expectedAmount 
       : rateForMonth;
@@ -356,13 +412,13 @@ export function ContributionManagement() {
   };
 
   // Save cell payment
-  const handleSaveCellPayment = () => {
+  const handleSaveCellPayment = async () => {
     if (!cellPayment) return;
     
     const amount = parseFloat(cellPayment.amount) || 0;
     
     // Pass the expected amount to store the historical rate
-    setMemberMonthlyPayment(
+    await setMemberMonthlyPayment(
       cellPayment.memberId,
       cellPayment.memberName,
       cellPayment.memberEmail,
@@ -534,13 +590,6 @@ export function ContributionManagement() {
     });
   };
   
-  // Monthly report data
-  const monthlyReport = getMonthlyDuesReport(
-    filterMonth,
-    filterYear,
-    members.map(m => ({ id: m.id, name: m.name, email: m.email }))
-  );
-  
   const paidCount = monthlyReport.filter(r => r.isPaid).length;
   const unpaidCount = monthlyReport.filter(r => !r.isPaid).length;
   
@@ -554,7 +603,7 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Wallet className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold text-green-400">{formatCurrency(stats.totalCollected)}</p>
+            <p className="text-xl font-bold text-green-400">{formatCurrency(stats?.totalCollected ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">Total Collected</p>
         </div>
@@ -564,7 +613,7 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Calendar className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold">{formatCurrency(stats.monthlyDuesCollected)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.monthlyDuesCollected ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">Monthly</p>
         </div>
@@ -574,7 +623,7 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Star className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold">{formatCurrency(stats.specialContributions)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.specialContributions ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">Special</p>
         </div>
@@ -584,7 +633,7 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold text-red-400">{formatCurrency(stats.outstandingDues)}</p>
+            <p className="text-xl font-bold text-red-400">{formatCurrency(stats?.outstandingDues ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">Outstanding Dues</p>
         </div>
@@ -594,7 +643,7 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold">{formatCurrency(stats.thisMonthTotal)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.thisMonthTotal ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">This Month</p>
         </div>
@@ -604,7 +653,7 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold">{formatCurrency(stats.thisYearTotal)}</p>
+            <p className="text-xl font-bold">{formatCurrency(stats?.thisYearTotal ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">This Year</p>
         </div>
@@ -840,7 +889,7 @@ export function ContributionManagement() {
                           }
                           
                           // Use historical rate tracking - compare against rate at time of payment
-                          const paymentDetails = getMemberMonthlyPaymentDetails(member.id, month, bulkYear);
+                          const paymentDetails = paymentDetailsMap[`${member.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: expectedAmount, hasHistoricalRate: false };
                           const amountPaid = paymentDetails.amountPaid;
                           // Use the stored historical rate, or fall back to current expected amount
                           const effectiveExpected = paymentDetails.hasHistoricalRate 
@@ -902,7 +951,7 @@ export function ContributionManagement() {
                     const currentExpected = monthlyType?.amount || 0;
                     // Count members who are fully paid using historical rate
                     const paidCount = members.filter(m => {
-                      const details = getMemberMonthlyPaymentDetails(m.id, month, bulkYear);
+                      const details = paymentDetailsMap[`${m.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: currentExpected, hasHistoricalRate: false };
                       const effectiveExpected = details.hasHistoricalRate ? details.expectedAmount : currentExpected;
                       return details.amountPaid >= effectiveExpected && effectiveExpected > 0;
                     }).length;
@@ -927,7 +976,7 @@ export function ContributionManagement() {
                       const totalPayments = members.reduce((sum, m) => {
                         let count = 0;
                         for (let month = 1; month <= 12; month++) {
-                          const details = getMemberMonthlyPaymentDetails(m.id, month, bulkYear);
+                          const details = paymentDetailsMap[`${m.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: currentExpected, hasHistoricalRate: false };
                           const effectiveExpected = details.hasHistoricalRate ? details.expectedAmount : currentExpected;
                           if (details.amountPaid >= effectiveExpected && effectiveExpected > 0) count++;
                         }
@@ -1346,7 +1395,7 @@ export function ContributionManagement() {
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {getActiveContributionTypes().map(type => (
+                  {contributionTypes.filter(t => t.isActive).map(type => (
                     <SelectItem key={type.id} value={type.id}>
                       {type.name} ({formatCurrency(type.amount)})
                     </SelectItem>
@@ -2105,7 +2154,7 @@ export function ContributionManagement() {
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
                   {MONTH_NAMES.map((name, index) => {
                     const month = index + 1;
-                    const alreadyPaid = getPaidMonthsForMember(bulkMemberId, bulkYear).includes(month);
+                    const alreadyPaid = bulkPaidMonths.includes(month);
                     const isSelected = selectedMonths.includes(month);
                     const isFutureMonth = bulkYear === new Date().getFullYear() && month > new Date().getMonth() + 1;
                     
