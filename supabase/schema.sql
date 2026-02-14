@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- MEMBERS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   phone VARCHAR(50),
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS members (
 -- EVENTS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
   date DATE NOT NULL,
@@ -48,15 +48,15 @@ CREATE TABLE IF NOT EXISTS events (
 -- ADMIN USERS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS admin_users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(50) DEFAULT 'reviewer' CHECK (role IN ('super_admin', 'main_admin', 'finance', 'secretary', 'disciplinary', 'reviewer')),
-  member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+  member_id TEXT,
   is_active BOOLEAN DEFAULT true,
   last_login TIMESTAMPTZ,
-  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
 -- LOGIN ATTEMPTS TABLE (For Rate Limiting)
 -- =============================================
 CREATE TABLE IF NOT EXISTS login_attempts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   email VARCHAR(255) NOT NULL,
   ip_address VARCHAR(45),
   success BOOLEAN DEFAULT false,
@@ -127,8 +127,8 @@ CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
 -- LEAVE REQUESTS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS leave_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
   reason TEXT NOT NULL,
@@ -143,14 +143,14 @@ CREATE TABLE IF NOT EXISTS leave_requests (
 -- EXPENSES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS expenses (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   amount DECIMAL(12, 2) NOT NULL,
   category VARCHAR(100) NOT NULL,
   date DATE NOT NULL,
   description TEXT,
   receipt_url TEXT,
-  recorded_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  recorded_by TEXT,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -159,14 +159,14 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- ANNOUNCEMENTS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS announcements (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
   type VARCHAR(20) DEFAULT 'general' CHECK (type IN ('general', 'event', 'warning', 'success')),
   priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('normal', 'high', 'urgent')),
   is_pinned BOOLEAN DEFAULT false,
   expires_at TIMESTAMPTZ,
-  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -174,8 +174,8 @@ CREATE TABLE IF NOT EXISTS announcements (
 -- AUDIT LOGS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL,
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
   user_email VARCHAR(255) NOT NULL,
   user_name VARCHAR(255) NOT NULL,
   action VARCHAR(100) NOT NULL,
@@ -193,18 +193,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit_logs(created_at DESC);
 -- DISCIPLINARY RECORDS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS disciplinary_records (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
   incident_date DATE NOT NULL,
   description TEXT NOT NULL,
   category VARCHAR(100) NOT NULL,
   severity VARCHAR(20) NOT NULL CHECK (severity IN ('minor', 'moderate', 'major', 'severe')),
   action_taken TEXT,
-  witnesses TEXT[], -- Array of member IDs
+  witnesses TEXT[],
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed', 'escalated')),
   resolution_date DATE,
   resolution_notes TEXT,
-  recorded_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  recorded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -213,14 +213,14 @@ CREATE TABLE IF NOT EXISTS disciplinary_records (
 -- INVENTORY TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS inventory (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   category VARCHAR(100) NOT NULL,
   quantity INTEGER DEFAULT 1,
   condition VARCHAR(50) DEFAULT 'good' CHECK (condition IN ('new', 'good', 'fair', 'poor')),
   location VARCHAR(255),
   notes TEXT,
-  assigned_to UUID REFERENCES members(id) ON DELETE SET NULL,
+  assigned_to TEXT,
   assigned_date DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS inventory (
 -- DOCUMENTS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS documents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
   category VARCHAR(100) NOT NULL,
@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS documents (
   file_size INTEGER,
   visibility VARCHAR(20) DEFAULT 'admins' CHECK (visibility IN ('public', 'members', 'admins')),
   tags TEXT[],
-  uploaded_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  uploaded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -248,18 +248,18 @@ CREATE TABLE IF NOT EXISTS documents (
 -- MEETING MINUTES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS meeting_minutes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   date DATE NOT NULL,
   type VARCHAR(50) DEFAULT 'regular' CHECK (type IN ('regular', 'special', 'executive', 'general')),
-  attendees UUID[],
+  attendees TEXT[],
   agenda TEXT,
   minutes TEXT NOT NULL,
   decisions TEXT[],
   action_items JSONB DEFAULT '[]'::jsonb,
   status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'archived')),
-  recorded_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
-  approved_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  recorded_by TEXT,
+  approved_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -268,7 +268,7 @@ CREATE TABLE IF NOT EXISTS meeting_minutes (
 -- GALLERY ALBUMS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS gallery_albums (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
   cover_image TEXT,
@@ -280,8 +280,8 @@ CREATE TABLE IF NOT EXISTS gallery_albums (
 -- GALLERY IMAGES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS gallery_images (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  album_id UUID REFERENCES gallery_albums(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
+  album_id TEXT,
   url TEXT NOT NULL,
   caption TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -291,7 +291,7 @@ CREATE TABLE IF NOT EXISTS gallery_images (
 -- MUSIC RELEASES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS music_releases (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   artist VARCHAR(255) DEFAULT 'The Serenades',
   release_type VARCHAR(50) DEFAULT 'single' CHECK (release_type IN ('single', 'album', 'ep')),
@@ -305,7 +305,7 @@ CREATE TABLE IF NOT EXISTS music_releases (
 -- PROMO CODES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS promo_codes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   code VARCHAR(50) UNIQUE NOT NULL,
   discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
   discount_value DECIMAL(10, 2) NOT NULL,
@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   valid_from TIMESTAMPTZ,
   valid_until TIMESTAMPTZ,
   is_active BOOLEAN DEFAULT true,
-  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -322,7 +322,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
 -- CONTACT SUBMISSIONS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS contact_submissions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(50),
@@ -331,7 +331,7 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   is_read BOOLEAN DEFAULT false,
   responded BOOLEAN DEFAULT false,
   responded_at TIMESTAMPTZ,
-  responded_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  responded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -339,7 +339,7 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
 -- DONATIONS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS donations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   donor_name VARCHAR(255) NOT NULL,
   donor_email VARCHAR(255),
   donor_phone VARCHAR(50),
@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS donations (
 -- AUDITIONS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS auditions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   applicant_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(50),
@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS auditions (
   scheduled_date DATE,
   scheduled_time VARCHAR(20),
   status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'passed', 'failed', 'cancelled')),
-  evaluator_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  evaluator_id TEXT,
   evaluation_notes TEXT,
   score INTEGER CHECK (score >= 0 AND score <= 100),
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -376,8 +376,8 @@ CREATE TABLE IF NOT EXISTS auditions (
 -- TICKETS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS tickets (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL,
   name VARCHAR(100) NOT NULL,
   price DECIMAL(10, 2) NOT NULL,
   quantity INTEGER NOT NULL,
@@ -389,8 +389,8 @@ CREATE TABLE IF NOT EXISTS tickets (
 -- TICKET ORDERS TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS ticket_orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
+  ticket_id TEXT NOT NULL,
   customer_name VARCHAR(255) NOT NULL,
   customer_email VARCHAR(255) NOT NULL,
   customer_phone VARCHAR(50),

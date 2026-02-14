@@ -247,8 +247,9 @@ export default function AdminLogin() {
       } else {
         setError("Failed to reset password. The link may have expired.");
       }
-    } catch {
-      setError("An error occurred. Please try again.");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      setError(err.message || "An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
