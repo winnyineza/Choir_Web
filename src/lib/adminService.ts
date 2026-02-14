@@ -498,19 +498,19 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "surveys", "analytics", "settings"
   ],
   finance: [
-    "dashboard", "members", "tickets", "contributions", "expenses", "treasury"
+    "dashboard", "members", "tickets", "contributions", "expenses", "treasury", "settings"
   ],
   secretary: [
     "dashboard", "members", "members_edit", "events", "attendance", "leave",
-    "announcements", "messages", "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance"
+    "announcements", "messages", "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "settings"
   ],
   disciplinary: [
-    "dashboard", "members", "leave", "disciplinary"
+    "dashboard", "members", "leave", "disciplinary", "settings"
   ],
   reviewer: [
     "dashboard", "members", "events", "tickets", "attendance", "leave", "disciplinary",
     "contributions", "expenses", "treasury", "announcements", "messages",
-    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance"
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "settings"
   ],
 };
 
