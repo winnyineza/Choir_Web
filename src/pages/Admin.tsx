@@ -40,6 +40,7 @@ import {
   Mail,
   Send,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -150,7 +151,7 @@ import { getAllContributions } from "@/lib/contributionService";
 import { getAllExpenses } from "@/lib/expenseService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Mail, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
-import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer } from "@/lib/adminService";
+import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer, changePassword, updateAdminUser } from "@/lib/adminService";
 const ContactSubmissions = lazy(() => import("@/components/admin/ContactSubmissions").then(m => ({ default: m.ContactSubmissions })));
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 const ExpenseManagement = lazy(() => import("@/components/admin/ExpenseManagement").then(m => ({ default: m.ExpenseManagement })));
@@ -287,6 +288,14 @@ export default function Admin() {
   // Settings state
   const [settings, setSettingsState] = useState<Awaited<ReturnType<typeof getSettings>> | null>(null);
   const [backupStats, setBackupStats] = useState<Awaited<ReturnType<typeof getBackupStats>> | null>(null);
+
+  // My Account state
+  const [accountName, setAccountName] = useState(currentUser?.name || "");
+  const [accountEmail, setAccountEmail] = useState(currentUser?.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [accountSaving, setAccountSaving] = useState(false);
 
   // Load data
   const loadData = async () => {
@@ -2752,6 +2761,145 @@ export default function Admin() {
           {activeTab === "settings" && settings && (
             <div className="space-y-6">
               <h2 className="font-display text-lg font-semibold">Settings</h2>
+
+              {/* My Account Section */}
+              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-primary" />
+                  My Account
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="accountName">Display Name</Label>
+                    <Input
+                      id="accountName"
+                      value={accountName}
+                      onChange={(e) => setAccountName(e.target.value)}
+                      className="mt-1 bg-secondary border-primary/20"
+                      placeholder="Your name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="accountEmail">Email Address</Label>
+                    <Input
+                      id="accountEmail"
+                      type="email"
+                      value={accountEmail}
+                      onChange={(e) => setAccountEmail(e.target.value)}
+                      className="mt-1 bg-secondary border-primary/20"
+                      placeholder="your@email.com"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span>Role: <strong className="text-foreground">{getRoleLabel(currentUser?.role || "reviewer")}</strong></span>
+                  </div>
+                  <Button
+                    variant="gold"
+                    disabled={accountSaving}
+                    onClick={async () => {
+                      if (!currentUser) return;
+                      if (!accountName.trim() || !accountEmail.trim()) {
+                        toast({ title: "Error", description: "Name and email are required", variant: "destructive" });
+                        return;
+                      }
+                      setAccountSaving(true);
+                      try {
+                        await updateAdminUser(currentUser.id, { name: accountName.trim(), email: accountEmail.trim() });
+                        await addAuditLog(currentUser, "UPDATE_PROFILE", "Updated own profile");
+                        toast({ title: "Profile Updated", description: "Your profile has been updated successfully." });
+                      } catch (err: any) {
+                        toast({ title: "Error", description: err.message || "Failed to update profile", variant: "destructive" });
+                      } finally {
+                        setAccountSaving(false);
+                      }
+                    }}
+                  >
+                    {accountSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Save Profile
+                  </Button>
+                </div>
+
+                {/* Change Password */}
+                <div className="mt-6 pt-6 border-t border-primary/10">
+                  <h4 className="font-semibold text-foreground mb-3">Change Password</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="currentPassword">Current Password</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="Enter current password"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="Enter new password (min 8 chars)"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                      <Input
+                        id="confirmNewPassword"
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      disabled={accountSaving}
+                      onClick={async () => {
+                        if (!currentUser) return;
+                        if (!currentPassword) {
+                          toast({ title: "Error", description: "Please enter your current password", variant: "destructive" });
+                          return;
+                        }
+                        if (newPassword.length < 8) {
+                          toast({ title: "Error", description: "New password must be at least 8 characters", variant: "destructive" });
+                          return;
+                        }
+                        if (newPassword !== confirmNewPassword) {
+                          toast({ title: "Error", description: "New passwords do not match", variant: "destructive" });
+                          return;
+                        }
+                        setAccountSaving(true);
+                        try {
+                          const success = await changePassword(currentUser.id, currentPassword, newPassword);
+                          if (success) {
+                            toast({ title: "Password Changed", description: "Your password has been updated successfully." });
+                            await addAuditLog(currentUser, "PASSWORD_CHANGE", "Changed own password");
+                            setCurrentPassword("");
+                            setNewPassword("");
+                            setConfirmNewPassword("");
+                          } else {
+                            toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
+                          }
+                        } catch (err: any) {
+                          toast({ title: "Error", description: err.message || "Failed to change password", variant: "destructive" });
+                        } finally {
+                          setAccountSaving(false);
+                        }
+                      }}
+                    >
+                      {accountSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
+                      Change Password
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="card-glass rounded-2xl p-6 max-w-2xl">
                 <h3 className="font-semibold text-foreground mb-4">Choir Information</h3>
                 <div className="space-y-4">
