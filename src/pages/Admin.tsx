@@ -2839,7 +2839,7 @@ export default function Admin() {
                           className="pr-10 bg-secondary border-primary/20"
                           placeholder="Enter current password"
                         />
-                        <button type="button" tabIndex={-1} onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                        <button type="button" tabIndex={-1} onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-sm text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors">
                           {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
@@ -2855,7 +2855,7 @@ export default function Admin() {
                           className="pr-10 bg-secondary border-primary/20"
                           placeholder="Enter new password (min 8 chars)"
                         />
-                        <button type="button" tabIndex={-1} onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                        <button type="button" tabIndex={-1} onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-sm text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors">
                           {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
@@ -2871,7 +2871,7 @@ export default function Admin() {
                           className="pr-10 bg-secondary border-primary/20"
                           placeholder="Confirm new password"
                         />
-                        <button type="button" tabIndex={-1} onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                        <button type="button" tabIndex={-1} onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-sm text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors">
                           {showConfirmNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>

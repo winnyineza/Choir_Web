@@ -452,7 +452,7 @@ export default function Scanner() {
                 maxLength={10}
                 autoFocus
               />
-              <button type="button" tabIndex={-1} onClick={() => setShowPin(!showPin)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+              <button type="button" tabIndex={-1} onClick={() => setShowPin(!showPin)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-sm text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors">
                 {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
