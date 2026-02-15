@@ -1,5 +1,6 @@
 -- Choir Management Database Schema
 -- Run this in your Supabase SQL Editor (SQL Editor tab in dashboard)
+-- This schema is aligned with supabaseSync.ts column mappings.
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -72,7 +73,6 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   attempted_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at);
 
@@ -84,10 +84,10 @@ CREATE TABLE IF NOT EXISTS contributions (
   member_id TEXT NOT NULL,
   member_name VARCHAR(255),
   member_email VARCHAR(255),
+  type VARCHAR(100),
   type_id TEXT,
   type_name VARCHAR(255),
-  type VARCHAR(100),
-  category VARCHAR(50) DEFAULT 'monthly' CHECK (category IN ('monthly', 'special')),
+  category VARCHAR(50) DEFAULT 'other',
   amount DECIMAL(12, 2) NOT NULL,
   expected_amount DECIMAL(12, 2),
   month INTEGER CHECK (month >= 1 AND month <= 12),
@@ -99,9 +99,25 @@ CREATE TABLE IF NOT EXISTS contributions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for faster lookups by member
 CREATE INDEX IF NOT EXISTS idx_contributions_member ON contributions(member_id);
 CREATE INDEX IF NOT EXISTS idx_contributions_date ON contributions(year, month);
+
+-- =============================================
+-- CONTRIBUTION TYPES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS contribution_types (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(20) DEFAULT 'monthly',
+  amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  description TEXT,
+  is_recurring BOOLEAN DEFAULT false,
+  rate_history JSONB DEFAULT '[]'::jsonb,
+  target_amount DECIMAL(12, 2),
+  deadline DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- =============================================
 -- ATTENDANCE TABLE
@@ -124,23 +140,59 @@ CREATE INDEX IF NOT EXISTS idx_attendance_member ON attendance(member_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
 
 -- =============================================
+-- ATTENDANCE SESSIONS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  title VARCHAR(255),
+  total_present INTEGER DEFAULT 0,
+  total_absent INTEGER DEFAULT 0,
+  total_excused INTEGER DEFAULT 0,
+  total_late INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by TEXT
+);
+
+-- =============================================
 -- LEAVE REQUESTS TABLE
+-- Aligned with supabaseSync: uses votes/approval_count/denial_count instead of approvals/denials JSONB
 -- =============================================
 CREATE TABLE IF NOT EXISTS leave_requests (
   id TEXT PRIMARY KEY,
   member_id TEXT NOT NULL,
+  member_name VARCHAR(255),
+  member_email VARCHAR(255),
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
   reason TEXT NOT NULL,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied')),
-  approvals JSONB DEFAULT '[]'::jsonb,
-  denials JSONB DEFAULT '[]'::jsonb,
+  votes JSONB DEFAULT '[]'::jsonb,
+  approval_count INTEGER DEFAULT 0,
+  denial_count INTEGER DEFAULT 0,
+  admin_notes TEXT,
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
+-- LEAVE VERIFICATION CODES TABLE
+-- Aligned with supabaseSync: uses email/code instead of leave_id/approver_id
+-- =============================================
+CREATE TABLE IF NOT EXISTS leave_verification_codes (
+  id TEXT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  code VARCHAR(20) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
 -- EXPENSES TABLE
+-- Aligned with supabaseSync: added vendor, receipt_number, notes, updated_at
 -- =============================================
 CREATE TABLE IF NOT EXISTS expenses (
   id TEXT PRIMARY KEY,
@@ -149,23 +201,31 @@ CREATE TABLE IF NOT EXISTS expenses (
   category VARCHAR(100) NOT NULL,
   date DATE NOT NULL,
   description TEXT,
+  vendor VARCHAR(255),
+  receipt_number VARCHAR(255),
   receipt_url TEXT,
   recorded_by TEXT,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
 -- ANNOUNCEMENTS TABLE
+-- Aligned with supabaseSync: uses audience, is_active, start_date, end_date
 -- =============================================
 CREATE TABLE IF NOT EXISTS announcements (
   id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
-  type VARCHAR(20) DEFAULT 'general' CHECK (type IN ('general', 'event', 'warning', 'success')),
-  priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('normal', 'high', 'urgent')),
+  type VARCHAR(20) DEFAULT 'general',
+  priority VARCHAR(20) DEFAULT 'normal',
+  audience VARCHAR(50) DEFAULT 'all',
   is_pinned BOOLEAN DEFAULT false,
-  expires_at TIMESTAMPTZ,
+  is_active BOOLEAN DEFAULT true,
+  start_date TIMESTAMPTZ,
+  end_date TIMESTAMPTZ,
   created_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -184,26 +244,37 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit_logs(created_at DESC);
 
 -- =============================================
 -- DISCIPLINARY RECORDS TABLE
+-- Aligned with supabaseSync: added member_name, type, expiry_date, issued_by, issued_by_name,
+-- resolved_by, appeal fields, attachments
 -- =============================================
 CREATE TABLE IF NOT EXISTS disciplinary_records (
   id TEXT PRIMARY KEY,
   member_id TEXT NOT NULL,
+  member_name VARCHAR(255),
+  type VARCHAR(100),
+  severity VARCHAR(20) NOT NULL DEFAULT 'minor',
   incident_date DATE NOT NULL,
   description TEXT NOT NULL,
-  category VARCHAR(100) NOT NULL,
-  severity VARCHAR(20) NOT NULL CHECK (severity IN ('minor', 'moderate', 'major', 'severe')),
+  category VARCHAR(100),
   action_taken TEXT,
-  witnesses TEXT[],
-  status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed', 'escalated')),
+  status VARCHAR(20) DEFAULT 'open',
+  expiry_date DATE,
+  issued_by TEXT,
+  issued_by_name VARCHAR(255),
+  witnesses JSONB DEFAULT '[]'::jsonb,
   resolution_date DATE,
   resolution_notes TEXT,
+  resolved_by TEXT,
+  appeal_date DATE,
+  appeal_reason TEXT,
+  appeal_decision TEXT,
+  attachments JSONB DEFAULT '[]'::jsonb,
   recorded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -211,169 +282,143 @@ CREATE TABLE IF NOT EXISTS disciplinary_records (
 
 -- =============================================
 -- INVENTORY TABLE
+-- Aligned with supabaseSync: added available, description, purchase_date, purchase_price,
+-- serial_number, last_checked
 -- =============================================
 CREATE TABLE IF NOT EXISTS inventory (
   id TEXT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   category VARCHAR(100) NOT NULL,
   quantity INTEGER DEFAULT 1,
-  condition VARCHAR(50) DEFAULT 'good' CHECK (condition IN ('new', 'good', 'fair', 'poor')),
+  available INTEGER DEFAULT 1,
+  condition VARCHAR(50) DEFAULT 'good',
   location VARCHAR(255),
+  description TEXT,
+  purchase_date DATE,
+  purchase_price DECIMAL(12, 2),
+  serial_number VARCHAR(255),
   notes TEXT,
-  assigned_to TEXT,
-  assigned_date DATE,
+  last_checked DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
+-- INVENTORY ASSIGNMENTS TABLE
+-- Aligned with supabaseSync: uses assigned_at/returned_at, member_name, quantity
+-- =============================================
+CREATE TABLE IF NOT EXISTS inventory_assignments (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  member_id TEXT NOT NULL,
+  member_name VARCHAR(255),
+  quantity INTEGER DEFAULT 1,
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  returned_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
 -- DOCUMENTS TABLE
+-- Aligned with supabaseSync: added file_name, file_data, is_public, download_count
 -- =============================================
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
   category VARCHAR(100) NOT NULL,
-  file_url TEXT NOT NULL,
+  file_url TEXT,
+  file_name VARCHAR(255),
   file_type VARCHAR(50),
   file_size INTEGER,
-  visibility VARCHAR(20) DEFAULT 'admins' CHECK (visibility IN ('public', 'members', 'admins')),
-  tags TEXT[],
+  file_data TEXT,
+  is_public BOOLEAN DEFAULT false,
+  download_count INTEGER DEFAULT 0,
+  visibility VARCHAR(20) DEFAULT 'admins',
+  tags JSONB DEFAULT '[]'::jsonb,
   uploaded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
+-- DOCUMENT FOLDERS TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS document_folders (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  parent_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
 -- MEETING MINUTES TABLE
+-- Aligned with supabaseSync: added start_time, end_time, location, absentees,
+-- chairperson, secretary, opening_prayer, closing_prayer, next_meeting_date, notes, approved_at
 -- =============================================
 CREATE TABLE IF NOT EXISTS meeting_minutes (
   id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   date DATE NOT NULL,
-  type VARCHAR(50) DEFAULT 'regular' CHECK (type IN ('regular', 'special', 'executive', 'general')),
-  attendees TEXT[],
+  type VARCHAR(50) DEFAULT 'regular',
+  start_time VARCHAR(20),
+  end_time VARCHAR(20),
+  location VARCHAR(255),
+  attendees JSONB DEFAULT '[]'::jsonb,
+  absentees JSONB DEFAULT '[]'::jsonb,
+  chairperson VARCHAR(255),
+  secretary VARCHAR(255),
   agenda TEXT,
-  minutes TEXT NOT NULL,
-  decisions TEXT[],
+  minutes TEXT,
   action_items JSONB DEFAULT '[]'::jsonb,
-  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'archived')),
+  opening_prayer VARCHAR(255),
+  closing_prayer VARCHAR(255),
+  next_meeting_date DATE,
+  notes TEXT,
+  decisions JSONB DEFAULT '[]'::jsonb,
+  status VARCHAR(20) DEFAULT 'draft',
   recorded_by TEXT,
   approved_by TEXT,
+  approved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
--- GALLERY ALBUMS TABLE
+-- TICKET ORDERS TABLE
+-- Aligned with supabaseSync: full event-based model with tickets JSON, QR, promo, etc.
 -- =============================================
-CREATE TABLE IF NOT EXISTS gallery_albums (
+CREATE TABLE IF NOT EXISTS ticket_orders (
   id TEXT PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  cover_image TEXT,
-  date DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- GALLERY IMAGES TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS gallery_images (
-  id TEXT PRIMARY KEY,
-  album_id TEXT,
-  url TEXT NOT NULL,
-  caption TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- MUSIC RELEASES TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS music_releases (
-  id TEXT PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  artist VARCHAR(255) DEFAULT 'The Serenades',
-  release_type VARCHAR(50) DEFAULT 'single' CHECK (release_type IN ('single', 'album', 'ep')),
-  cover_art TEXT,
-  release_date DATE,
-  streaming_links JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- PROMO CODES TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS promo_codes (
-  id TEXT PRIMARY KEY,
-  code VARCHAR(50) UNIQUE NOT NULL,
-  discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
-  discount_value DECIMAL(10, 2) NOT NULL,
-  max_uses INTEGER,
-  times_used INTEGER DEFAULT 0,
-  valid_from TIMESTAMPTZ,
-  valid_until TIMESTAMPTZ,
-  is_active BOOLEAN DEFAULT true,
-  created_by TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- CONTACT SUBMISSIONS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS contact_submissions (
-  id TEXT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL,
-  phone VARCHAR(50),
-  subject VARCHAR(255),
-  message TEXT NOT NULL,
-  is_read BOOLEAN DEFAULT false,
-  responded BOOLEAN DEFAULT false,
-  responded_at TIMESTAMPTZ,
-  responded_by TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- DONATIONS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS donations (
-  id TEXT PRIMARY KEY,
-  donor_name VARCHAR(255) NOT NULL,
-  donor_email VARCHAR(255),
-  donor_phone VARCHAR(50),
-  amount DECIMAL(12, 2) NOT NULL,
+  event_id TEXT,
+  tx_ref TEXT,
+  event_title VARCHAR(255),
+  event_date DATE,
+  event_location VARCHAR(255),
+  event_image TEXT,
+  tickets JSONB DEFAULT '[]'::jsonb,
+  subtotal DECIMAL(12, 2) DEFAULT 0,
+  service_fee DECIMAL(12, 2) DEFAULT 0,
+  discount DECIMAL(12, 2) DEFAULT 0,
+  total_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  promo_code VARCHAR(50),
+  customer_name VARCHAR(255) NOT NULL,
+  customer_email VARCHAR(255) NOT NULL,
+  customer_phone VARCHAR(50),
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled', 'confirmed')),
   payment_method VARCHAR(50),
   payment_reference VARCHAR(255),
-  is_anonymous BOOLEAN DEFAULT false,
-  message TEXT,
-  status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed')),
+  qr_code_data TEXT,
+  confirmed_at TIMESTAMPTZ,
+  ticket_id TEXT,
+  quantity INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
--- AUDITIONS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS auditions (
-  id TEXT PRIMARY KEY,
-  applicant_name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL,
-  phone VARCHAR(50),
-  voice_type VARCHAR(20) NOT NULL CHECK (voice_type IN ('Soprano', 'Alto', 'Tenor', 'Bass')),
-  experience TEXT,
-  scheduled_date DATE,
-  scheduled_time VARCHAR(20),
-  status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'passed', 'failed', 'cancelled')),
-  evaluator_id TEXT,
-  evaluation_notes TEXT,
-  score INTEGER CHECK (score >= 0 AND score <= 100),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- TICKETS TABLE
+-- TICKETS TABLE (ticket tier definitions)
 -- =============================================
 CREATE TABLE IF NOT EXISTS tickets (
   id TEXT PRIMARY KEY,
@@ -386,172 +431,165 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 
 -- =============================================
--- TICKET ORDERS TABLE
+-- PROMO CODES TABLE
+-- Aligned with supabaseSync: added min_purchase, event_id
 -- =============================================
-CREATE TABLE IF NOT EXISTS ticket_orders (
+CREATE TABLE IF NOT EXISTS promo_codes (
   id TEXT PRIMARY KEY,
-  ticket_id TEXT NOT NULL,
-  customer_name VARCHAR(255) NOT NULL,
-  customer_email VARCHAR(255) NOT NULL,
-  customer_phone VARCHAR(50),
-  quantity INTEGER NOT NULL,
-  total_amount DECIMAL(12, 2) NOT NULL,
-  payment_reference VARCHAR(255),
-  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- FUNCTION: Update timestamp on row update
--- =============================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Apply update trigger to relevant tables (drop first to allow re-running)
-DROP TRIGGER IF EXISTS update_members_updated_at ON members;
-DROP TRIGGER IF EXISTS update_events_updated_at ON events;
-DROP TRIGGER IF EXISTS update_admin_users_updated_at ON admin_users;
-DROP TRIGGER IF EXISTS update_leave_requests_updated_at ON leave_requests;
-DROP TRIGGER IF EXISTS update_disciplinary_records_updated_at ON disciplinary_records;
-DROP TRIGGER IF EXISTS update_inventory_updated_at ON inventory;
-DROP TRIGGER IF EXISTS update_documents_updated_at ON documents;
-DROP TRIGGER IF EXISTS update_meeting_minutes_updated_at ON meeting_minutes;
-DROP TRIGGER IF EXISTS update_auditions_updated_at ON auditions;
-
-CREATE TRIGGER update_members_updated_at BEFORE UPDATE ON members FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_admin_users_updated_at BEFORE UPDATE ON admin_users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON leave_requests FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_disciplinary_records_updated_at BEFORE UPDATE ON disciplinary_records FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_inventory_updated_at BEFORE UPDATE ON inventory FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_meeting_minutes_updated_at BEFORE UPDATE ON meeting_minutes FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_auditions_updated_at BEFORE UPDATE ON auditions FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
--- =============================================
--- FUNCTION: Check rate limiting for login
--- =============================================
-CREATE OR REPLACE FUNCTION check_login_rate_limit(check_email VARCHAR)
-RETURNS TABLE (
-  is_locked BOOLEAN,
-  failed_attempts INTEGER,
-  lockout_until TIMESTAMPTZ
-) AS $$
-DECLARE
-  attempts INTEGER;
-  last_attempt TIMESTAMPTZ;
-  lockout_duration INTERVAL;
-BEGIN
-  -- Count failed attempts in last 15 minutes
-  SELECT COUNT(*), MAX(attempted_at) INTO attempts, last_attempt
-  FROM login_attempts
-  WHERE email = check_email
-    AND success = false
-    AND attempted_at > NOW() - INTERVAL '15 minutes';
-  
-  -- Determine lockout
-  IF attempts >= 10 THEN
-    lockout_duration := INTERVAL '1 hour';
-  ELSIF attempts >= 5 THEN
-    lockout_duration := INTERVAL '15 minutes';
-  ELSE
-    lockout_duration := INTERVAL '0 minutes';
-  END IF;
-  
-  RETURN QUERY SELECT
-    CASE WHEN attempts >= 5 AND last_attempt + lockout_duration > NOW() THEN true ELSE false END,
-    attempts,
-    CASE WHEN attempts >= 5 THEN last_attempt + lockout_duration ELSE NULL END;
-END;
-$$ LANGUAGE plpgsql;
-
--- Super admin should be created via the Admin Team Management UI, not hardcoded
-
--- =============================================
--- PUSH SUBSCRIPTIONS (Web Push API)
--- =============================================
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  endpoint TEXT NOT NULL UNIQUE,
-  p256dh TEXT NOT NULL,
-  auth TEXT NOT NULL,
-  user_id TEXT DEFAULT 'anonymous',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
-
--- =============================================
--- CONTRIBUTION TYPES TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS contribution_types (
-  id TEXT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  category VARCHAR(20) DEFAULT 'monthly' CHECK (category IN ('monthly', 'special')),
-  amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
-  description TEXT,
-  is_recurring BOOLEAN DEFAULT false,
-  rate_history JSONB DEFAULT '[]'::jsonb,
-  target_amount DECIMAL(12, 2),
-  deadline DATE,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  discount_type VARCHAR(20) NOT NULL DEFAULT 'percentage',
+  discount_value DECIMAL(10, 2) NOT NULL,
+  min_purchase DECIMAL(10, 2) DEFAULT 0,
+  max_uses INTEGER,
+  times_used INTEGER DEFAULT 0,
+  valid_from TIMESTAMPTZ,
+  valid_until TIMESTAMPTZ,
+  event_id TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
--- ATTENDANCE SESSIONS TABLE
+-- SURVEYS TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS attendance_sessions (
+CREATE TABLE IF NOT EXISTS surveys (
   id TEXT PRIMARY KEY,
-  date DATE NOT NULL,
-  title VARCHAR(255),
-  total_present INTEGER DEFAULT 0,
-  total_absent INTEGER DEFAULT 0,
-  total_excused INTEGER DEFAULT 0,
-  total_late INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by TEXT
-);
-
--- =============================================
--- ADMIN INVITES TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS admin_invites (
-  id TEXT PRIMARY KEY,
-  email VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  role VARCHAR(50) DEFAULT 'reviewer',
-  invite_code VARCHAR(50) NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  questions JSONB DEFAULT '[]'::jsonb,
+  status VARCHAR(20) DEFAULT 'draft',
+  target_audience VARCHAR(50) DEFAULT 'all',
+  event_id TEXT,
   created_by TEXT,
-  expires_at TIMESTAMPTZ,
-  used BOOLEAN DEFAULT false,
-  member_id TEXT
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  closes_at TIMESTAMPTZ
 );
 
 -- =============================================
--- PASSWORD RESETS TABLE
+-- SURVEY RESPONSES TABLE
+-- Aligned with supabaseSync: uses submitted_at instead of created_at for ordering
 -- =============================================
-CREATE TABLE IF NOT EXISTS password_resets (
+CREATE TABLE IF NOT EXISTS survey_responses (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  survey_id TEXT NOT NULL,
+  member_id TEXT,
+  member_name VARCHAR(255),
+  member_email VARCHAR(255),
+  answers JSONB DEFAULT '{}'::jsonb,
+  submitted_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- CONTACT SUBMISSIONS TABLE
+-- Aligned with supabaseSync: added notes column
+-- =============================================
+CREATE TABLE IF NOT EXISTS contact_submissions (
+  id TEXT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
-  token TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  used BOOLEAN DEFAULT false,
+  phone VARCHAR(50),
+  subject VARCHAR(255),
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  responded BOOLEAN DEFAULT false,
+  responded_at TIMESTAMPTZ,
+  responded_by TEXT,
+  notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
--- CHOIR SETTINGS TABLE (Key-Value Store)
+-- DONATIONS TABLE
+-- Aligned with supabaseSync: added method, date, recorded_by columns
 -- =============================================
-CREATE TABLE IF NOT EXISTS choir_settings (
-  key VARCHAR(255) PRIMARY KEY,
-  value TEXT,
+CREATE TABLE IF NOT EXISTS donations (
+  id TEXT PRIMARY KEY,
+  donor_name VARCHAR(255) NOT NULL,
+  donor_email VARCHAR(255),
+  donor_phone VARCHAR(50),
+  amount DECIMAL(12, 2) NOT NULL,
+  method VARCHAR(50),
+  payment_method VARCHAR(50),
+  payment_reference VARCHAR(255),
+  reference VARCHAR(255),
+  is_anonymous BOOLEAN DEFAULT false,
+  message TEXT,
+  date DATE,
+  recorded_by TEXT,
+  status VARCHAR(20) DEFAULT 'completed',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- AUDITIONS TABLE
+-- Aligned with supabaseSync: added candidate_name, candidate_phone, panelists, rating, recommended_voice
+-- =============================================
+CREATE TABLE IF NOT EXISTS auditions (
+  id TEXT PRIMARY KEY,
+  applicant_name VARCHAR(255),
+  candidate_name VARCHAR(255),
+  email VARCHAR(255),
+  phone VARCHAR(50),
+  candidate_phone VARCHAR(50),
+  voice_type VARCHAR(20) DEFAULT 'Soprano',
+  experience TEXT,
+  scheduled_date DATE,
+  scheduled_time VARCHAR(20),
+  panelists JSONB DEFAULT '[]'::jsonb,
+  evaluation_notes TEXT,
+  rating INTEGER,
+  recommended_voice VARCHAR(20),
+  status VARCHAR(20) DEFAULT 'scheduled',
+  evaluator_id TEXT,
+  score INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- RECEIPTS TABLE
+-- Aligned with supabaseSync: uses member_email, category, type_name, payment_method, month, year, recorded_by
+-- =============================================
+CREATE TABLE IF NOT EXISTS receipts (
+  id TEXT PRIMARY KEY,
+  member_id TEXT,
+  member_name VARCHAR(255),
+  member_email VARCHAR(255),
+  amount DECIMAL(12, 2) NOT NULL,
+  category VARCHAR(100),
+  type VARCHAR(100),
+  type_name VARCHAR(255),
+  reference VARCHAR(255),
+  payment_method VARCHAR(50),
+  month INTEGER,
+  year INTEGER,
+  date DATE DEFAULT CURRENT_DATE,
+  recorded_by TEXT,
+  issued_by TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================
+-- PAYMENTS TABLE
+-- Aligned with supabaseSync: added currency, purpose, status, metadata, updated_at
+-- =============================================
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY,
+  member_id TEXT,
+  member_name VARCHAR(255),
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(10) DEFAULT 'RWF',
+  method VARCHAR(50),
+  purpose TEXT,
+  reference VARCHAR(255),
+  category VARCHAR(100),
+  status VARCHAR(20) DEFAULT 'pending',
+  metadata JSONB DEFAULT '{}'::jsonb,
+  date DATE DEFAULT CURRENT_DATE,
+  notes TEXT,
+  recorded_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -560,7 +598,7 @@ CREATE TABLE IF NOT EXISTS choir_settings (
 -- =============================================
 CREATE TABLE IF NOT EXISTS gallery_items (
   id TEXT PRIMARY KEY,
-  type VARCHAR(20) DEFAULT 'photo' CHECK (type IN ('photo', 'video')),
+  type VARCHAR(20) DEFAULT 'photo',
   title VARCHAR(255) DEFAULT '',
   url TEXT NOT NULL,
   thumbnail TEXT,
@@ -600,104 +638,41 @@ CREATE TABLE IF NOT EXISTS scan_records (
 );
 
 -- =============================================
--- SURVEYS TABLE
+-- ADMIN INVITES TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS surveys (
+CREATE TABLE IF NOT EXISTS admin_invites (
   id TEXT PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  questions JSONB DEFAULT '[]'::jsonb,
-  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'closed')),
-  target_audience VARCHAR(50) DEFAULT 'all',
-  event_id TEXT,
-  created_by TEXT,
+  email VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'reviewer',
+  invite_code VARCHAR(50) NOT NULL UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  closes_at TIMESTAMPTZ
+  created_by TEXT,
+  expires_at TIMESTAMPTZ,
+  used BOOLEAN DEFAULT false,
+  member_id TEXT
 );
 
 -- =============================================
--- SURVEY RESPONSES TABLE
+-- PASSWORD RESETS TABLE
 -- =============================================
-CREATE TABLE IF NOT EXISTS survey_responses (
+CREATE TABLE IF NOT EXISTS password_resets (
   id TEXT PRIMARY KEY,
-  survey_id TEXT NOT NULL,
-  member_id TEXT,
-  member_name VARCHAR(255),
-  member_email VARCHAR(255),
-  answers JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- LEAVE VERIFICATION CODES TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS leave_verification_codes (
-  id TEXT PRIMARY KEY,
-  leave_id TEXT NOT NULL,
-  approver_id TEXT NOT NULL,
-  code VARCHAR(20) NOT NULL,
+  user_id TEXT NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  token TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
--- DOCUMENT FOLDERS TABLE
+-- CHOIR SETTINGS TABLE (Key-Value Store)
 -- =============================================
-CREATE TABLE IF NOT EXISTS document_folders (
-  id TEXT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  parent_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- INVENTORY ASSIGNMENTS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS inventory_assignments (
-  id TEXT PRIMARY KEY,
-  item_id TEXT NOT NULL,
-  member_id TEXT NOT NULL,
-  assigned_date DATE DEFAULT CURRENT_DATE,
-  returned_date DATE,
-  condition_on_assign VARCHAR(50),
-  condition_on_return VARCHAR(50),
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- RECEIPTS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS receipts (
-  id TEXT PRIMARY KEY,
-  member_id TEXT,
-  member_name VARCHAR(255),
-  type VARCHAR(100),
-  amount DECIMAL(12, 2) NOT NULL,
-  date DATE DEFAULT CURRENT_DATE,
-  reference VARCHAR(255),
-  issued_by TEXT,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================
--- PAYMENTS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS payments (
-  id TEXT PRIMARY KEY,
-  member_id TEXT,
-  member_name VARCHAR(255),
-  amount DECIMAL(12, 2) NOT NULL,
-  method VARCHAR(50),
-  reference VARCHAR(255),
-  category VARCHAR(100),
-  date DATE DEFAULT CURRENT_DATE,
-  notes TEXT,
-  recorded_by TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS choir_settings (
+  key VARCHAR(255) PRIMARY KEY,
+  value TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =============================================
@@ -786,6 +761,20 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 );
 
 -- =============================================
+-- PUSH SUBSCRIPTIONS (Web Push API)
+-- =============================================
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_id TEXT DEFAULT 'anonymous',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
+
+-- =============================================
 -- MEMBER INVITES TABLE
 -- =============================================
 CREATE TABLE IF NOT EXISTS member_invites (
@@ -794,9 +783,82 @@ CREATE TABLE IF NOT EXISTS member_invites (
   email VARCHAR(255) NOT NULL,
   name VARCHAR(255) NOT NULL,
   sent_at TIMESTAMPTZ DEFAULT NOW(),
-  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  status VARCHAR(20) DEFAULT 'pending',
   error TEXT
 );
+
+-- =============================================
+-- FUNCTION: Update timestamp on row update
+-- =============================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Apply update trigger to relevant tables
+DROP TRIGGER IF EXISTS update_members_updated_at ON members;
+DROP TRIGGER IF EXISTS update_events_updated_at ON events;
+DROP TRIGGER IF EXISTS update_admin_users_updated_at ON admin_users;
+DROP TRIGGER IF EXISTS update_leave_requests_updated_at ON leave_requests;
+DROP TRIGGER IF EXISTS update_disciplinary_records_updated_at ON disciplinary_records;
+DROP TRIGGER IF EXISTS update_inventory_updated_at ON inventory;
+DROP TRIGGER IF EXISTS update_documents_updated_at ON documents;
+DROP TRIGGER IF EXISTS update_meeting_minutes_updated_at ON meeting_minutes;
+DROP TRIGGER IF EXISTS update_auditions_updated_at ON auditions;
+DROP TRIGGER IF EXISTS update_expenses_updated_at ON expenses;
+DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
+
+CREATE TRIGGER update_members_updated_at BEFORE UPDATE ON members FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_admin_users_updated_at BEFORE UPDATE ON admin_users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON leave_requests FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_disciplinary_records_updated_at BEFORE UPDATE ON disciplinary_records FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_inventory_updated_at BEFORE UPDATE ON inventory FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_meeting_minutes_updated_at BEFORE UPDATE ON meeting_minutes FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_auditions_updated_at BEFORE UPDATE ON auditions FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- =============================================
+-- FUNCTION: Check rate limiting for login
+-- =============================================
+CREATE OR REPLACE FUNCTION check_login_rate_limit(check_email VARCHAR)
+RETURNS TABLE (
+  is_locked BOOLEAN,
+  failed_attempts INTEGER,
+  lockout_until TIMESTAMPTZ
+) AS $$
+DECLARE
+  attempts INTEGER;
+  last_attempt TIMESTAMPTZ;
+  lockout_duration INTERVAL;
+BEGIN
+  SELECT COUNT(*), MAX(attempted_at) INTO attempts, last_attempt
+  FROM login_attempts
+  WHERE email = check_email
+    AND success = false
+    AND attempted_at > NOW() - INTERVAL '15 minutes';
+
+  IF attempts >= 10 THEN
+    lockout_duration := INTERVAL '1 hour';
+  ELSIF attempts >= 5 THEN
+    lockout_duration := INTERVAL '15 minutes';
+  ELSE
+    lockout_duration := INTERVAL '0 minutes';
+  END IF;
+
+  RETURN QUERY SELECT
+    CASE WHEN attempts >= 5 AND last_attempt + lockout_duration > NOW() THEN true ELSE false END,
+    attempts,
+    CASE WHEN attempts >= 5 THEN last_attempt + lockout_duration ELSE NULL END;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Super admin should be created via the Admin Team Management UI
 
 -- =============================================
 -- COMMENTS ON TABLES
@@ -819,3 +881,10 @@ COMMENT ON TABLE surveys IS 'Survey definitions';
 COMMENT ON TABLE survey_responses IS 'Member survey responses';
 COMMENT ON TABLE analytics_page_views IS 'Page view tracking for analytics';
 COMMENT ON TABLE analytics_sessions IS 'Session tracking for analytics';
+COMMENT ON TABLE ticket_orders IS 'Event ticket purchases';
+COMMENT ON TABLE disciplinary_records IS 'Member disciplinary records';
+COMMENT ON TABLE inventory IS 'Choir inventory items';
+COMMENT ON TABLE meeting_minutes IS 'Meeting minutes and records';
+COMMENT ON TABLE documents IS 'Shared choir documents';
+COMMENT ON TABLE payments IS 'Payment transactions';
+COMMENT ON TABLE receipts IS 'Payment receipts';

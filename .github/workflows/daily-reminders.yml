@@ -12,9 +12,19 @@ jobs:
     steps:
       - name: Trigger Daily Reminders
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "Triggering daily reminders at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          response=$(curl -s -w "\n%{http_code}" \
             "https://serenadesofpraise.netlify.app/.netlify/functions/daily-reminders")
-          echo "Response code: $response"
-          if [ "$response" -ne 200 ]; then
-            echo "Warning: Function returned $response"
+          
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "Daily reminders sent successfully!"
+          else
+            echo "Warning: Function returned HTTP $http_code"
+            exit 1
           fi
