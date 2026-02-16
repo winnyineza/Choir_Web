@@ -327,8 +327,8 @@ export async function sendAdminInviteEmail(
   inviteCode: string
 ): Promise<{ success: boolean; message: string }> {
   const loginUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/admin?invite=${inviteCode}`
-    : `https://serenadesofpraise.netlify.app/admin?invite=${inviteCode}`;
+    ? `${window.location.origin}/admin/login?invite=${inviteCode}`
+    : `https://serenadesofpraise.netlify.app/admin/login?invite=${inviteCode}`;
 
   const firstName = name.split(" ")[0] || "Admin";
 
