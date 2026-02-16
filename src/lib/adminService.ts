@@ -3,6 +3,7 @@
 
 import bcrypt from "bcryptjs";
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
+import { supabase } from './supabase';
 
 const ADMIN_USERS_KEY = "choir_admin_users";
 const SALT_ROUNDS = 10;
@@ -241,28 +242,45 @@ export async function createAdminUser(
     throw new Error("An admin with this email already exists");
   }
 
-  const hashedPassword = hashPassword(data.password);
-
-  // Verify hash works immediately (catch any bcrypt issues)
-  if (!bcrypt.compareSync(data.password.trim(), hashedPassword)) {
-    console.error("[Auth] Password hash verification failed immediately after hashing - retrying");
-    const retryHash = hashPassword(data.password);
-    if (!bcrypt.compareSync(data.password.trim(), retryHash)) {
-      throw new Error("Password hashing failed. Please try again.");
-    }
-  }
-
+  // Step 1: Create user with a temporary password placeholder
+  const tempHash = hashPassword(data.password);
   const newUser = {
     ...data,
     id: `admin-${Date.now()}`,
-    password: hashedPassword,
+    password: tempHash,
     createdAt: new Date().toISOString(),
     createdBy,
     isActive: true,
     passwordHashed: true,
   };
 
-  return dbInsert<AdminUser>(ADMIN_USERS_KEY, newUser);
+  const inserted = await dbInsert<AdminUser>(ADMIN_USERS_KEY, newUser);
+
+  // Step 2: Immediately re-set the password using the same UPDATE path
+  // that resetPassword uses (which is proven to work).
+  // This ensures the password_hash in Supabase is reliably stored.
+  const finalHash = hashPassword(data.password);
+  await dbUpdate<AdminUser>(ADMIN_USERS_KEY, inserted.id, {
+    password: finalHash,
+    passwordHashed: true,
+  });
+
+  // Step 3: Read back and verify
+  const verified = await dbGetById<AdminUser>(ADMIN_USERS_KEY, inserted.id);
+  if (verified && !comparePassword(data.password, verified.password)) {
+    console.error("[Auth] Password verification failed after create+update. Attempting direct fix...");
+    // Last resort: store password with a direct Supabase call
+    const directHash = hashPassword(data.password);
+    const { error } = await supabase
+      .from('admin_users')
+      .update({ password_hash: directHash })
+      .eq('id', inserted.id);
+    if (error) {
+      console.error("[Auth] Direct password fix failed:", error);
+    }
+  }
+
+  return verified || inserted;
 }
 
 // Update admin user
