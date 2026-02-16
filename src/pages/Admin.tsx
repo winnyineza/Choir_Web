@@ -162,9 +162,14 @@ import {
   type UnlockRequestType,
 } from "@/lib/unlockRequestService";
 import { getAllExpenses } from "@/lib/expenseService";
+import {
+  notifyLeaveRequestDecision,
+  notifyUnlockRequestCreated,
+  notifyUnlockRequestDecision,
+} from "@/lib/notificationEmailService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
-import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer, changePassword, updateAdminUser } from "@/lib/adminService";
+import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer, changePassword, updateAdminUser, getAdminById } from "@/lib/adminService";
 const ContactSubmissions = lazy(() => import("@/components/admin/ContactSubmissions").then(m => ({ default: m.ContactSubmissions })));
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 const ExpenseManagement = lazy(() => import("@/components/admin/ExpenseManagement").then(m => ({ default: m.ExpenseManagement })));
@@ -2623,8 +2628,8 @@ export default function Admin() {
                                         variant="ghost"
                                         size="sm"
                                         className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                                        onClick={() => {
-                                          const result = approveLeaveRequest(
+                                        onClick={async () => {
+                                          const result = await approveLeaveRequest(
                                             request.id, 
                                             currentUser?.id || "admin",
                                             currentUser?.name || "Admin"
@@ -2643,9 +2648,10 @@ export default function Admin() {
                                             const progress = getApprovalProgress(result);
                                             if (result.status === "approved") {
                                               toast({
-                                                title: "Leave Fully Approved! ✅",
+                                                title: "Leave Fully Approved!",
                                                 description: `${request.memberName}'s leave request has been approved (${progress.approvals}/${progress.required}).`,
                                               });
+                                              notifyLeaveRequestDecision(request.memberEmail, request.memberName, request.startDate, request.endDate, "approved", currentUser?.name);
                                             } else {
                                               toast({
                                                 title: "Vote Recorded",
@@ -2662,9 +2668,9 @@ export default function Admin() {
                                         variant="ghost"
                                         size="sm"
                                         className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                        onClick={() => {
+                                        onClick={async () => {
                                           const notes = prompt("Reason for denial (optional):");
-                                          const result = denyLeaveRequest(
+                                          const result = await denyLeaveRequest(
                                             request.id, 
                                             currentUser?.id || "admin",
                                             currentUser?.name || "Admin", 
@@ -2684,9 +2690,10 @@ export default function Admin() {
                                             const progress = getApprovalProgress(result);
                                             if (result.status === "denied") {
                                               toast({
-                                                title: "Leave Denied ❌",
+                                                title: "Leave Denied",
                                                 description: `${request.memberName}'s leave request has been denied (${progress.denials}/${progress.requiredDenials} denials).`,
                                               });
+                                              notifyLeaveRequestDecision(request.memberEmail, request.memberName, request.startDate, request.endDate, "denied", currentUser?.name);
                                             } else {
                                               toast({
                                                 title: "Vote Recorded",
@@ -3193,6 +3200,10 @@ export default function Admin() {
                               onClick={async () => {
                                 await approveUnlockRequest(req.id, currentUser?.name || "Admin", undefined, 3);
                                 toast({ title: "Approved", description: `${CONTRIB_MONTH_NAMES[req.month - 1]} ${req.year} unlocked for 3 days.` });
+                                const requester = req.requestedById ? await getAdminById(req.requestedById) : null;
+                                if (requester) {
+                                  notifyUnlockRequestDecision(requester.email, requester.name, req.month, req.year, "approved", currentUser?.name || "Admin", 3);
+                                }
                                 loadData();
                               }}
                             >
@@ -3204,6 +3215,10 @@ export default function Admin() {
                               onClick={async () => {
                                 await denyUnlockRequest(req.id, currentUser?.name || "Admin", "Denied by admin");
                                 toast({ title: "Denied", description: "Unlock request denied." });
+                                const requester = req.requestedById ? await getAdminById(req.requestedById) : null;
+                                if (requester) {
+                                  notifyUnlockRequestDecision(requester.email, requester.name, req.month, req.year, "denied", currentUser?.name || "Admin");
+                                }
                                 loadData();
                               }}
                             >

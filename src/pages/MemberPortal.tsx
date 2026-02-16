@@ -75,6 +75,7 @@ import {
   sendVerificationCode,
   verifyEmailCode,
 } from "@/lib/emailVerificationService";
+import { notifyLeaveRequestCreated } from "@/lib/notificationEmailService";
 import {
   getAttendanceByMemberEmail,
   getMemberAttendanceStatsByEmail,
@@ -499,6 +500,9 @@ export default function MemberPortal() {
         setView("request");
         return;
       }
+
+      // Notify approvers via email
+      notifyLeaveRequestCreated(memberInfo?.name || email, startDate, endDate, reason);
 
       setView("success");
       toast({

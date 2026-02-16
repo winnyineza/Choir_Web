@@ -70,6 +70,7 @@ import {
   type ContributionCategory,
 } from "@/lib/contributionService";
 import { isMonthTemporarilyUnlocked, createUnlockRequest, type UnlockRequestType } from "@/lib/unlockRequestService";
+import { notifyUnlockRequestCreated } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock, Unlock } from "lucide-react";
 import { 
@@ -2666,6 +2667,13 @@ export function ContributionManagement() {
                     year: prevYear,
                     reason: unlockReason.trim(),
                   });
+                  // Notify main_admin and super_admin via email
+                  notifyUnlockRequestCreated(
+                    currentUser?.name || "Admin",
+                    currentUser?.role || "finance",
+                    prevMonth, prevYear, "both",
+                    unlockReason.trim()
+                  );
                   toast({ title: "Request Sent", description: "Your unlock request has been sent to the admin for approval." });
                   setShowUnlockRequest(false);
                   setUnlockReason("");
