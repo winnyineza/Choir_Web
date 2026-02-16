@@ -1,7 +1,7 @@
 // Notification Email Service - Send email notifications for requests and approvals
 
 import { getAllAdminUsers, canApproveLeave } from "./adminService";
-import { getSettings } from "./dataService";
+import { getSettings, getAllMembers } from "./dataService";
 import { MONTH_NAMES } from "./contributionService";
 
 const isDev = () => typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -161,4 +161,169 @@ export async function notifyUnlockRequestDecision(
   `, settings.choirName);
 
   await sendEmail([{ email: requesterEmail, name: requesterName }], subject, html);
+}
+
+// ============ CONTRIBUTION RECEIPT NOTIFICATIONS ============
+
+function formatCurrencyEmail(amount: number): string {
+  return `${amount.toLocaleString()} RWF`;
+}
+
+export async function notifyContributionRecorded(
+  memberEmail: string,
+  memberName: string,
+  amount: number,
+  expectedAmount: number,
+  month: number,
+  year: number,
+  category: "monthly" | "special",
+  typeName?: string
+): Promise<void> {
+  const settings = await getSettings();
+  const monthName = MONTH_NAMES[month - 1];
+  const remaining = Math.max(0, expectedAmount - amount);
+  const percentage = expectedAmount > 0 ? Math.round((amount / expectedAmount) * 100) : 100;
+  const isFullyPaid = amount >= expectedAmount && expectedAmount > 0;
+
+  const statusBadge = isFullyPaid
+    ? `<span style="background: rgba(34,197,94,0.2); color: #22c55e; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;">Fully Paid</span>`
+    : `<span style="background: rgba(234,179,8,0.2); color: #eab308; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;">${percentage}% Paid</span>`;
+
+  const subject = isFullyPaid
+    ? `Payment Confirmed: ${category === "monthly" ? `${monthName} ${year} Dues` : typeName || "Contribution"}`
+    : `Payment Received: ${formatCurrencyEmail(amount)} for ${category === "monthly" ? `${monthName} ${year}` : typeName || "Contribution"}`;
+
+  const html = emailWrapper("Contribution Receipt", `
+    <p style="color: #e0e0e0; margin: 0 0 12px 0;">Hi <strong>${memberName}</strong>,</p>
+    <p style="color: #e0e0e0; margin: 0 0 16px 0;">Your payment has been recorded. Here's your receipt:</p>
+    <div style="text-align: center; margin-bottom: 16px;">${statusBadge}</div>
+    <table style="width: 100%; border-collapse: collapse;">
+      ${category === "monthly" ? `<tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Month:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right;">${monthName} ${year}</td></tr>` : ""}
+      ${typeName ? `<tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Type:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right;">${typeName}</td></tr>` : ""}
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Amount Paid:</td><td style="color: #22c55e; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; font-weight: bold; font-size: 16px;">${formatCurrencyEmail(amount)}</td></tr>
+      ${expectedAmount > 0 ? `<tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Expected:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right;">${formatCurrencyEmail(expectedAmount)}</td></tr>` : ""}
+      ${!isFullyPaid && remaining > 0 ? `<tr><td style="color: #888; padding: 6px 8px 6px 0;">Remaining:</td><td style="color: #eab308; padding: 6px 0; text-align: right; font-weight: bold;">${formatCurrencyEmail(remaining)}</td></tr>` : ""}
+    </table>
+    ${isFullyPaid
+      ? `<p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px; text-align: center;">Thank you for your full payment!</p>`
+      : `<p style="color: #eab308; margin: 16px 0 0 0; font-size: 14px; text-align: center;">You still have <strong>${formatCurrencyEmail(remaining)}</strong> remaining. Thank you for your contribution!</p>`
+    }
+  `, settings.choirName);
+
+  await sendEmail([{ email: memberEmail, name: memberName }], subject, html);
+}
+
+// ============ ANNOUNCEMENT NOTIFICATIONS ============
+
+export async function notifyAnnouncementPosted(
+  title: string,
+  content: string,
+  priority: string,
+  audience: string
+): Promise<void> {
+  const [members, settings] = await Promise.all([getAllMembers(), getSettings()]);
+  const activeMembers = members.filter(m => m.status === "Active" && m.email);
+  if (activeMembers.length === 0) return;
+
+  const priorityBadge = priority === "urgent"
+    ? `<span style="background: rgba(239,68,68,0.2); color: #ef4444; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">URGENT</span>`
+    : priority === "high"
+    ? `<span style="background: rgba(234,179,8,0.2); color: #eab308; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">HIGH PRIORITY</span>`
+    : "";
+
+  const subject = `${priority === "urgent" ? "[URGENT] " : ""}${title}`;
+  const html = emailWrapper("Announcement", `
+    <div style="margin-bottom: 12px;">${priorityBadge}</div>
+    <h3 style="color: #ffffff; margin: 0 0 12px 0;">${title}</h3>
+    <div style="color: #d0d0d0; line-height: 1.6; white-space: pre-line;">${content}</div>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 13px;">Visit the member portal for more details.</p>
+  `, settings.choirName);
+
+  const to = activeMembers.map(m => ({ email: m.email, name: m.name }));
+  await sendEmail(to, subject, html);
+}
+
+// ============ EVENT NOTIFICATIONS ============
+
+export async function notifyEventCreated(
+  eventTitle: string,
+  eventDate: string,
+  eventTime: string,
+  eventLocation: string,
+  description?: string,
+  isFree?: boolean
+): Promise<void> {
+  const [members, settings] = await Promise.all([getAllMembers(), getSettings()]);
+  const activeMembers = members.filter(m => m.status === "Active" && m.email);
+  if (activeMembers.length === 0) return;
+
+  const formattedDate = new Date(eventDate).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric"
+  });
+
+  const subject = `New Event: ${eventTitle}`;
+  const html = emailWrapper("New Event", `
+    <h3 style="color: #d4af37; margin: 0 0 16px 0;">${eventTitle}</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; white-space: nowrap;">Date:</td><td style="color: #fff; padding: 6px 0;">${formattedDate}</td></tr>
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; white-space: nowrap;">Time:</td><td style="color: #fff; padding: 6px 0;">${eventTime}</td></tr>
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; white-space: nowrap;">Location:</td><td style="color: #fff; padding: 6px 0;">${eventLocation}</td></tr>
+      ${isFree !== undefined ? `<tr><td style="color: #888; padding: 6px 8px 6px 0; white-space: nowrap;">Admission:</td><td style="color: ${isFree ? "#22c55e" : "#d4af37"}; padding: 6px 0;">${isFree ? "Free" : "Ticketed"}</td></tr>` : ""}
+    </table>
+    ${description ? `<p style="color: #d0d0d0; margin: 16px 0 0 0; line-height: 1.5;">${description.substring(0, 300)}${description.length > 300 ? "..." : ""}</p>` : ""}
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 13px;">Mark your calendar! Visit the portal for more details.</p>
+  `, settings.choirName);
+
+  const to = activeMembers.map(m => ({ email: m.email, name: m.name }));
+  await sendEmail(to, subject, html);
+}
+
+// ============ DISCIPLINARY NOTIFICATIONS ============
+
+export async function notifyDisciplinaryAction(
+  memberEmail: string,
+  memberName: string,
+  actionType: string,
+  severity: string,
+  reason: string,
+  actionTaken?: string,
+  expiryDate?: string
+): Promise<void> {
+  const settings = await getSettings();
+  const typeLabels: Record<string, string> = {
+    warning: "Warning",
+    suspension: "Suspension",
+    fine: "Fine",
+    probation: "Probation",
+    expulsion: "Expulsion",
+    commendation: "Commendation",
+  };
+  const typeLabel = typeLabels[actionType] || actionType;
+  const isPositive = actionType === "commendation";
+  const severityColor = severity === "major" ? "#ef4444" : severity === "moderate" ? "#eab308" : "#3b82f6";
+
+  const subject = isPositive
+    ? `Commendation: ${memberName}`
+    : `Disciplinary Notice: ${typeLabel}`;
+
+  const html = emailWrapper(isPositive ? "Commendation" : "Disciplinary Notice", `
+    <p style="color: #e0e0e0; margin: 0 0 12px 0;">Dear <strong>${memberName}</strong>,</p>
+    ${isPositive
+      ? `<p style="color: #22c55e; margin: 0 0 16px 0;">Congratulations! You have received a commendation from the choir leadership.</p>`
+      : `<p style="color: #e0e0e0; margin: 0 0 16px 0;">This is to inform you of a disciplinary action that has been recorded.</p>`
+    }
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Type:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${typeLabel}</td></tr>
+      ${!isPositive ? `<tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Severity:</td><td style="color: ${severityColor}; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: bold;">${severity.charAt(0).toUpperCase() + severity.slice(1)}</td></tr>` : ""}
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Reason:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${reason}</td></tr>
+      ${actionTaken ? `<tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Action:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${actionTaken}</td></tr>` : ""}
+      ${expiryDate ? `<tr><td style="color: #888; padding: 6px 8px 6px 0;">Expires:</td><td style="color: #fff; padding: 6px 0;">${new Date(expiryDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td></tr>` : ""}
+    </table>
+    ${isPositive
+      ? `<p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px;">Keep up the excellent work!</p>`
+      : `<p style="color: #e0e0e0; margin: 16px 0 0 0; font-size: 14px;">If you have questions, please reach out to the choir administration.</p>`
+    }
+  `, settings.choirName);
+
+  await sendEmail([{ email: memberEmail, name: memberName }], subject, html);
 }

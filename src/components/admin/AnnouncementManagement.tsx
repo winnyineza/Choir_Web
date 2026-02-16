@@ -44,6 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
+import { notifyAnnouncementPosted } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 
 const typeConfig = {
@@ -150,7 +151,9 @@ export function AnnouncementManagement() {
       if (currentUser) {
         addAuditLog(currentUser, "CREATE_ANNOUNCEMENT", `Created announcement: ${data.title}`);
       }
-      toast({ title: "Announcement Created", description: "The announcement is now live" });
+      // Send email to all members for new announcements
+      notifyAnnouncementPosted(data.title, data.content, data.priority, data.audience);
+      toast({ title: "Announcement Created", description: "The announcement is now live and members will be notified by email." });
     }
 
     setIsModalOpen(false);

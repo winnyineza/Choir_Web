@@ -32,6 +32,7 @@ import {
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
+import { notifyDisciplinaryAction } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -185,7 +186,16 @@ export function DisciplinaryManagement() {
         if (currentUser) {
           addAuditLog(currentUser, "CREATE_DISCIPLINARY", `Created disciplinary record for ${member.name}: ${formData.type}`);
         }
-        toast({ title: "Record Created", description: "Disciplinary record has been created." });
+        // Notify the member via email
+        if (member.email) {
+          notifyDisciplinaryAction(
+            member.email, member.name,
+            formData.type, formData.severity,
+            formData.reason, formData.actionTaken,
+            formData.expiryDate
+          );
+        }
+        toast({ title: "Record Created", description: "Disciplinary record has been created and the member has been notified." });
       }
       await loadData();
       setShowAddModal(false);

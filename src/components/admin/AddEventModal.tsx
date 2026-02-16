@@ -20,6 +20,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { addEvent, updateEvent, type Event, type EventTicket } from "@/lib/dataService";
+import { notifyEventCreated } from "@/lib/notificationEmailService";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 
 interface AddEventModalProps {
@@ -143,9 +144,11 @@ export function AddEventModal({ isOpen, onClose, onSuccess, editEvent }: AddEven
         });
       } else {
         await addEvent(eventData);
+        // Notify all active members about the new event
+        notifyEventCreated(title, date, time, location, description, isFree);
         toast({
           title: "Event Created",
-          description: `"${title}" has been created successfully.`,
+          description: `"${title}" has been created and members will be notified.`,
         });
       }
       

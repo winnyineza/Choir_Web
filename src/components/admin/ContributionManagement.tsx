@@ -70,7 +70,7 @@ import {
   type ContributionCategory,
 } from "@/lib/contributionService";
 import { isMonthTemporarilyUnlocked, createUnlockRequest, type UnlockRequestType } from "@/lib/unlockRequestService";
-import { notifyUnlockRequestCreated } from "@/lib/notificationEmailService";
+import { notifyUnlockRequestCreated, notifyContributionRecorded } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock, Unlock } from "lucide-react";
 import { 
@@ -427,6 +427,20 @@ export function ContributionManagement() {
       title: "Payment Recorded",
       description: `${formatCurrency(amount)} for ${specialCellPayment.memberName} - ${specialCellPayment.typeName}`,
     });
+    // Send contribution receipt email for special payment
+    if (specialCellPayment.memberEmail) {
+      const type = contributionTypes.find(t => t.id === specialCellPayment.typeId);
+      notifyContributionRecorded(
+        specialCellPayment.memberEmail,
+        specialCellPayment.memberName,
+        amount,
+        specialCellPayment.expectedAmount || type?.targetAmount || 0,
+        new Date().getMonth() + 1,
+        new Date().getFullYear(),
+        "special",
+        specialCellPayment.typeName
+      );
+    }
     
     setSpecialCellPayment(null);
     await loadData();
@@ -458,6 +472,18 @@ export function ContributionManagement() {
           title: "Payment Recorded",
           description: `${formatCurrency(amount)} for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
         });
+        // Send contribution receipt email
+        if (cellPayment.memberEmail) {
+          notifyContributionRecorded(
+            cellPayment.memberEmail,
+            cellPayment.memberName,
+            amount,
+            cellPayment.expectedAmount,
+            cellPayment.month,
+            cellPayment.year,
+            "monthly"
+          );
+        }
       } else {
         toast({
           title: "Payment Removed",
