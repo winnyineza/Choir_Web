@@ -171,6 +171,55 @@ export async function getMonthlyRateForPeriod(month: number, year: number): Prom
   return applicableRate;
 }
 
+// ============ MONTH LOCKING ============
+// Months auto-lock on the 5th of the following month.
+// Example: January 2026 locks on February 5, 2026.
+// Super admins can still override locked months.
+
+const LOCK_DAY = 5; // Day of the next month when the previous month locks
+
+export function isMonthLocked(month: number, year: number): boolean {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-indexed
+  const currentDay = now.getDate();
+
+  // The lock date for a given month/year is the LOCK_DAY of the next month
+  let lockMonth = month + 1;
+  let lockYear = year;
+  if (lockMonth > 12) {
+    lockMonth = 1;
+    lockYear += 1;
+  }
+
+  // If we're past the lock date, the month is locked
+  if (currentYear > lockYear) return true;
+  if (currentYear === lockYear && currentMonth > lockMonth) return true;
+  if (currentYear === lockYear && currentMonth === lockMonth && currentDay >= LOCK_DAY) return true;
+
+  return false;
+}
+
+export function getMonthLockDate(month: number, year: number): Date {
+  let lockMonth = month; // 0-indexed for Date constructor (month param is 1-indexed)
+  let lockYear = year;
+  if (month >= 12) {
+    lockMonth = 0;
+    lockYear += 1;
+  }
+  return new Date(lockYear, lockMonth, LOCK_DAY);
+}
+
+export function getLockedMonthsForYear(year: number): number[] {
+  const locked: number[] = [];
+  for (let m = 1; m <= 12; m++) {
+    if (isMonthLocked(m, year)) {
+      locked.push(m);
+    }
+  }
+  return locked;
+}
+
 // ============ CONTRIBUTIONS ============
 
 export async function getAllContributions(): Promise<Contribution[]> {
@@ -238,8 +287,12 @@ export async function setMemberMonthlyPayment(
   year: number,
   amount: number,
   recordedBy: string,
-  expectedAmount?: number
+  expectedAmount?: number,
+  forceOverride?: boolean
 ): Promise<Contribution | null> {
+  if (!forceOverride && isMonthLocked(month, year)) {
+    throw new Error(`Month ${month}/${year} is locked. Contributions cannot be modified after the ${LOCK_DAY}th of the following month.`);
+  }
   const contributions = await getAllContributions();
   const types = await getAllContributionTypes();
   const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
@@ -341,8 +394,14 @@ export async function updateContribution(
   }
 }
 
-export async function deleteContribution(id: string): Promise<boolean> {
+export async function deleteContribution(id: string, forceOverride?: boolean): Promise<boolean> {
   try {
+    if (!forceOverride) {
+      const contribution = await getContributionById(id);
+      if (contribution && contribution.month && contribution.year && isMonthLocked(contribution.month, contribution.year)) {
+        throw new Error(`Cannot delete: month ${contribution.month}/${contribution.year} is locked.`);
+      }
+    }
     await dbDelete(CONTRIBUTIONS_KEY, id);
     return true;
   } catch {

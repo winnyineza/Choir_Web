@@ -42,6 +42,7 @@ import {
   Loader2,
   Lock,
   EyeOff,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -110,6 +111,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { AddMemberModal } from "@/components/admin/AddMemberModal";
+import { BulkAddMembersModal } from "@/components/admin/BulkAddMembersModal";
 import { AddEventModal } from "@/components/admin/AddEventModal";
 import { UploadGalleryModal } from "@/components/admin/UploadGalleryModal";
 import { TicketDetailModal } from "@/components/admin/TicketDetailModal";
@@ -268,6 +270,7 @@ export default function Admin() {
 
   // Modal states
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showBulkAddMembers, setShowBulkAddMembers] = useState(false);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [showUploadGallery, setShowUploadGallery] = useState(false);
   const [showAddAlbum, setShowAddAlbum] = useState(false);
@@ -1288,10 +1291,16 @@ export default function Admin() {
                     />
                   </div>
                   {canEditMembers(effectiveUser) && (
-                    <Button variant="gold" onClick={() => { setEditingMember(null); setShowAddMember(true); }}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Member
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="gold" onClick={() => { setEditingMember(null); setShowAddMember(true); }}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Member
+                      </Button>
+                      <Button variant="gold-outline" onClick={() => setShowBulkAddMembers(true)}>
+                        <Users className="w-4 h-4 mr-2" />
+                        Bulk Add
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -3103,6 +3112,17 @@ export default function Admin() {
           loadData();
         }}
         editMember={editingMember}
+      />
+
+      <BulkAddMembersModal
+        isOpen={showBulkAddMembers}
+        onClose={() => setShowBulkAddMembers(false)}
+        onSuccess={() => {
+          if (currentUser) {
+            addAuditLog(currentUser, "CREATE_MEMBER", "Bulk added members");
+          }
+          loadData();
+        }}
       />
 
       <AddEventModal

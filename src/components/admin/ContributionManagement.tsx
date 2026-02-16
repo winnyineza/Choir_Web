@@ -60,13 +60,14 @@ import {
   getMemberMonthlyPaymentDetails,
   setMemberMonthlyPayment,
   getMonthlyRateForPeriod,
+  isMonthLocked,
   MONTH_NAMES,
   type Contribution,
   type ContributionType,
   type ContributionCategory,
 } from "@/lib/contributionService";
 import { cn } from "@/lib/utils";
-import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle } from "lucide-react";
+import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock } from "lucide-react";
 import { 
   exportContributionsToCSV, 
   exportMonthlyDuesReport,
@@ -335,6 +336,11 @@ export function ContributionManagement() {
 
   // Handle cell click in the overview table
   const handleCellClick = async (member: Member, month: number, year: number) => {
+    // Check if month is locked (super_admin can override)
+    if (isMonthLocked(month, year) && currentUser?.role !== "super_admin") {
+      toast({ title: "Month Locked", description: `${MONTH_NAMES[month - 1]} ${year} is locked. Contributions can't be modified after the 5th of the following month.`, variant: "destructive" });
+      return;
+    }
     const paymentDetails = await getMemberMonthlyPaymentDetails(member.id, month, year);
     
     // Use historical rate if payment exists, otherwise use the rate for that month
@@ -416,29 +422,35 @@ export function ContributionManagement() {
     if (!cellPayment) return;
     
     const amount = parseFloat(cellPayment.amount) || 0;
+    const isSuperAdmin = currentUser?.role === "super_admin";
     
-    // Pass the expected amount to store the historical rate
-    await setMemberMonthlyPayment(
-      cellPayment.memberId,
-      cellPayment.memberName,
-      cellPayment.memberEmail,
-      cellPayment.month,
-      cellPayment.year,
-      amount,
-      currentUser?.name || "Admin",
-      cellPayment.expectedAmount // Historical rate tracking
-    );
+    try {
+      // Pass the expected amount to store the historical rate
+      await setMemberMonthlyPayment(
+        cellPayment.memberId,
+        cellPayment.memberName,
+        cellPayment.memberEmail,
+        cellPayment.month,
+        cellPayment.year,
+        amount,
+        currentUser?.name || "Admin",
+        cellPayment.expectedAmount, // Historical rate tracking
+        isSuperAdmin // Allow super_admin to override lock
+      );
     
-    if (amount > 0) {
-      toast({
-        title: "Payment Recorded",
-        description: `${formatCurrency(amount)} for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
-      });
-    } else {
-      toast({
-        title: "Payment Removed",
-        description: `Payment cleared for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
-      });
+      if (amount > 0) {
+        toast({
+          title: "Payment Recorded",
+          description: `${formatCurrency(amount)} for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
+        });
+      } else {
+        toast({
+          title: "Payment Removed",
+          description: `Payment cleared for ${cellPayment.memberName} - ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`,
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to save payment", variant: "destructive" });
     }
     
     setCellPayment(null);
@@ -833,11 +845,17 @@ export function ContributionManagement() {
                   <th className="text-left p-3 text-sm font-medium text-muted-foreground sticky left-0 bg-secondary/50 z-10">
                     Member
                   </th>
-                  {MONTH_NAMES.map((month, i) => (
-                    <th key={i} className="p-2 text-center text-xs font-medium text-muted-foreground w-16">
-                      {month.slice(0, 3)}
+                  {MONTH_NAMES.map((month, i) => {
+                    const locked = isMonthLocked(i + 1, bulkYear);
+                    return (
+                    <th key={i} className={cn("p-2 text-center text-xs font-medium w-16", locked ? "text-muted-foreground/50" : "text-muted-foreground")} title={locked ? `${month} ${bulkYear} is locked` : undefined}>
+                      <span className="flex items-center justify-center gap-0.5">
+                        {month.slice(0, 3)}
+                        {locked && <Lock className="w-2.5 h-2.5" />}
+                      </span>
                     </th>
-                  ))}
+                    );
+                  })}
                   <th className="p-3 text-center text-sm font-medium text-muted-foreground">
                     Total
                   </th>
@@ -898,6 +916,8 @@ export function ContributionManagement() {
                           const isFullyPaid = amountPaid >= effectiveExpected && effectiveExpected > 0;
                           const isPartiallyPaid = amountPaid > 0 && amountPaid < effectiveExpected;
                           const percentPaid = effectiveExpected > 0 ? Math.round((amountPaid / effectiveExpected) * 100) : 0;
+                          const locked = isMonthLocked(month, bulkYear);
+                          const canEdit = !locked || currentUser?.role === "super_admin";
                           
                           if (isFullyPaid) paidMonthsCount++;
                           
@@ -905,11 +925,14 @@ export function ContributionManagement() {
                             <td key={month} className="p-1 text-center">
                               <button
                                 onClick={() => handleCellClick(member, month, bulkYear)}
+                                title={locked ? (canEdit ? `Locked (super admin override)` : `${MONTH_NAMES[monthIndex]} ${bulkYear} is locked`) : undefined}
                                 className={cn(
-                                  "w-full h-10 rounded-lg transition-all flex items-center justify-center",
+                                  "w-full h-10 rounded-lg transition-all flex items-center justify-center relative",
                                   isFullyPaid && "bg-green-500/20 hover:bg-green-500/30",
                                   isPartiallyPaid && "bg-yellow-500/20 hover:bg-yellow-500/30",
-                                  !amountPaid && "bg-secondary/50 hover:bg-secondary"
+                                  !amountPaid && !locked && "bg-secondary/50 hover:bg-secondary",
+                                  !amountPaid && locked && "bg-secondary/30",
+                                  locked && !canEdit && "cursor-not-allowed opacity-60"
                                 )}
                               >
                                 {isFullyPaid ? (

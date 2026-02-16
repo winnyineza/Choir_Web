@@ -283,7 +283,7 @@ export function AdminTeamManagement() {
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">
-                {admins.filter(a => a.isActive).length}
+                {admins.filter(a => a.isActive && (currentUser?.role === "super_admin" || a.role !== "super_admin")).length}
               </p>
               <p className="text-sm text-muted-foreground">Active Admins</p>
             </div>
@@ -305,9 +305,11 @@ export function AdminTeamManagement() {
         <div className="col-span-2 p-4 rounded-xl bg-secondary/50 border border-primary/10">
           <p className="text-sm text-muted-foreground mb-2">Role Breakdown</p>
           <div className="flex flex-wrap gap-2">
-            <span className="px-2 py-1 rounded-full text-xs bg-primary/20 text-primary">
-              {admins.filter(a => (a.role === "super_admin" || a.role === "main_admin") && a.isActive).length} Administrators
-            </span>
+            {currentUser?.role === "super_admin" && (
+              <span className="px-2 py-1 rounded-full text-xs bg-primary/20 text-primary">
+                {admins.filter(a => (a.role === "super_admin" || a.role === "main_admin") && a.isActive).length} Administrators
+              </span>
+            )}
             <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400">
               {admins.filter(a => a.role === "main_admin" && a.isActive).length} Main Admin
             </span>
@@ -331,7 +333,13 @@ export function AdminTeamManagement() {
       <div className="space-y-4">
         <h3 className="font-semibold text-foreground">Team Members</h3>
         <div className="space-y-2">
-          {admins.map((admin) => {
+          {admins.filter((admin) => {
+            // Hide super_admin from non-super-admin users
+            if (admin.role === "super_admin" && currentUser?.role !== "super_admin") {
+              return false;
+            }
+            return true;
+          }).map((admin) => {
             const member = getMemberForAdmin(admin);
             return (
               <div
