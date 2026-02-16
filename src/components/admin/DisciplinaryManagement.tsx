@@ -32,7 +32,7 @@ import {
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
-import { notifyDisciplinaryAction } from "@/lib/notificationEmailService";
+import { notifyDisciplinaryAction, notifyDisciplinaryResolved } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -220,7 +220,16 @@ export function DisciplinaryManagement() {
       if (currentUser) {
         addAuditLog(currentUser, "RESOLVE_DISCIPLINARY", `Resolved disciplinary record for ${selectedRecord.memberName}`);
       }
-      toast({ title: "Record Resolved", description: "Disciplinary record has been resolved." });
+      // Notify the member that their record has been resolved
+      const resolvedMember = members.find(m => m.id === selectedRecord.memberId);
+      if (resolvedMember?.email) {
+        notifyDisciplinaryResolved(
+          resolvedMember.email, selectedRecord.memberName,
+          selectedRecord.type, resolution,
+          currentUser?.name || "Admin"
+        );
+      }
+      toast({ title: "Record Resolved", description: "Disciplinary record has been resolved and the member has been notified." });
       await loadData();
       setShowResolveModal(false);
       setResolution("");

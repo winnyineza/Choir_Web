@@ -327,3 +327,36 @@ export async function notifyDisciplinaryAction(
 
   await sendEmail([{ email: memberEmail, name: memberName }], subject, html);
 }
+
+export async function notifyDisciplinaryResolved(
+  memberEmail: string,
+  memberName: string,
+  actionType: string,
+  resolution: string,
+  resolvedBy: string
+): Promise<void> {
+  const settings = await getSettings();
+  const typeLabels: Record<string, string> = {
+    warning: "Warning",
+    suspension: "Suspension",
+    fine: "Fine",
+    probation: "Probation",
+    expulsion: "Expulsion",
+    commendation: "Commendation",
+  };
+  const typeLabel = typeLabels[actionType] || actionType;
+
+  const subject = `Disciplinary Record Resolved: ${typeLabel}`;
+  const html = emailWrapper("Record Resolved", `
+    <p style="color: #e0e0e0; margin: 0 0 12px 0;">Dear <strong>${memberName}</strong>,</p>
+    <p style="color: #22c55e; margin: 0 0 16px 0;">Your disciplinary record (<strong>${typeLabel}</strong>) has been resolved.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Record Type:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${typeLabel}</td></tr>
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Resolution:</td><td style="color: #22c55e; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${resolution}</td></tr>
+      <tr><td style="color: #888; padding: 6px 8px 6px 0;">Resolved By:</td><td style="color: #fff; padding: 6px 0;">${resolvedBy}</td></tr>
+    </table>
+    <p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px;">This matter is now closed. Thank you for your cooperation.</p>
+  `, settings.choirName);
+
+  await sendEmail([{ email: memberEmail, name: memberName }], subject, html);
+}
