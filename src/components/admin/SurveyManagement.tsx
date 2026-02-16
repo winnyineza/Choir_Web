@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { notifySurveyPublished } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import {
   getSurveys,
@@ -219,9 +220,13 @@ export function SurveyManagement() {
   const handleToggleStatus = (survey: Survey) => {
     const newStatus = survey.status === "active" ? "closed" : "active";
     updateSurvey(survey.id, { status: newStatus }, currentUser || undefined);
+    // Notify all members when a survey is published/activated
+    if (newStatus === "active") {
+      notifySurveyPublished(survey.title, survey.description);
+    }
     toast({ 
       title: newStatus === "active" ? "Activated" : "Closed", 
-      description: `Survey is now ${newStatus}.` 
+      description: newStatus === "active" ? "Survey is now active and members will be notified." : "Survey is now closed." 
     });
     loadData();
   };

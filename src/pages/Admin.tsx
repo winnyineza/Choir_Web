@@ -42,7 +42,6 @@ import {
   Loader2,
   Lock,
   EyeOff,
-  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -166,6 +165,7 @@ import {
   notifyLeaveRequestDecision,
   notifyUnlockRequestCreated,
   notifyUnlockRequestDecision,
+  notifyMemberStatusChanged,
 } from "@/lib/notificationEmailService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
@@ -672,7 +672,16 @@ export default function Admin() {
     if (selectedMembers.length === 0) return;
     if (!confirm(`Update ${selectedMembers.length} member(s) to ${status}?`)) return;
     
+    // Get member details before updating for email notifications
+    const membersToUpdate = members.filter(m => selectedMembers.includes(m.id));
     await Promise.all(selectedMembers.map(id => updateMember(id, { status })));
+    
+    // Notify members of status change
+    for (const m of membersToUpdate) {
+      if (m.email && m.status !== status) {
+        notifyMemberStatusChanged(m.email, m.name, m.status, status);
+      }
+    }
     
     await loadData();
     setSelectedMembers([]);

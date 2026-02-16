@@ -200,4 +200,29 @@ CREATE TABLE IF NOT EXISTS unlock_requests (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ============================================================
+-- MEMBER INVITE LOGS TABLE (new)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS member_invite_logs (
+  id TEXT PRIMARY KEY,
+  member_id TEXT,
+  email TEXT NOT NULL,
+  name TEXT,
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'pending',
+  error TEXT
+);
+
+-- ============================================================
+-- RSVPS TABLE (new)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS rsvps (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  member_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  note TEXT
+);
+
 -- Done! All columns now match the application's supabaseSync.ts mappings.

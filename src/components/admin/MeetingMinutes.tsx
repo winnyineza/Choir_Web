@@ -37,6 +37,7 @@ import {
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
+import { notifyMeetingMinutesApproved } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import {
   FileText,
@@ -189,7 +190,11 @@ export function MeetingMinutesComponent() {
         if (user && meeting) {
           addAuditLog(user, "APPROVE_MEETING", `Approved meeting minutes: ${meeting.title}`);
         }
-        toast({ title: "Meeting Approved", description: "Meeting minutes have been approved." });
+        // Notify all members that meeting minutes are available
+        if (meeting) {
+          notifyMeetingMinutesApproved(meeting.title, meeting.date, user?.name || "Admin");
+        }
+        toast({ title: "Meeting Approved", description: "Meeting minutes have been approved and members will be notified." });
         await loadData();
       }
     } catch (e) {

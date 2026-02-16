@@ -1327,6 +1327,54 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
       channels: r.channels || [],
     }),
   },
+
+  // --- Member Invite Logs ---
+  choir_member_invites: {
+    table: 'member_invite_logs',
+    orderBy: 'sent_at',
+    orderAsc: false,
+    toDb: (i: any) => ({
+      id: i.id,
+      member_id: i.memberId || null,
+      email: i.email,
+      name: i.name || null,
+      sent_at: i.sentAt || new Date().toISOString(),
+      status: i.status || 'pending',
+      error: i.error || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id || '',
+      email: r.email,
+      name: r.name || '',
+      sentAt: r.sent_at,
+      status: r.status || 'pending',
+      error: r.error || undefined,
+    }),
+  },
+
+  // --- RSVPs ---
+  serenades_rsvps: {
+    table: 'rsvps',
+    orderBy: 'updated_at',
+    orderAsc: false,
+    toDb: (r: any) => ({
+      id: r.id,
+      event_id: r.eventId,
+      member_id: r.memberId,
+      status: r.status,
+      updated_at: r.updatedAt || new Date().toISOString(),
+      note: r.note || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      eventId: r.event_id,
+      memberId: r.member_id,
+      status: r.status,
+      updatedAt: r.updated_at,
+      note: r.note || undefined,
+    }),
+  },
 };
 
 // Export config for use in supabaseDB.ts

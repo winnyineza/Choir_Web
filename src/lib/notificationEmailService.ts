@@ -360,3 +360,84 @@ export async function notifyDisciplinaryResolved(
 
   await sendEmail([{ email: memberEmail, name: memberName }], subject, html);
 }
+
+// ============ MEMBER STATUS CHANGE NOTIFICATIONS ============
+
+export async function notifyMemberStatusChanged(
+  memberEmail: string,
+  memberName: string,
+  oldStatus: string,
+  newStatus: string
+): Promise<void> {
+  const settings = await getSettings();
+  const statusColor = newStatus === "Active" ? "#22c55e" : newStatus === "Inactive" ? "#ef4444" : "#eab308";
+
+  const subject = `Membership Status Update: ${newStatus}`;
+  const html = emailWrapper("Membership Status Update", `
+    <p style="color: #e0e0e0; margin: 0 0 12px 0;">Dear <strong>${memberName}</strong>,</p>
+    <p style="color: #e0e0e0; margin: 0 0 16px 0;">Your membership status has been updated.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #888; padding: 6px 8px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">Previous Status:</td><td style="color: #fff; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${oldStatus}</td></tr>
+      <tr><td style="color: #888; padding: 6px 8px 6px 0;">New Status:</td><td style="color: ${statusColor}; padding: 6px 0; font-weight: bold;">${newStatus}</td></tr>
+    </table>
+    ${newStatus === "Active"
+      ? `<p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px;">Welcome! You now have full access to choir activities and the member portal.</p>`
+      : newStatus === "Inactive"
+      ? `<p style="color: #ef4444; margin: 16px 0 0 0; font-size: 14px;">Your membership has been set to inactive. Please contact the admin team if you have questions.</p>`
+      : `<p style="color: #eab308; margin: 16px 0 0 0; font-size: 14px;">Your status is pending. The admin team will review your membership shortly.</p>`
+    }
+  `, settings.choirName);
+
+  await sendEmail([{ email: memberEmail, name: memberName }], subject, html);
+}
+
+// ============ SURVEY PUBLISHED NOTIFICATIONS ============
+
+export async function notifySurveyPublished(
+  surveyTitle: string,
+  surveyDescription?: string
+): Promise<void> {
+  const [members, settings] = await Promise.all([getAllMembers(), getSettings()]);
+  const activeMembers = members.filter(m => m.status === "Active" && m.email);
+  if (activeMembers.length === 0) return;
+
+  const subject = `New Survey: ${surveyTitle}`;
+  const html = emailWrapper("New Survey", `
+    <h3 style="color: #d4af37; margin: 0 0 12px 0;">${surveyTitle}</h3>
+    ${surveyDescription ? `<p style="color: #d0d0d0; margin: 0 0 16px 0; line-height: 1.5;">${surveyDescription}</p>` : ""}
+    <p style="color: #e0e0e0; margin: 0 0 8px 0;">A new survey is available for you to complete. Your feedback is important to us!</p>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 13px;">Visit the member portal to submit your response.</p>
+  `, settings.choirName);
+
+  const to = activeMembers.map(m => ({ email: m.email, name: m.name }));
+  await sendEmail(to, subject, html);
+}
+
+// ============ MEETING MINUTES APPROVED NOTIFICATIONS ============
+
+export async function notifyMeetingMinutesApproved(
+  meetingTitle: string,
+  meetingDate: string,
+  approvedBy: string
+): Promise<void> {
+  const [members, settings] = await Promise.all([getAllMembers(), getSettings()]);
+  const activeMembers = members.filter(m => m.status === "Active" && m.email);
+  if (activeMembers.length === 0) return;
+
+  const formattedDate = new Date(meetingDate).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric"
+  });
+
+  const subject = `Meeting Minutes Available: ${meetingTitle}`;
+  const html = emailWrapper("Meeting Minutes", `
+    <h3 style="color: #d4af37; margin: 0 0 16px 0;">${meetingTitle}</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #888; padding: 6px 8px 6px 0;">Date:</td><td style="color: #fff; padding: 6px 0;">${formattedDate}</td></tr>
+      <tr><td style="color: #888; padding: 6px 8px 6px 0;">Approved By:</td><td style="color: #fff; padding: 6px 0;">${approvedBy}</td></tr>
+    </table>
+    <p style="color: #e0e0e0; margin: 16px 0 0 0;">The meeting minutes have been approved and are now available for review in the member portal.</p>
+  `, settings.choirName);
+
+  const to = activeMembers.map(m => ({ email: m.email, name: m.name }));
+  await sendEmail(to, subject, html);
+}
