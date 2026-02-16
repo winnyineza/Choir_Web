@@ -1108,6 +1108,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
       voice: m.voice,
       status: m.status || 'Pending',
       joined_date: m.joinedDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+      invite_status: m.inviteStatus || 'not_invited',
       date_of_birth: m.dateOfBirth || null,
       photo: m.photo || null,
       emergency_contact_name: m.emergencyContact?.name || null,
@@ -1122,6 +1123,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
       voice: r.voice,
       status: r.status || 'Pending',
       joinedDate: r.joined_date,
+      inviteStatus: r.invite_status || 'not_invited',
       dateOfBirth: r.date_of_birth || undefined,
       photo: r.photo || undefined,
       emergencyContact: r.emergency_contact_name ? {

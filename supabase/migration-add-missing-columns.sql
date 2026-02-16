@@ -225,4 +225,7 @@ CREATE TABLE IF NOT EXISTS rsvps (
   note TEXT
 );
 
+-- Add invite_status to members table
+ALTER TABLE members ADD COLUMN IF NOT EXISTS invite_status TEXT DEFAULT 'not_invited';
+
 -- Done! All columns now match the application's supabaseSync.ts mappings.

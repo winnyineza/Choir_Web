@@ -600,10 +600,15 @@ export default function Admin() {
     try {
       const result = await sendMemberInvite(member);
       if (result.success) {
+        // Mark member as invited
+        if (member.inviteStatus !== "accepted") {
+          await updateMember(member.id, { inviteStatus: "invited" });
+        }
         toast({ title: "Invite Sent", description: result.message });
         if (currentUser) {
           addAuditLog(currentUser, "SEND_MEMBER_INVITE", `Sent portal invite to: ${member.name} (${member.email})`);
         }
+        await loadData();
       } else {
         toast({ title: "Invite Failed", description: result.message, variant: "destructive" });
       }
@@ -626,6 +631,15 @@ export default function Admin() {
     setSendingInviteId("bulk");
     try {
       const result = await sendBulkInvites(selectedMembersList);
+      // Mark successfully invited members
+      for (const r of result.results) {
+        if (r.success) {
+          const m = selectedMembersList.find(mem => mem.email === r.email);
+          if (m && m.inviteStatus !== "accepted") {
+            await updateMember(m.id, { inviteStatus: "invited" });
+          }
+        }
+      }
       toast({ 
         title: "Invites Sent", 
         description: `${result.sent} sent, ${result.failed} failed out of ${result.total} members.` 
@@ -634,6 +648,7 @@ export default function Admin() {
         addAuditLog(currentUser, "BULK_SEND_INVITES", `Sent ${result.sent} portal invites (${result.failed} failed)`);
       }
       setSelectedMembers([]);
+      await loadData();
     } catch {
       toast({ title: "Error", description: "Failed to send invites", variant: "destructive" });
     } finally {
@@ -1447,7 +1462,7 @@ export default function Admin() {
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Email</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Voice</th>
-                        <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">Joined</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">Invite</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
                         <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
                       </tr>
@@ -1482,8 +1497,17 @@ export default function Admin() {
                           </td>
                           <td className="p-4 text-muted-foreground hidden md:table-cell">{member.email}</td>
                           <td className="p-4 text-muted-foreground">{member.voice}</td>
-                          <td className="p-4 text-muted-foreground text-sm hidden lg:table-cell">
-                            {member.joinedDate ? new Date(member.joinedDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—"}
+                          <td className="p-4 hidden lg:table-cell">
+                            <span className={cn(
+                              "px-2 py-1 rounded-full text-xs font-medium",
+                              member.inviteStatus === "accepted" ? "bg-green-500/20 text-green-400" :
+                              member.inviteStatus === "invited" ? "bg-blue-500/20 text-blue-400" :
+                              "bg-zinc-500/20 text-zinc-400"
+                            )}>
+                              {member.inviteStatus === "accepted" ? "Accepted" :
+                               member.inviteStatus === "invited" ? "Pending" :
+                               "Not Invited"}
+                            </span>
                           </td>
                           <td className="p-4">
                             <span className={cn(

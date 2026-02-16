@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS members (
   voice VARCHAR(20) NOT NULL CHECK (voice IN ('Soprano', 'Alto', 'Tenor', 'Bass')),
   status VARCHAR(20) DEFAULT 'Pending' CHECK (status IN ('Active', 'Pending', 'Inactive')),
   joined_date DATE DEFAULT CURRENT_DATE,
+  invite_status TEXT DEFAULT 'not_invited',
   date_of_birth DATE,
   photo TEXT,
   emergency_contact_name VARCHAR(255),

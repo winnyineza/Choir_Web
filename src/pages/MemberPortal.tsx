@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ import {
   Star,
   CheckSquare,
   MessageSquare,
+  Camera,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
@@ -153,6 +154,8 @@ export default function MemberPortal() {
     altPhone: "",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [editPhoto, setEditPhoto] = useState<string | undefined>(undefined);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Surveys
   const [activeSurveys, setActiveSurveys] = useState<Survey[]>([]);
@@ -190,6 +193,7 @@ export default function MemberPortal() {
       setEditName(memberInfo.name || "");
       setEditPhone(memberInfo.phone || "");
       setEditDateOfBirth(memberInfo.dateOfBirth || "");
+      setEditPhoto(memberInfo.photo || undefined);
       if (memberInfo.emergencyContact) {
         setEditEmergencyContact(memberInfo.emergencyContact);
       } else {
@@ -209,6 +213,7 @@ export default function MemberPortal() {
       const updatedMember = await updateMember(memberInfo.id, {
         name: editName,
         phone: editPhone,
+        photo: editPhoto || undefined,
         dateOfBirth: editDateOfBirth || undefined,
         emergencyContact: editEmergencyContact.name ? editEmergencyContact : undefined,
       });
@@ -353,6 +358,12 @@ export default function MemberPortal() {
     }
 
     setMemberInfo(member);
+
+    // Mark invite as accepted on first portal login
+    if (member.inviteStatus !== "accepted") {
+      await updateMember(member.id, { inviteStatus: "accepted" });
+    }
+
     const [attendance, attStats, requests] = await Promise.all([
       getAttendanceByMemberEmail(email),
       getMemberAttendanceStatsByEmail(email),
@@ -684,19 +695,30 @@ export default function MemberPortal() {
                 {/* Header */}
                 <div className="card-glass rounded-2xl p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <h1 className="font-display text-2xl font-bold">
-                        Member <span className="gold-text">Portal</span>
-                      </h1>
-                      {memberInfo ? (
-                        <p className="text-muted-foreground">
-                          Welcome back, <span className="text-primary">{memberInfo.name}</span>!
-                        </p>
-                      ) : (
-                        <p className="text-muted-foreground">
-                          Enter your email to view your personal data
-                        </p>
+                    <div className="flex items-center gap-4">
+                      {memberInfo && (
+                        memberInfo.photo ? (
+                          <img src={memberInfo.photo} alt={memberInfo.name} className="w-12 h-12 rounded-full object-cover border-2 border-primary/30 hidden sm:block" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center hidden sm:flex">
+                            <User className="w-6 h-6 text-primary" />
+                          </div>
+                        )
                       )}
+                      <div>
+                        <h1 className="font-display text-2xl font-bold">
+                          Member <span className="gold-text">Portal</span>
+                        </h1>
+                        {memberInfo ? (
+                          <p className="text-muted-foreground">
+                            Welcome back, <span className="text-primary">{memberInfo.name}</span>!
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            Enter your email to view your personal data
+                          </p>
+                        )}
+                      </div>
                     </div>
                     
                     {!memberInfo && (
@@ -883,16 +905,17 @@ export default function MemberPortal() {
                     </h2>
                     <div className="bg-secondary/30 rounded-xl p-4 mb-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                          <User className="w-6 h-6 text-primary" />
-                        </div>
+                        {memberInfo.photo ? (
+                          <img src={memberInfo.photo} alt={memberInfo.name} className="w-12 h-12 rounded-full object-cover border border-primary/30" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                            <User className="w-6 h-6 text-primary" />
+                          </div>
+                        )}
                         <div>
                           <p className="font-medium text-foreground">{memberInfo.name}</p>
                           <p className="text-sm text-muted-foreground">{memberInfo.voice} • {memberInfo.status}</p>
                           <p className="text-xs text-muted-foreground mt-1">{memberInfo.phone || "No phone added"}</p>
-                          {memberInfo.joinedDate && (
-                            <p className="text-xs text-muted-foreground mt-0.5">Member since {new Date(memberInfo.joinedDate).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -924,9 +947,6 @@ export default function MemberPortal() {
                 {/* Emergency Contact (if logged in and has one) */}
                 {memberInfo && memberInfo.emergencyContact && (
                   <div className="card-glass rounded-2xl p-6">
-                    {memberInfo.joinedDate && (
-                      <p className="text-xs text-muted-foreground mb-3">Member since {new Date(memberInfo.joinedDate).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
-                    )}
                     <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
                       <Phone className="w-5 h-5 text-primary" />
                       Emergency Contact
@@ -1857,7 +1877,7 @@ export default function MemberPortal() {
 
             {/* Profile Edit Modal - available from dashboard and contributions */}
             <Dialog open={showProfileEdit} onOpenChange={setShowProfileEdit}>
-                  <DialogContent className="max-w-md bg-background border-primary/20">
+                  <DialogContent className="max-w-xl bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Pencil className="w-5 h-5 text-primary" />
@@ -1868,62 +1888,121 @@ export default function MemberPortal() {
                       </DialogDescription>
                     </DialogHeader>
                     
-                    <div className="space-y-6 pt-4">
-                      {/* Name */}
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-name">Name</Label>
-                        <Input
-                          id="profile-name"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Full name"
-                          className="bg-secondary border-primary/20"
+                    <div className="space-y-5 pt-4">
+                      {/* Profile Photo */}
+                      <div className="flex flex-col items-center gap-2">
+                        <div
+                          className="relative w-20 h-20 rounded-full cursor-pointer group"
+                          onClick={() => photoInputRef.current?.click()}
+                        >
+                          {editPhoto ? (
+                            <img
+                              src={editPhoto}
+                              alt="Profile"
+                              className="w-20 h-20 rounded-full object-cover border-2 border-primary/30 group-hover:border-primary transition-colors"
+                            />
+                          ) : (
+                            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-dashed border-primary/30 group-hover:border-primary transition-colors">
+                              <User className="w-8 h-8 text-primary/60" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Camera className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => photoInputRef.current?.click()}
+                        >
+                          {editPhoto ? "Change Photo" : "Add Photo"}
+                        </button>
+                        {editPhoto && (
+                          <button
+                            type="button"
+                            className="text-xs text-red-400 hover:underline"
+                            onClick={() => setEditPhoto(undefined)}
+                          >
+                            Remove Photo
+                          </button>
+                        )}
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 2 * 1024 * 1024) {
+                              toast({ title: "File Too Large", description: "Photo must be under 2MB.", variant: "destructive" });
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setEditPhoto(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = "";
+                          }}
                         />
                       </div>
 
-                      {/* Email (read-only) */}
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-email">Email</Label>
-                        <Input
-                          id="profile-email"
-                          type="email"
-                          value={memberInfo?.email || ""}
-                          readOnly
-                          disabled
-                          className="bg-muted border-primary/20 text-muted-foreground cursor-not-allowed"
-                        />
-                        <p className="text-xs text-muted-foreground">Email cannot be changed. Contact an admin if needed.</p>
+                      {/* Row 1: Name + Phone */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-name">Name</Label>
+                          <Input
+                            id="profile-name"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Full name"
+                            className="bg-secondary border-primary/20"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone Number</Label>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            value={editPhone}
+                            onChange={(e) => setEditPhone(e.target.value)}
+                            placeholder="e.g., 078 123 4567"
+                            className="bg-secondary border-primary/20"
+                          />
+                        </div>
                       </div>
 
-                      {/* Phone Number */}
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          placeholder="e.g., 078 123 4567"
-                          className="bg-secondary border-primary/20"
-                        />
-                      </div>
-
-                      {/* Voice (read-only) */}
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-voice">Voice Part</Label>
-                        <Input
-                          id="profile-voice"
-                          value={memberInfo?.voice || ""}
-                          readOnly
-                          disabled
-                          className="bg-muted border-primary/20 text-muted-foreground cursor-not-allowed"
-                        />
+                      {/* Row 2: Email (read-only) + Voice (read-only) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-email">Email</Label>
+                          <Input
+                            id="profile-email"
+                            type="email"
+                            value={memberInfo?.email || ""}
+                            readOnly
+                            disabled
+                            className="bg-muted border-primary/20 text-muted-foreground cursor-not-allowed"
+                          />
+                          <p className="text-xs text-muted-foreground">Contact an admin to change.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-voice">Voice Part</Label>
+                          <Input
+                            id="profile-voice"
+                            value={memberInfo?.voice || ""}
+                            readOnly
+                            disabled
+                            className="bg-muted border-primary/20 text-muted-foreground cursor-not-allowed"
+                          />
+                        </div>
                       </div>
 
                       {/* Date of Birth */}
                       <div className="space-y-2">
                         <Label htmlFor="profile-dob">Date of Birth</Label>
-                        <div className="relative">
+                        <div className="relative sm:max-w-[calc(50%-0.5rem)]">
                           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
                             id="profile-dob"
@@ -1936,11 +2015,12 @@ export default function MemberPortal() {
                       </div>
 
                       {/* Emergency Contact */}
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <Label className="text-base font-semibold">Emergency Contact</Label>
                         
-                        <div className="space-y-3">
-                          <div>
+                        {/* EC Row 1: Name + Relationship */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
                             <Label htmlFor="ec-name" className="text-sm">Contact Name</Label>
                             <Input
                               id="ec-name"
@@ -1950,8 +2030,7 @@ export default function MemberPortal() {
                               className="bg-secondary border-primary/20"
                             />
                           </div>
-
-                          <div>
+                          <div className="space-y-1">
                             <Label htmlFor="ec-relationship" className="text-sm">Relationship</Label>
                             <Select
                               value={editEmergencyContact.relationship}
@@ -1970,8 +2049,11 @@ export default function MemberPortal() {
                               </SelectContent>
                             </Select>
                           </div>
+                        </div>
 
-                          <div>
+                        {/* EC Row 2: Phone + Alt Phone */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
                             <Label htmlFor="ec-phone" className="text-sm">Phone</Label>
                             <Input
                               id="ec-phone"
@@ -1982,9 +2064,8 @@ export default function MemberPortal() {
                               className="bg-secondary border-primary/20"
                             />
                           </div>
-
-                          <div>
-                            <Label htmlFor="ec-alt-phone" className="text-sm">Alternative Phone (Optional)</Label>
+                          <div className="space-y-1">
+                            <Label htmlFor="ec-alt-phone" className="text-sm">Alt. Phone (Optional)</Label>
                             <Input
                               id="ec-alt-phone"
                               type="tel"

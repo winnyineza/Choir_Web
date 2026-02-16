@@ -19,6 +19,7 @@ export interface Member {
   voice: "Soprano" | "Alto" | "Tenor" | "Bass";
   status: "Active" | "Pending" | "Inactive";
   joinedDate: string;
+  inviteStatus?: "not_invited" | "invited" | "accepted";
   photo?: string;
   dateOfBirth?: string;
   emergencyContact?: EmergencyContact;
@@ -134,6 +135,7 @@ export async function addMember(member: Omit<Member, "id" | "joinedDate">): Prom
     ...member,
     id: generateId(),
     joinedDate: new Date().toISOString(),
+    inviteStatus: "not_invited",
   };
   return dbInsert<Member>(KEYS.MEMBERS, newMember);
 }

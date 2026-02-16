@@ -46,7 +46,6 @@ import {
   reactivateAdminUser,
   deleteAdminUser,
   getRoleLabel,
-  isMemberAdmin,
   addAuditLog,
   type AdminUser,
   type AdminInvite,
@@ -59,6 +58,7 @@ export function AdminTeamManagement() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [availableMembers, setAvailableMembers] = useState<Member[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState<string | null>(null);
   
@@ -80,14 +80,15 @@ export function AdminTeamManagement() {
     setAdmins(adminsList);
     setInvites(invitesList.filter(i => !i.used));
     setMembers(membersList);
+
+    // Filter out members who are already admins
+    const adminMemberIds = new Set(adminsList.filter(a => a.memberId).map(a => a.memberId));
+    setAvailableMembers(membersList.filter(m => !adminMemberIds.has(m.id)));
   };
 
   useEffect(() => {
     loadData();
   }, []);
-
-  // Get members who are not already admins
-  const availableMembers = members.filter(m => !isMemberAdmin(m.id));
 
   // Get member info for an admin
   const getMemberForAdmin = (admin: AdminUser): Member | undefined => {
