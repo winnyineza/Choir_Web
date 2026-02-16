@@ -865,7 +865,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
   },
 
   // --- Donations ---
-  choir_donations: {
+  serenades_donations: {
     table: 'donations',
     orderBy: 'created_at',
     orderAsc: false,

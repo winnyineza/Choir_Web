@@ -34,6 +34,8 @@ import {
   FileText,
   Gavel,
   Crown,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +63,7 @@ export function AdminTeamManagement() {
   const [availableMembers, setAvailableMembers] = useState<Member[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState<string | null>(null);
+  const [resendingInvite, setResendingInvite] = useState<string | null>(null);
   
   // Invite form
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
@@ -182,6 +185,41 @@ export function AdminTeamManagement() {
       description: "Invite link copied to clipboard",
     });
     setTimeout(() => setCopiedInvite(null), 2000);
+  };
+
+  const handleResendInvite = async (invite: AdminInvite) => {
+    setResendingInvite(invite.id);
+    try {
+      const emailResult = await sendAdminInviteEmail(
+        invite.email,
+        invite.name,
+        getRoleLabel(invite.role),
+        invite.inviteCode
+      );
+      if (emailResult.success) {
+        toast({
+          title: "Invite Resent!",
+          description: `Invite email resent to ${invite.email}`,
+        });
+      } else {
+        toast({
+          title: "Email Failed",
+          description: `Could not send email: ${emailResult.message}. Try copying the link instead.`,
+          variant: "destructive",
+        });
+      }
+      if (currentUser) {
+        await addAuditLog(currentUser, "RESEND_ADMIN_INVITE", `Resent invite to ${invite.name} (${invite.email})`);
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to resend invite",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingInvite(null);
+    }
   };
 
   const handleDeleteInvite = (id: string) => {
@@ -485,6 +523,24 @@ export function AdminTeamManagement() {
                         <>
                           <Copy className="w-4 h-4 mr-1" />
                           Copy Link
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResendInvite(invite)}
+                      disabled={resendingInvite === invite.id}
+                    >
+                      {resendingInvite === invite.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-1" />
+                          Resend
                         </>
                       )}
                     </Button>
