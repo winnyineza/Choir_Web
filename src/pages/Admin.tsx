@@ -225,8 +225,28 @@ const sidebarItems = [
   { id: "settings" as Tab, label: "Settings", icon: Settings },
 ];
 
+const VALID_TABS = new Set<string>(["dashboard","members","events","tickets","attendance","leave","disciplinary","contributions","expenses","treasury","announcements","messages","releases","promos","gallery","inventory","minutes","documents","voice-balance","surveys","analytics","event-staff","team","audit","settings"]);
+
+function getTabFromHash(): Tab {
+  if (typeof window === "undefined") return "dashboard";
+  const hash = window.location.hash.replace("#", "");
+  return VALID_TABS.has(hash) ? (hash as Tab) : "dashboard";
+}
+
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [activeTab, setActiveTabState] = useState<Tab>(getTabFromHash);
+
+  const setActiveTab = (tab: Tab) => {
+    setActiveTabState(tab);
+    window.location.hash = tab === "dashboard" ? "" : tab;
+  };
+
+  // Sync tab when browser back/forward changes the hash
+  useEffect(() => {
+    const onHashChange = () => setActiveTabState(getTabFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, isLoading, logout, isSuperAdmin, currentUser } = useAuth();
   const { toast } = useToast();
