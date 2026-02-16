@@ -886,6 +886,9 @@ export default function MemberPortal() {
                           <p className="font-medium text-foreground">{memberInfo.name}</p>
                           <p className="text-sm text-muted-foreground">{memberInfo.voice} • {memberInfo.status}</p>
                           <p className="text-xs text-muted-foreground mt-1">{memberInfo.phone || "No phone added"}</p>
+                          {memberInfo.joinedDate && (
+                            <p className="text-xs text-muted-foreground mt-0.5">Member since {new Date(memberInfo.joinedDate).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -917,6 +920,9 @@ export default function MemberPortal() {
                 {/* Emergency Contact (if logged in and has one) */}
                 {memberInfo && memberInfo.emergencyContact && (
                   <div className="card-glass rounded-2xl p-6">
+                    {memberInfo.joinedDate && (
+                      <p className="text-xs text-muted-foreground mb-3">Member since {new Date(memberInfo.joinedDate).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                    )}
                     <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
                       <Phone className="w-5 h-5 text-primary" />
                       Emergency Contact

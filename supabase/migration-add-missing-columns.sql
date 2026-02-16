@@ -180,4 +180,24 @@ DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
 CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
+-- ============================================================
+-- UNLOCK REQUESTS TABLE (new)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS unlock_requests (
+  id TEXT PRIMARY KEY,
+  requested_by TEXT,
+  requested_by_role TEXT,
+  requested_by_id TEXT,
+  type TEXT DEFAULT 'both',
+  month INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  reason TEXT,
+  status TEXT DEFAULT 'pending',
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ,
+  review_notes TEXT,
+  unlocked_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Done! All columns now match the application's supabaseSync.ts mappings.

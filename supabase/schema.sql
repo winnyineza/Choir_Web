@@ -888,3 +888,24 @@ COMMENT ON TABLE meeting_minutes IS 'Meeting minutes and records';
 COMMENT ON TABLE documents IS 'Shared choir documents';
 COMMENT ON TABLE payments IS 'Payment transactions';
 COMMENT ON TABLE receipts IS 'Payment receipts';
+COMMENT ON TABLE unlock_requests IS 'Month unlock requests with approval workflow';
+
+-- ============================================================
+-- UNLOCK REQUESTS (Month unlock requests)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS unlock_requests (
+  id TEXT PRIMARY KEY,
+  requested_by TEXT,
+  requested_by_role TEXT,
+  requested_by_id TEXT,
+  type TEXT DEFAULT 'both',
+  month INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  reason TEXT,
+  status TEXT DEFAULT 'pending',
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ,
+  review_notes TEXT,
+  unlocked_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);

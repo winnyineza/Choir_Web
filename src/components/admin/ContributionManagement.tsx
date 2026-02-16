@@ -69,8 +69,9 @@ import {
   type ContributionType,
   type ContributionCategory,
 } from "@/lib/contributionService";
+import { isMonthTemporarilyUnlocked, createUnlockRequest, type UnlockRequestType } from "@/lib/unlockRequestService";
 import { cn } from "@/lib/utils";
-import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock } from "lucide-react";
+import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock, Unlock } from "lucide-react";
 import { 
   exportContributionsToCSV, 
   exportMonthlyDuesReport,
@@ -102,6 +103,8 @@ export function ContributionManagement() {
   const [reportType, setReportType] = useState<"monthly" | "yearly">("monthly");
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showFinancialSummary, setShowFinancialSummary] = useState(false);
+  const [showUnlockRequest, setShowUnlockRequest] = useState(false);
+  const [unlockReason, setUnlockReason] = useState("");
   const [summaryYear, setSummaryYear] = useState(new Date().getFullYear());
   const [summaryYearExpenses, setSummaryYearExpenses] = useState<Awaited<ReturnType<typeof getExpensesByYear>>>([]);
   const [showBulkMonthlyDues, setShowBulkMonthlyDues] = useState(false);
@@ -346,8 +349,11 @@ export function ContributionManagement() {
   const handleCellClick = async (member: Member, month: number, year: number) => {
     // Check if month is locked (super_admin can override)
     if (isMonthLocked(month, year) && currentUser?.role !== "super_admin") {
-      toast({ title: "Month Locked", description: `${MONTH_NAMES[month - 1]} ${year} is locked. Contributions can't be modified after the ${getLockDay()}th of the following month.`, variant: "destructive" });
-      return;
+      const tempUnlocked = await isMonthTemporarilyUnlocked(month, year, "contributions");
+      if (!tempUnlocked) {
+        toast({ title: "Month Locked", description: `${MONTH_NAMES[month - 1]} ${year} is locked. Contributions can't be modified after the ${getLockDay()}th of the following month.`, variant: "destructive" });
+        return;
+      }
     }
     const paymentDetails = await getMemberMonthlyPaymentDetails(member.id, month, year);
     
@@ -849,7 +855,7 @@ export function ContributionManagement() {
           {/* Grace period banner */}
           {(() => {
             const now = new Date();
-            const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth(); // previous month (1-indexed)
+            const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
             const prevMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
             if (bulkYear === prevMonthYear || bulkYear === now.getFullYear()) {
               const daysLeft = getDaysUntilLock(prevMonth, prevMonthYear);
@@ -861,6 +867,20 @@ export function ContributionManagement() {
                       <span className="font-medium">{daysLeft} day{daysLeft !== 1 ? "s" : ""} left</span> to add {MONTH_NAMES[prevMonth - 1]} {prevMonthYear} data. 
                       Locks on the {getLockDay()}{getLockDay() === 1 ? "st" : getLockDay() === 2 ? "nd" : getLockDay() === 3 ? "rd" : "th"} of {MONTH_NAMES[prevMonth === 12 ? 0 : prevMonth]}.
                     </span>
+                  </div>
+                );
+              }
+              // Show request unlock button for locked months (non-super/main admins)
+              if (isMonthLocked(prevMonth, prevMonthYear) && currentUser?.role !== "super_admin" && currentUser?.role !== "main_admin") {
+                return (
+                  <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between gap-2">
+                    <span className="text-sm text-red-400 flex items-center gap-2">
+                      <Lock className="w-4 h-4 flex-shrink-0" />
+                      {MONTH_NAMES[prevMonth - 1]} {prevMonthYear} is locked.
+                    </span>
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowUnlockRequest(true)}>
+                      <Unlock className="w-3 h-3 mr-1" /> Request Unlock
+                    </Button>
                   </div>
                 );
               }
@@ -2577,6 +2597,86 @@ export function ContributionManagement() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Request Unlock Dialog */}
+      <Dialog open={showUnlockRequest} onOpenChange={setShowUnlockRequest}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlock className="w-5 h-5 text-yellow-500" />
+              Request Month Unlock
+            </DialogTitle>
+            <DialogDescription>
+              Request the main admin or super admin to temporarily unlock a locked month so you can add or edit data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Month</Label>
+                <Select
+                  value={(new Date().getMonth() === 0 ? 12 : new Date().getMonth()).toString()}
+                  onValueChange={() => {}}
+                >
+                  <SelectTrigger className="bg-secondary border-primary/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES.map((name, i) => (
+                      <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Year</Label>
+                <Input
+                  type="number"
+                  value={new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear()}
+                  readOnly
+                  className="bg-secondary border-primary/20"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Reason for unlock request</Label>
+              <Textarea
+                value={unlockReason}
+                onChange={(e) => setUnlockReason(e.target.value)}
+                placeholder="e.g., Need to add late contribution records for January..."
+                className="mt-1 bg-secondary border-primary/20"
+                rows={3}
+              />
+            </div>
+            <Button
+              variant="gold"
+              className="w-full"
+              disabled={!unlockReason.trim()}
+              onClick={async () => {
+                try {
+                  const prevMonth = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
+                  const prevYear = new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+                  await createUnlockRequest({
+                    requestedBy: currentUser?.name || "Admin",
+                    requestedByRole: currentUser?.role || "finance",
+                    requestedById: currentUser?.id || "",
+                    type: "both",
+                    month: prevMonth,
+                    year: prevYear,
+                    reason: unlockReason.trim(),
+                  });
+                  toast({ title: "Request Sent", description: "Your unlock request has been sent to the admin for approval." });
+                  setShowUnlockRequest(false);
+                  setUnlockReason("");
+                } catch (err: any) {
+                  toast({ title: "Error", description: err.message || "Failed to send request", variant: "destructive" });
+                }
+              }}
+            >
+              Send Unlock Request
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

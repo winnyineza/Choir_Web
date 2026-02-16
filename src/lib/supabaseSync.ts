@@ -156,6 +156,45 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     }),
   },
 
+  // --- Unlock Requests ---
+  choir_unlock_requests: {
+    table: 'unlock_requests',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (u: any) => ({
+      id: u.id,
+      requested_by: u.requestedBy || null,
+      requested_by_role: u.requestedByRole || null,
+      requested_by_id: u.requestedById || null,
+      type: u.type || 'both',
+      month: u.month,
+      year: u.year,
+      reason: u.reason || null,
+      status: u.status || 'pending',
+      reviewed_by: u.reviewedBy || null,
+      reviewed_at: u.reviewedAt || null,
+      review_notes: u.reviewNotes || null,
+      unlocked_until: u.unlockedUntil || null,
+      created_at: u.createdAt || new Date().toISOString(),
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      requestedBy: r.requested_by || '',
+      requestedByRole: r.requested_by_role || '',
+      requestedById: r.requested_by_id || '',
+      type: r.type || 'both',
+      month: r.month,
+      year: r.year,
+      reason: r.reason || '',
+      status: r.status || 'pending',
+      reviewedBy: r.reviewed_by || '',
+      reviewedAt: r.reviewed_at || '',
+      reviewNotes: r.review_notes || '',
+      unlockedUntil: r.unlocked_until || '',
+      createdAt: r.created_at,
+    }),
+  },
+
   // --- Contact Submissions ---
   choir_contact_submissions: {
     table: 'contact_submissions',

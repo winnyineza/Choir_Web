@@ -150,7 +150,17 @@ const AnnouncementManagement = lazy(() => import("@/components/admin/Announcemen
 const EventStaffManagement = lazy(() => import("@/components/admin/EventStaffManagement").then(m => ({ default: m.EventStaffManagement })));
 import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
 const ContributionManagement = lazy(() => import("@/components/admin/ContributionManagement").then(m => ({ default: m.ContributionManagement })));
-import { getAllContributions, setLockDay } from "@/lib/contributionService";
+import { getAllContributions, setLockDay, isMonthLocked, getLockDay, MONTH_NAMES as CONTRIB_MONTH_NAMES } from "@/lib/contributionService";
+import {
+  getAllUnlockRequests,
+  getPendingUnlockRequests,
+  createUnlockRequest,
+  approveUnlockRequest,
+  denyUnlockRequest,
+  isMonthTemporarilyUnlocked,
+  type UnlockRequest,
+  type UnlockRequestType,
+} from "@/lib/unlockRequestService";
 import { getAllExpenses } from "@/lib/expenseService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
@@ -271,6 +281,9 @@ export default function Admin() {
   // Modal states
   const [showAddMember, setShowAddMember] = useState(false);
   const [showBulkAddMembers, setShowBulkAddMembers] = useState(false);
+  const [showUnlockRequest, setShowUnlockRequest] = useState(false);
+  const [unlockRequests, setUnlockRequests] = useState<UnlockRequest[]>([]);
+  const [unlockForm, setUnlockForm] = useState({ month: new Date().getMonth() === 0 ? 12 : new Date().getMonth(), year: new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear(), type: "both" as UnlockRequestType, reason: "" });
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [showUploadGallery, setShowUploadGallery] = useState(false);
   const [showAddAlbum, setShowAddAlbum] = useState(false);
@@ -367,6 +380,12 @@ export default function Admin() {
     setBackupStats(stats);
     setOrderStats(orderStatsData);
     setOverallAttendanceStats(attendanceStatsData);
+
+    // Load unlock requests
+    try {
+      const unlockReqs = await getAllUnlockRequests();
+      setUnlockRequests(unlockReqs);
+    } catch { /* table may not exist yet */ }
   };
 
   // Load settings on mount
@@ -1414,6 +1433,7 @@ export default function Admin() {
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Name</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Email</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Voice</th>
+                        <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">Joined</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
                         <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
                       </tr>
@@ -1448,6 +1468,9 @@ export default function Admin() {
                           </td>
                           <td className="p-4 text-muted-foreground hidden md:table-cell">{member.email}</td>
                           <td className="p-4 text-muted-foreground">{member.voice}</td>
+                          <td className="p-4 text-muted-foreground text-sm hidden lg:table-cell">
+                            {member.joinedDate ? new Date(member.joinedDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—"}
+                          </td>
                           <td className="p-4">
                             <span className={cn(
                               "px-2 py-1 rounded-full text-xs font-semibold",
@@ -2121,16 +2144,27 @@ export default function Admin() {
                   </div>
                   
                   <div className="flex flex-wrap gap-3 items-center">
-                    <Input
-                      type="date"
-                      value={attendanceDate}
-                      onChange={(e) => {
-                        setAttendanceDate(e.target.value);
-                        setIsTakingAttendance(false);
-                        setAttendanceRecords({});
-                      }}
-                      className="w-40 bg-secondary border-primary/20"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="date"
+                        value={attendanceDate}
+                        onChange={(e) => {
+                          setAttendanceDate(e.target.value);
+                          setIsTakingAttendance(false);
+                          setAttendanceRecords({});
+                        }}
+                        className="w-40 bg-secondary border-primary/20"
+                      />
+                      {(() => {
+                        const d = new Date(attendanceDate);
+                        const m = d.getMonth() + 1;
+                        const y = d.getFullYear();
+                        if (isMonthLocked(m, y) && currentUser?.role !== "super_admin") {
+                          return <span className="text-[10px] text-red-400 mt-0.5 block">Month locked</span>;
+                        }
+                        return null;
+                      })()}
+                    </div>
                     <Input
                       type="text"
                       placeholder="Session title"
@@ -2149,6 +2183,22 @@ export default function Admin() {
                               variant: "destructive",
                             });
                             return;
+                          }
+                          
+                          // Check if the date falls in a locked month
+                          const attDate = new Date(attendanceDate);
+                          const attMonth = attDate.getMonth() + 1;
+                          const attYear = attDate.getFullYear();
+                          if (isMonthLocked(attMonth, attYear) && currentUser?.role !== "super_admin") {
+                            const tempUnlocked = await isMonthTemporarilyUnlocked(attMonth, attYear, "attendance");
+                            if (!tempUnlocked) {
+                              toast({
+                                title: "Month Locked",
+                                description: `${CONTRIB_MONTH_NAMES[attMonth - 1]} ${attYear} is locked. Attendance can't be modified after the ${getLockDay()}th of the following month.`,
+                                variant: "destructive",
+                              });
+                              return;
+                            }
                           }
                           
                           // Pre-fill with existing attendance if any
@@ -2179,6 +2229,17 @@ export default function Admin() {
                         <Button
                           variant="gold"
                         onClick={async () => {
+                          // Re-check lock before saving
+                          const savDate = new Date(attendanceDate);
+                          const savMonth = savDate.getMonth() + 1;
+                          const savYear = savDate.getFullYear();
+                          if (isMonthLocked(savMonth, savYear) && currentUser?.role !== "super_admin") {
+                            const savTempUnlocked = await isMonthTemporarilyUnlocked(savMonth, savYear, "attendance");
+                            if (!savTempUnlocked) {
+                              toast({ title: "Month Locked", description: `${CONTRIB_MONTH_NAMES[savMonth - 1]} ${savYear} is locked.`, variant: "destructive" });
+                              return;
+                            }
+                          }
                           const records = members.map(m => ({
                             memberId: m.id,
                             memberName: m.name,
@@ -2191,7 +2252,7 @@ export default function Admin() {
                             loadData();
                             setIsTakingAttendance(false);
                             toast({
-                              title: "Attendance Saved! ✅",
+                              title: "Attendance Saved!",
                               description: `Attendance for ${new Date(attendanceDate).toLocaleDateString()} has been recorded.`,
                             });
                           }}
@@ -3088,13 +3149,96 @@ export default function Admin() {
                   <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-xs text-muted-foreground space-y-1">
                     <p className="font-medium text-foreground">How it works:</p>
                     <p>- After the lock day, the previous month turns read-only for all admins</p>
+                    <p>- Both contributions AND attendance are locked together</p>
                     <p>- Locked months show a lock icon in the contributions grid</p>
                     <p>- Super admin can always override locked months</p>
-                    <p>- Attendance has no lock restrictions (past dates can always be entered)</p>
+                    <p>- Finance admins can request a temporary unlock (needs approval)</p>
                   </div>
                   <Button variant="gold" onClick={handleSaveSettings}>Save Lock Settings</Button>
                 </div>
               </div>
+
+              {/* Unlock Requests Management */}
+              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
+              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-yellow-500" />
+                  Unlock Requests
+                  {unlockRequests.filter(r => r.status === "pending").length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/20 text-yellow-500">
+                      {unlockRequests.filter(r => r.status === "pending").length} pending
+                    </span>
+                  )}
+                </h3>
+                {unlockRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No unlock requests yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {unlockRequests.filter(r => r.status === "pending").map(req => (
+                      <div key={req.id} className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {CONTRIB_MONTH_NAMES[req.month - 1]} {req.year} — {req.type === "both" ? "Contributions & Attendance" : req.type}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Requested by <span className="text-foreground">{req.requestedBy}</span> ({req.requestedByRole}) — {new Date(req.createdAt).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">{req.reason}</p>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              variant="gold"
+                              size="sm"
+                              onClick={async () => {
+                                await approveUnlockRequest(req.id, currentUser?.name || "Admin", undefined, 3);
+                                toast({ title: "Approved", description: `${CONTRIB_MONTH_NAMES[req.month - 1]} ${req.year} unlocked for 3 days.` });
+                                loadData();
+                              }}
+                            >
+                              Approve (3 days)
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                await denyUnlockRequest(req.id, currentUser?.name || "Admin", "Denied by admin");
+                                toast({ title: "Denied", description: "Unlock request denied." });
+                                loadData();
+                              }}
+                            >
+                              Deny
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {unlockRequests.filter(r => r.status !== "pending").length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                          Past requests ({unlockRequests.filter(r => r.status !== "pending").length})
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                          {unlockRequests.filter(r => r.status !== "pending").slice(0, 10).map(req => (
+                            <div key={req.id} className={`p-3 rounded-lg border text-sm ${
+                              req.status === "approved" ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
+                            }`}>
+                              <p className="text-foreground">
+                                {CONTRIB_MONTH_NAMES[req.month - 1]} {req.year} — <span className={req.status === "approved" ? "text-green-500" : "text-red-500"}>{req.status}</span>
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                By {req.requestedBy} • {req.reviewedBy ? `Reviewed by ${req.reviewedBy}` : ""}
+                                {req.unlockedUntil && req.status === "approved" ? ` • Unlocked until ${new Date(req.unlockedUntil).toLocaleDateString()}` : ""}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+              )}
 
               {/* Data Export Section */}
               <div className="card-glass rounded-2xl p-6 max-w-2xl">

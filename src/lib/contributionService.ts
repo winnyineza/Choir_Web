@@ -3,6 +3,7 @@
 import { getAllMembers } from "./dataService";
 import { createReceipt } from "./receiptService";
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
+import { isMonthTemporarilyUnlocked } from './unlockRequestService';
 
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
@@ -312,7 +313,11 @@ export async function setMemberMonthlyPayment(
   forceOverride?: boolean
 ): Promise<Contribution | null> {
   if (!forceOverride && isMonthLocked(month, year)) {
-    throw new Error(`Month ${month}/${year} is locked. Contributions cannot be modified after the ${_cachedLockDay}th of the following month.`);
+    // Check if there's an approved temporary unlock
+    const tempUnlocked = await isMonthTemporarilyUnlocked(month, year, "contributions");
+    if (!tempUnlocked) {
+      throw new Error(`Month ${month}/${year} is locked. Contributions cannot be modified after the ${_cachedLockDay}th of the following month.`);
+    }
   }
   const contributions = await getAllContributions();
   const types = await getAllContributionTypes();
