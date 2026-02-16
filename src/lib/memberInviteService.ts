@@ -48,6 +48,7 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
+              <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,0,0,0.2); margin-bottom: 12px;" />
               <h1 style="margin: 0; color: #000; font-size: 24px; font-weight: bold;">Serenades of Praise</h1>
               <p style="margin: 10px 0 0; color: #000; font-size: 14px;">Member Portal Invitation</p>
             </td>
@@ -157,9 +158,17 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
             </td>
           </tr>
           
+          <!-- Signature -->
+          <tr>
+            <td style="padding: 20px 30px 10px; text-align: center;">
+              <p style="margin: 0 0 4px; color: #ccc; font-size: 14px; font-style: italic;">Yours faithfully,</p>
+              <p style="margin: 0; color: #d4a537; font-size: 15px; font-weight: 600;">Serenades of Praise Committee</p>
+            </td>
+          </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 30px; background-color: #151515; text-align: center;">
+            <td style="padding: 16px 30px; background-color: #151515; text-align: center;">
               <p style="margin: 0 0 10px; color: #888; font-size: 12px;">
                 Questions? Contact us at <a href="mailto:info@serenadesofpraise.com" style="color: #d4a537;">info@serenadesofpraise.com</a>
               </p>
@@ -337,6 +346,7 @@ export async function sendAdminInviteEmail(
         <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
+              <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,0,0,0.2); margin-bottom: 12px;" />
               <h1 style="margin: 0; color: #000; font-size: 24px; font-weight: bold;">Serenades of Praise</h1>
               <p style="margin: 10px 0 0; color: #000; font-size: 14px;">Admin Team Invitation</p>
             </td>
@@ -376,7 +386,13 @@ export async function sendAdminInviteEmail(
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 30px; border-top: 1px solid #333; text-align: center;">
+            <td style="padding: 20px 30px 10px; text-align: center;">
+              <p style="margin: 0 0 4px; color: #ccc; font-size: 14px; font-style: italic;">Yours faithfully,</p>
+              <p style="margin: 0; color: #d4a537; font-size: 15px; font-weight: 600;">Serenades of Praise Committee</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 30px; border-top: 1px solid #333; text-align: center;">
               <p style="margin: 0; color: #666; font-size: 12px;">
                 This invite code is for one-time use only. If you did not expect this invitation, please ignore this email.
               </p>

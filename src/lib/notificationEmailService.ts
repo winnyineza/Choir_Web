@@ -27,20 +27,27 @@ async function sendEmail(to: Array<{ email: string; name: string }>, subject: st
   }
 }
 
+const LOGO_URL = "https://serenadesofpraise.netlify.app/LogoTSC.jpg";
+
 function emailWrapper(title: string, body: string, choirName: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; padding: 32px; color: #e0e0e0;">
         <div style="text-align: center; margin-bottom: 24px;">
+          <img src="${LOGO_URL}" alt="${choirName}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid #d4af37; margin-bottom: 12px;" />
           <h2 style="color: #d4af37; margin: 0; font-size: 20px;">${choirName}</h2>
         </div>
         <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; margin-bottom: 16px;">
           <h3 style="color: #ffffff; margin: 0 0 16px 0; font-size: 18px;">${title}</h3>
           ${body}
         </div>
-        <p style="color: #888; font-size: 12px; text-align: center; margin: 16px 0 0 0;">
-          This is an automated notification from ${choirName} Admin Portal.
-        </p>
+        <div style="text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <p style="color: #ccc; font-size: 14px; margin: 0 0 4px 0; font-style: italic;">Yours faithfully,</p>
+          <p style="color: #d4af37; font-size: 15px; font-weight: 600; margin: 0 0 12px 0;">Serenades of Praise Committee</p>
+          <p style="color: #666; font-size: 11px; margin: 0;">
+            This is an automated notification from ${choirName} Admin Portal.
+          </p>
+        </div>
       </div>
     </div>
   `;
