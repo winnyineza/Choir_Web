@@ -35,7 +35,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const { login } = useAuth();
+  const { login, loginDirect } = useAuth();
   const navigate = useNavigate();
 
   // Validate invite code and reset token asynchronously
@@ -142,11 +142,10 @@ export default function AdminLogin() {
       const user = await redeemInvite(inviteCode!, password);
       if (user) {
         setSignupSuccess(true);
-        setTimeout(async () => {
-          const result = await login(user.email, password, true);
-          if (result.success) {
-            navigate("/admin");
-          }
+        // Directly authenticate with the returned user object (no password re-check needed)
+        setTimeout(() => {
+          loginDirect(user, true);
+          navigate("/admin");
         }, 2000);
       } else {
         setError("Failed to create account. Please try again.");

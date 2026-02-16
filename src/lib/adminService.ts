@@ -28,16 +28,29 @@ export interface AdminUser {
 
 // Hash a password
 export function hashPassword(password: string): string {
-  return bcrypt.hashSync(password, SALT_ROUNDS);
+  return bcrypt.hashSync(password.trim(), SALT_ROUNDS);
 }
 
 // Compare password with hash
 export function comparePassword(password: string, hash: string): boolean {
+  const trimmedPassword = password.trim();
+
+  if (!hash || hash.length === 0) {
+    console.error("[Auth] Password hash is empty or missing");
+    return false;
+  }
+
   // If password doesn't look hashed (legacy), do direct comparison
   if (!hash.startsWith("$2")) {
-    return password === hash;
+    return trimmedPassword === hash;
   }
-  return bcrypt.compareSync(password, hash);
+
+  try {
+    return bcrypt.compareSync(trimmedPassword, hash);
+  } catch (err) {
+    console.error("[Auth] bcrypt.compareSync error:", err);
+    return false;
+  }
 }
 
 export interface AdminInvite {
@@ -228,10 +241,21 @@ export async function createAdminUser(
     throw new Error("An admin with this email already exists");
   }
 
+  const hashedPassword = hashPassword(data.password);
+
+  // Verify hash works immediately (catch any bcrypt issues)
+  if (!bcrypt.compareSync(data.password.trim(), hashedPassword)) {
+    console.error("[Auth] Password hash verification failed immediately after hashing - retrying");
+    const retryHash = hashPassword(data.password);
+    if (!bcrypt.compareSync(data.password.trim(), retryHash)) {
+      throw new Error("Password hashing failed. Please try again.");
+    }
+  }
+
   const newUser = {
     ...data,
     id: `admin-${Date.now()}`,
-    password: hashPassword(data.password),
+    password: hashedPassword,
     createdAt: new Date().toISOString(),
     createdBy,
     isActive: true,

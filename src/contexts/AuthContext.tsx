@@ -12,6 +12,7 @@ interface AuthContextType {
   isLoading: boolean;
   currentUser: AdminUser | null;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>;
+  loginDirect: (user: AdminUser, rememberMe?: boolean) => void;
   logout: () => void;
   isSuperAdmin: boolean;
   sessionTimeRemaining: number | null;
@@ -154,6 +155,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
+  // Direct login - skip password verification (for post-signup, where we already have the user)
+  const loginDirect = (user: AdminUser, remember: boolean = true) => {
+    const duration = remember ? SESSION_DURATION_REMEMBER : SESSION_DURATION_DEFAULT;
+    const expiry = Date.now() + duration;
+    
+    const tokenData = {
+      userId: user.id,
+      expiry,
+      rememberMe: remember,
+    };
+    localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(tokenData));
+    
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setSessionExpiry(expiry);
+    setRememberMe(remember);
+    
+    addAuditLog(user, "LOGIN", "Logged in after account creation");
+  };
+
   const isSuperAdmin = currentUser?.role === "super_admin";
 
   return (
@@ -162,7 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated, 
         isLoading, 
         currentUser, 
-        login, 
+        login,
+        loginDirect,
         logout,
         isSuperAdmin,
         sessionTimeRemaining,
