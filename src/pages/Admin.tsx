@@ -150,7 +150,7 @@ const AnnouncementManagement = lazy(() => import("@/components/admin/Announcemen
 const EventStaffManagement = lazy(() => import("@/components/admin/EventStaffManagement").then(m => ({ default: m.EventStaffManagement })));
 import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
 const ContributionManagement = lazy(() => import("@/components/admin/ContributionManagement").then(m => ({ default: m.ContributionManagement })));
-import { getAllContributions } from "@/lib/contributionService";
+import { getAllContributions, setLockDay } from "@/lib/contributionService";
 import { getAllExpenses } from "@/lib/expenseService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
@@ -371,7 +371,10 @@ export default function Admin() {
 
   // Load settings on mount
   useEffect(() => {
-    getSettings().then(setSettingsState);
+    getSettings().then((s) => {
+      setSettingsState(s);
+      if (s.contributionLockDay) setLockDay(s.contributionLockDay);
+    });
   }, []);
 
   // Load data on mount
@@ -711,6 +714,8 @@ export default function Admin() {
   const handleSaveSettings = async () => {
     if (!settings) return;
     await updateSettings(settings);
+    // Sync lock day immediately
+    if (settings.contributionLockDay) setLockDay(settings.contributionLockDay);
     if (currentUser) {
       addAuditLog(currentUser, "UPDATE_SETTINGS", "Updated system settings");
     }
@@ -3045,6 +3050,49 @@ export default function Admin() {
                     💡 Admins can access the scanner without a PIN when logged in
                   </p>
                   <Button variant="gold" onClick={handleSaveSettings}>Save Scanner Settings</Button>
+                </div>
+              </div>
+
+              {/* Contribution Lock Settings */}
+              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-primary" />
+                  Contribution Month Locking
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Control when monthly contribution data becomes read-only. After the lock day, admins (except super admin) cannot modify that month's contributions.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="lockDay">Lock Day (of the following month)</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <Input
+                        id="lockDay"
+                        type="number"
+                        min={1}
+                        max={28}
+                        value={settings.contributionLockDay || 5}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(28, parseInt(e.target.value) || 5));
+                          setSettingsState({ ...settings, contributionLockDay: val });
+                        }}
+                        className="bg-secondary border-primary/20 max-w-24 text-center text-lg font-semibold"
+                      />
+                      <span className="text-sm text-muted-foreground">of the next month</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Example: If set to <span className="font-medium text-foreground">{settings.contributionLockDay || 5}</span>, January's contributions will lock on <span className="font-medium text-foreground">February {settings.contributionLockDay || 5}</span>.
+                      Set a higher number (e.g. 15) to give more time for late data entry.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-xs text-muted-foreground space-y-1">
+                    <p className="font-medium text-foreground">How it works:</p>
+                    <p>- After the lock day, the previous month turns read-only for all admins</p>
+                    <p>- Locked months show a lock icon in the contributions grid</p>
+                    <p>- Super admin can always override locked months</p>
+                    <p>- Attendance has no lock restrictions (past dates can always be entered)</p>
+                  </div>
+                  <Button variant="gold" onClick={handleSaveSettings}>Save Lock Settings</Button>
                 </div>
               </div>
 

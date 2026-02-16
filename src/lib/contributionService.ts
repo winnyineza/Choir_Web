@@ -172,19 +172,31 @@ export async function getMonthlyRateForPeriod(month: number, year: number): Prom
 }
 
 // ============ MONTH LOCKING ============
-// Months auto-lock on the 5th of the following month.
-// Example: January 2026 locks on February 5, 2026.
+// Months auto-lock on a configurable day of the following month (default: 5th).
+// Example: If lock day is 5, January 2026 locks on February 5, 2026.
 // Super admins can still override locked months.
 
-const LOCK_DAY = 5; // Day of the next month when the previous month locks
+const DEFAULT_LOCK_DAY = 5;
+
+// Cache the lock day from settings to avoid async calls in synchronous functions
+let _cachedLockDay: number = DEFAULT_LOCK_DAY;
+
+export function setLockDay(day: number) {
+  _cachedLockDay = Math.max(1, Math.min(28, day));
+}
+
+export function getLockDay(): number {
+  return _cachedLockDay;
+}
 
 export function isMonthLocked(month: number, year: number): boolean {
+  const lockDay = _cachedLockDay;
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1; // 1-indexed
   const currentDay = now.getDate();
 
-  // The lock date for a given month/year is the LOCK_DAY of the next month
+  // The lock date for a given month/year is the lock day of the next month
   let lockMonth = month + 1;
   let lockYear = year;
   if (lockMonth > 12) {
@@ -195,19 +207,28 @@ export function isMonthLocked(month: number, year: number): boolean {
   // If we're past the lock date, the month is locked
   if (currentYear > lockYear) return true;
   if (currentYear === lockYear && currentMonth > lockMonth) return true;
-  if (currentYear === lockYear && currentMonth === lockMonth && currentDay >= LOCK_DAY) return true;
+  if (currentYear === lockYear && currentMonth === lockMonth && currentDay >= lockDay) return true;
 
   return false;
 }
 
 export function getMonthLockDate(month: number, year: number): Date {
+  const lockDay = _cachedLockDay;
   let lockMonth = month; // 0-indexed for Date constructor (month param is 1-indexed)
   let lockYear = year;
   if (month >= 12) {
     lockMonth = 0;
     lockYear += 1;
   }
-  return new Date(lockYear, lockMonth, LOCK_DAY);
+  return new Date(lockYear, lockMonth, lockDay);
+}
+
+export function getDaysUntilLock(month: number, year: number): number | null {
+  if (isMonthLocked(month, year)) return null;
+  const lockDate = getMonthLockDate(month, year);
+  const now = new Date();
+  const diffMs = lockDate.getTime() - now.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
 export function getLockedMonthsForYear(year: number): number[] {
@@ -291,7 +312,7 @@ export async function setMemberMonthlyPayment(
   forceOverride?: boolean
 ): Promise<Contribution | null> {
   if (!forceOverride && isMonthLocked(month, year)) {
-    throw new Error(`Month ${month}/${year} is locked. Contributions cannot be modified after the ${LOCK_DAY}th of the following month.`);
+    throw new Error(`Month ${month}/${year} is locked. Contributions cannot be modified after the ${_cachedLockDay}th of the following month.`);
   }
   const contributions = await getAllContributions();
   const types = await getAllContributionTypes();

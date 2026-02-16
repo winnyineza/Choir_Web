@@ -84,6 +84,7 @@ export interface Settings {
   bankName: string;
   memberPortalPin: string;
   scannerPin: string;
+  contributionLockDay: number; // Day of the next month when previous month locks (1-28, default 5)
 }
 
 export interface EventStaff {
@@ -476,6 +477,7 @@ const DEFAULT_SETTINGS: Settings = {
   bankName: "",
   memberPortalPin: "2024",
   scannerPin: "2024",
+  contributionLockDay: 5,
 };
 
 export async function getSettings(): Promise<Settings> {

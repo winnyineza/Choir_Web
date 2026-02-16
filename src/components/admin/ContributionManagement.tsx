@@ -42,7 +42,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/flutterwave";
-import { getAllMembers, type Member } from "@/lib/dataService";
+import { getAllMembers, getSettings, type Member } from "@/lib/dataService";
 import { addAuditLog } from "@/lib/adminService";
 import {
   getAllContributions,
@@ -61,6 +61,9 @@ import {
   setMemberMonthlyPayment,
   getMonthlyRateForPeriod,
   isMonthLocked,
+  setLockDay,
+  getLockDay,
+  getDaysUntilLock,
   MONTH_NAMES,
   type Contribution,
   type ContributionType,
@@ -172,11 +175,16 @@ export function ContributionManagement() {
   }, [filterMonth, filterYear, members]);
   
   const loadData = async () => {
-    const [contribs, types, memb] = await Promise.all([
+    const [contribs, types, memb, settings] = await Promise.all([
       getAllContributions(),
       getAllContributionTypes(),
       getAllMembers(),
+      getSettings(),
     ]);
+    // Sync the lock day from settings
+    if (settings.contributionLockDay) {
+      setLockDay(settings.contributionLockDay);
+    }
     setContributions(contribs);
     setContributionTypes(types);
     setMembers(memb);
@@ -338,7 +346,7 @@ export function ContributionManagement() {
   const handleCellClick = async (member: Member, month: number, year: number) => {
     // Check if month is locked (super_admin can override)
     if (isMonthLocked(month, year) && currentUser?.role !== "super_admin") {
-      toast({ title: "Month Locked", description: `${MONTH_NAMES[month - 1]} ${year} is locked. Contributions can't be modified after the 5th of the following month.`, variant: "destructive" });
+      toast({ title: "Month Locked", description: `${MONTH_NAMES[month - 1]} ${year} is locked. Contributions can't be modified after the ${getLockDay()}th of the following month.`, variant: "destructive" });
       return;
     }
     const paymentDetails = await getMemberMonthlyPaymentDetails(member.id, month, year);
@@ -838,6 +846,27 @@ export function ContributionManagement() {
               ))}
             </div>
           </div>
+          {/* Grace period banner */}
+          {(() => {
+            const now = new Date();
+            const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth(); // previous month (1-indexed)
+            const prevMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            if (bulkYear === prevMonthYear || bulkYear === now.getFullYear()) {
+              const daysLeft = getDaysUntilLock(prevMonth, prevMonthYear);
+              if (daysLeft !== null && daysLeft > 0) {
+                return (
+                  <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                    <span className="text-sm text-yellow-500">
+                      <span className="font-medium">{daysLeft} day{daysLeft !== 1 ? "s" : ""} left</span> to add {MONTH_NAMES[prevMonth - 1]} {prevMonthYear} data. 
+                      Locks on the {getLockDay()}{getLockDay() === 1 ? "st" : getLockDay() === 2 ? "nd" : getLockDay() === 3 ? "rd" : "th"} of {MONTH_NAMES[prevMonth === 12 ? 0 : prevMonth]}.
+                    </span>
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead className="bg-secondary/50">
