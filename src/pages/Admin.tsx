@@ -3,6 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   LayoutDashboard,
   Users,
   Calendar,
@@ -294,6 +300,7 @@ export default function Admin() {
   const [showAddAlbum, setShowAddAlbum] = useState(false);
   const [showAddMusicVideo, setShowAddMusicVideo] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [viewingMember, setViewingMember] = useState<Member | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [showEventSummary, setShowEventSummary] = useState(false);
   const [summaryEvent, setSummaryEvent] = useState<Event | null>(null);
@@ -1520,6 +1527,14 @@ export default function Admin() {
                             </span>
                           </td>
                           <td className="p-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="View Profile"
+                              onClick={() => setViewingMember(member)}
+                            >
+                              <Eye className="w-4 h-4 text-muted-foreground" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -3418,6 +3433,125 @@ export default function Admin() {
         onSuccess={loadData}
         editVideo={editingMusicVideo}
       />
+
+      {/* Member Profile Viewer */}
+      <Dialog open={!!viewingMember} onOpenChange={(open) => { if (!open) setViewingMember(null); }}>
+        <DialogContent className="max-w-md bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              Member Profile
+            </DialogTitle>
+          </DialogHeader>
+          {viewingMember && (
+            <div className="space-y-5 pt-2">
+              {/* Photo + Name */}
+              <div className="flex flex-col items-center gap-3">
+                {viewingMember.photo ? (
+                  <img src={viewingMember.photo} alt={viewingMember.name} className="w-24 h-24 rounded-full object-cover border-3 border-primary/30" />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-primary">{viewingMember.name.charAt(0)}</span>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-foreground">{viewingMember.name}</h3>
+                  <div className="flex items-center gap-2 justify-center mt-1">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-xs font-semibold",
+                      viewingMember.status === "Active" ? "bg-green-500/20 text-green-400" :
+                      viewingMember.status === "Pending" ? "bg-yellow-500/20 text-yellow-400" :
+                      "bg-red-500/20 text-red-400"
+                    )}>{viewingMember.status}</span>
+                    <span className="text-sm text-primary font-medium">{viewingMember.voice}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="bg-secondary/30 rounded-xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Email</span>
+                  <span className="text-sm text-foreground">{viewingMember.email}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Phone</span>
+                  <span className="text-sm text-foreground">{viewingMember.phone || "Not provided"}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Date of Birth</span>
+                  <span className="text-sm text-foreground">
+                    {viewingMember.dateOfBirth ? new Date(viewingMember.dateOfBirth).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Not provided"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Invite Status</span>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-xs font-medium",
+                    viewingMember.inviteStatus === "accepted" ? "bg-green-500/20 text-green-400" :
+                    viewingMember.inviteStatus === "invited" ? "bg-blue-500/20 text-blue-400" :
+                    "bg-zinc-500/20 text-zinc-400"
+                  )}>
+                    {viewingMember.inviteStatus === "accepted" ? "Accepted" :
+                     viewingMember.inviteStatus === "invited" ? "Pending" :
+                     "Not Invited"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              {viewingMember.emergencyContact && viewingMember.emergencyContact.name && (
+                <div className="bg-secondary/30 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-foreground mb-3">Emergency Contact</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Name</span>
+                      <span className="text-sm text-foreground">{viewingMember.emergencyContact.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Relationship</span>
+                      <span className="text-sm text-foreground">{viewingMember.emergencyContact.relationship}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Phone</span>
+                      <span className="text-sm text-foreground">{viewingMember.emergencyContact.phone}</span>
+                    </div>
+                    {viewingMember.emergencyContact.altPhone && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Alt. Phone</span>
+                        <span className="text-sm text-foreground">{viewingMember.emergencyContact.altPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setViewingMember(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="gold"
+                  className="flex-1"
+                  onClick={() => {
+                    setEditingMember(viewingMember);
+                    setShowAddMember(true);
+                    setViewingMember(null);
+                  }}
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit Member
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

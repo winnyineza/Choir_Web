@@ -170,7 +170,7 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <tr>
             <td style="padding: 16px 30px; background-color: #151515; text-align: center;">
               <p style="margin: 0 0 10px; color: #888; font-size: 12px;">
-                Questions? Contact us at <a href="mailto:info@serenadesofpraise.com" style="color: #d4a537;">info@serenadesofpraise.com</a>
+                Questions? Contact us at <a href="mailto:theserenadeschoir@gmail.com" style="color: #d4a537;">theserenadeschoir@gmail.com</a>
               </p>
               <p style="margin: 0; color: #666; font-size: 11px;">
                 Serenades of Praise Choir &bull; Kacyiru SDA Church, Kigali, Rwanda
