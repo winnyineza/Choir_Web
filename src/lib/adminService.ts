@@ -408,9 +408,16 @@ export async function redeemInvite(code: string, password: string): Promise<Admi
     invite.createdBy
   );
 
+  // Verify the account actually exists in the database before marking invite as used
+  const verifyUser = await getAdminByEmail(invite.email);
+  if (!verifyUser) {
+    console.error("[Auth] Account creation appeared to succeed but user not found in database");
+    throw new Error("Account creation failed. Please try again or contact administrator.");
+  }
+
   await dbUpdate<AdminInvite>(ADMIN_INVITES_KEY, invite.id, { used: true });
 
-  return user;
+  return verifyUser;
 }
 
 // Delete invite

@@ -210,7 +210,7 @@ export default function AdminLogin() {
           }
         }
       } else {
-        setError("No account found with this email address");
+        setError("No account found with this email address. If you recently created an account via invite, the creation may have failed. Please ask the administrator to re-invite you.");
       }
     } catch {
       setError("An error occurred. Please try again.");
