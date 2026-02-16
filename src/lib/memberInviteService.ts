@@ -439,3 +439,124 @@ export async function sendAdminInviteEmail(
     return { success: false, message: `Error sending email: ${err.message}` };
   }
 }
+
+/**
+ * Send welcome email to a new admin after they successfully create their account
+ */
+export async function sendAdminWelcomeEmail(
+  email: string,
+  name: string,
+  role: string
+): Promise<{ success: boolean; message: string }> {
+  const portalUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/admin`
+    : "https://serenadesofpraise.netlify.app/admin";
+
+  const firstName = name.split(" ")[0] || "Admin";
+
+  const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
+              <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,0,0,0.2); margin-bottom: 12px;" />
+              <h1 style="margin: 0; color: #000; font-size: 24px; font-weight: bold;">Serenades of Praise</h1>
+              <p style="margin: 10px 0 0; color: #000; font-size: 14px;">Welcome to the Admin Team!</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px; text-align: center;">
+              <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #22c55e, #16a34a); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 32px; line-height: 64px;">&#10003;</span>
+              </div>
+              <h2 style="margin: 0 0 10px; color: #fff; font-size: 22px;">You're All Set, ${firstName}!</h2>
+              <p style="margin: 0; color: #aaa; font-size: 15px; line-height: 1.6;">
+                Your admin account has been successfully created. You are now part of the
+                <strong style="color: #d4a537;">Serenades of Praise</strong> admin team.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 30px 20px;">
+              <div style="background-color: #252525; border-radius: 12px; padding: 20px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="color: #888; font-size: 13px; padding: 6px 0;">Role:</td>
+                    <td style="color: #d4a537; font-size: 14px; font-weight: bold; padding: 6px 0; text-align: right;">${role}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #888; font-size: 13px; padding: 6px 0;">Email:</td>
+                    <td style="color: #fff; font-size: 14px; padding: 6px 0; text-align: right;">${email}</td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 30px 30px; text-align: center;">
+              <p style="color: #aaa; font-size: 14px; margin: 0 0 16px;">You can now log in to the Admin Portal anytime:</p>
+              <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4a537, #b8860b); color: #000; font-weight: bold; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px;">
+                Go to Admin Portal
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 30px 10px; text-align: center;">
+              <p style="margin: 0 0 4px; color: #ccc; font-size: 14px; font-style: italic;">Yours faithfully,</p>
+              <p style="margin: 0; color: #d4a537; font-size: 15px; font-weight: 600;">Serenades of Praise Committee</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 30px; border-top: 1px solid #333; text-align: center;">
+              <p style="margin: 0; color: #666; font-size: 12px;">
+                If you have any questions, contact us at theserenadeschoir@gmail.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const isDev = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  if (isDev) {
+    console.info(
+      `[DEV] Admin welcome email for ${name} (${email}):\n` +
+      `Role: ${role}\n` +
+      `(Email not sent in development mode)`
+    );
+    return { success: true, message: `Development mode: Welcome email logged for ${name}.` };
+  }
+
+  try {
+    const response = await fetch("/.netlify/functions/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: [{ email, name }],
+        subject: "Welcome to Serenades of Praise Admin Team!",
+        html: emailHtml,
+      }),
+    });
+
+    if (response.ok) {
+      return { success: true, message: `Welcome email sent to ${email}` };
+    } else {
+      return { success: false, message: "Failed to send welcome email" };
+    }
+  } catch (err: any) {
+    return { success: false, message: `Error sending welcome email: ${err.message}` };
+  }
+}

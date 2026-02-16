@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { validateInvite, redeemInvite, requestPasswordReset, validateResetToken, resetPassword } from "@/lib/adminService";
+import { validateInvite, redeemInvite, requestPasswordReset, validateResetToken, resetPassword, getRoleLabel } from "@/lib/adminService";
+import { sendAdminWelcomeEmail } from "@/lib/memberInviteService";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { validateEmail, validatePassword, checkRateLimit, LOGIN_RATE_LIMIT, sanitizeString } from "@/lib/validation";
 import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
@@ -142,6 +143,8 @@ export default function AdminLogin() {
       const user = await redeemInvite(inviteCode!, password);
       if (user) {
         setSignupSuccess(true);
+        // Send welcome email (fire and forget — don't block the redirect)
+        sendAdminWelcomeEmail(user.email, user.name, getRoleLabel(user.role)).catch(() => {});
         // Directly authenticate with the returned user object (no password re-check needed)
         setTimeout(() => {
           loginDirect(user, true);
