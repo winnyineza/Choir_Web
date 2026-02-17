@@ -349,75 +349,138 @@ export default function Admin() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
-  // Load data
-  const loadData = async () => {
+  // Load core data (members, events, dashboard essentials)
+  const loadCoreData = async () => {
     const [
       membersData,
       eventsData,
-      galleryData,
-      leaveData,
       dashboardData,
-      expensesData,
       unreadCount,
     ] = await Promise.all([
       getAllMembers(),
       getAllEvents(),
-      getAllGalleryItems(),
-      getAllLeaveRequests(),
       getDashboardStats(),
-      getAllExpenses(),
       getUnreadContactCount(),
     ]);
     setMembers(membersData);
     setEvents(eventsData);
-    setGallery(galleryData);
-    setLeaveRequests(leaveData);
     setDashboardStats(dashboardData);
     setUnreadMessages(unreadCount);
+  };
 
-    const [allOrders, contributions, donations] = await Promise.all([
-      getAllOrders(),
-      getAllContributions(),
-      getAllDonations(),
-    ]);
-    setOrders(allOrders);
-    setPromoCodes(await getAllPromoCodes());
-    setAlbums(await getAllAlbums());
-    setMusicVideos(await getAllMusicVideos());
-    setStreamingPlatforms(await getAllPlatforms());
-    setAttendanceSessions(await getRecentSessions(20));
+  // Load tab-specific data on demand
+  const loadTabData = async (tab: string) => {
+    switch (tab) {
+      case "dashboard": {
+        const [allOrders, contributions, donations, expensesData] = await Promise.all([
+          getAllOrders(),
+          getAllContributions(),
+          getAllDonations(),
+          getAllExpenses(),
+        ]);
+        setOrders(allOrders);
+        const confirmedOrders = allOrders.filter(o => o.status === "confirmed");
+        const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+        const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
+        const expenseTotal = expensesData.reduce((sum, e) => sum + e.amount, 0);
+        const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + o.total, 0);
+        const totalIncome = contributionTotal + donationTotal + ticketRevenue;
+        setFinancialTotals({
+          contributions: contributionTotal,
+          donations: donationTotal,
+          expenses: expenseTotal,
+          ticketRevenue,
+          totalIncome,
+          balance: totalIncome - expenseTotal,
+        });
+        const [orderStatsData, attendanceStatsData] = await Promise.all([
+          getOrderStats(),
+          getOverallAttendanceStats(),
+        ]);
+        setOrderStats(orderStatsData);
+        setOverallAttendanceStats(attendanceStatsData);
+        break;
+      }
+      case "tickets": {
+        const allOrders = await getAllOrders();
+        setOrders(allOrders);
+        setOrderStats(await getOrderStats());
+        break;
+      }
+      case "gallery":
+        setGallery(await getAllGalleryItems());
+        break;
+      case "leave":
+        setLeaveRequests(await getAllLeaveRequests());
+        break;
+      case "contributions": {
+        const contributions = await getAllContributions();
+        const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+        setFinancialTotals(prev => ({ ...prev, contributions: contributionTotal }));
+        break;
+      }
+      case "expenses": {
+        const expensesData = await getAllExpenses();
+        const expenseTotal = expensesData.reduce((sum, e) => sum + e.amount, 0);
+        setFinancialTotals(prev => ({ ...prev, expenses: expenseTotal }));
+        break;
+      }
+      case "treasury": {
+        const [contributions, donations, expensesData, allOrders] = await Promise.all([
+          getAllContributions(),
+          getAllDonations(),
+          getAllExpenses(),
+          getAllOrders(),
+        ]);
+        const confirmedOrders = allOrders.filter(o => o.status === "confirmed");
+        const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+        const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
+        const expenseTotal = expensesData.reduce((sum, e) => sum + e.amount, 0);
+        const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + o.total, 0);
+        const totalIncome = contributionTotal + donationTotal + ticketRevenue;
+        setFinancialTotals({
+          contributions: contributionTotal,
+          donations: donationTotal,
+          expenses: expenseTotal,
+          ticketRevenue,
+          totalIncome,
+          balance: totalIncome - expenseTotal,
+        });
+        break;
+      }
+      case "releases": {
+        const [albums, videos, platforms] = await Promise.all([
+          getAllAlbums(),
+          getAllMusicVideos(),
+          getAllPlatforms(),
+        ]);
+        setAlbums(albums);
+        setMusicVideos(videos);
+        setStreamingPlatforms(platforms);
+        break;
+      }
+      case "promos":
+        setPromoCodes(await getAllPromoCodes());
+        break;
+      case "attendance":
+        setAttendanceSessions(await getRecentSessions(20));
+        break;
+      case "settings": {
+        const stats = await getBackupStats();
+        setBackupStats(stats);
+        try {
+          const unlockReqs = await getAllUnlockRequests();
+          setUnlockRequests(unlockReqs);
+        } catch { /* table may not exist yet */ }
+        break;
+      }
+    }
+  };
 
-    const confirmedOrders = allOrders.filter(o => o.status === "confirmed");
-
-    const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
-    const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
-    const expenseTotal = expensesData.reduce((sum, e) => sum + e.amount, 0);
-    const ticketRevenue = confirmedOrders.reduce((sum, o) => sum + o.total, 0);
-    const totalIncome = contributionTotal + donationTotal + ticketRevenue;
-
-    setFinancialTotals({
-      contributions: contributionTotal,
-      donations: donationTotal,
-      expenses: expenseTotal,
-      ticketRevenue,
-      totalIncome,
-      balance: totalIncome - expenseTotal,
-    });
-
-    const [stats, orderStatsData, attendanceStatsData] = await Promise.all([
-      getBackupStats(),
-      getOrderStats(),
-      getOverallAttendanceStats(),
-    ]);
-    setBackupStats(stats);
-    setOrderStats(orderStatsData);
-    setOverallAttendanceStats(attendanceStatsData);
-
-    // Load unlock requests
-    try {
-      const unlockReqs = await getAllUnlockRequests();
-      setUnlockRequests(unlockReqs);
-    } catch { /* table may not exist yet */ }
+  // Combined load for full refresh (used after mutations)
+  const loadData = async () => {
+    await loadCoreData();
+    await loadTabData(activeTab);
   };
 
   // Load settings on mount
@@ -428,13 +491,15 @@ export default function Admin() {
     });
   }, []);
 
-  // Load data on mount
+  // Load core data on mount, then tab-specific data
   useEffect(() => {
-    loadData();
+    loadCoreData();
+    loadTabData(activeTab);
   }, []);
 
+  // Load tab-specific data when switching tabs
   useEffect(() => {
-    loadData();
+    loadTabData(activeTab);
   }, [activeTab]);
 
   // Filtered data
@@ -1385,109 +1450,110 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Voice Part Distribution */}
-              {members.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="card-glass rounded-xl p-4">
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Voice Distribution</h3>
-                    <div className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={getMembersByVoice()}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={40}
-                            outerRadius={75}
-                            paddingAngle={3}
-                            dataKey="value"
-                            label={({ name, value, cx: cxPos, cy: cyPos, midAngle, outerRadius: oR }) => {
-                              const RADIAN = Math.PI / 180;
-                              const radius = (oR || 75) + 20;
-                              const x = cxPos + radius * Math.cos(-midAngle * RADIAN);
-                              const y = cyPos + radius * Math.sin(-midAngle * RADIAN);
-                              return (
-                                <text x={x} y={y} fill="#e0e0e0" fontSize={12} fontWeight={600} textAnchor={x > cxPos ? "start" : "end"} dominantBaseline="central">
-                                  {name}: {value}
-                                </text>
-                              );
-                            }}
-                            labelLine={{ stroke: "#888", strokeWidth: 1 }}
-                          >
-                            {getMembersByVoice().map((_, index) => (
-                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{ backgroundColor: "#1a1a2e", border: "1px solid #333", borderRadius: "8px", color: "#fff" }}
-                            itemStyle={{ color: "#d4af37" }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
+              {/* Two-column layout: Stats on left, Table on right */}
+              <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
+                {/* Left Column: Chart + Quick Stats */}
+                {members.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="card-glass rounded-xl p-4">
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-3">Voice Distribution</h3>
+                      <div className="h-48">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={getMembersByVoice()}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={35}
+                              outerRadius={65}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {getMembersByVoice().map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "#1a1a2e", border: "1px solid #333", borderRadius: "8px", color: "#fff" }}
+                              itemStyle={{ color: "#d4af37" }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Legend below chart */}
+                      <div className="flex flex-wrap justify-center gap-3 mt-2">
+                        {getMembersByVoice().map((voice, i) => (
+                          <div key={voice.name} className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                            <span className="text-xs text-muted-foreground">{voice.name}: <strong className="text-foreground">{voice.value}</strong></span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="card-glass rounded-xl p-4">
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-3">Quick Stats</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        {getMembersByVoice().map((voice, i) => (
+                          <div key={voice.name} className="p-3 rounded-lg bg-secondary/50">
+                            <p className="text-lg font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                              {voice.value}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{voice.name}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="card-glass rounded-xl p-4">
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-3">Quick Stats</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      {getMembersByVoice().map((voice, i) => (
-                        <div key={voice.name} className="p-3 rounded-lg bg-secondary/50">
-                          <p className="text-lg font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                            {voice.value}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{voice.name}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Bulk Actions Bar */}
-              {selectedMembers.length > 0 && canEditMembers(effectiveUser) && (
-                <div className="card-glass rounded-xl p-3 flex items-center justify-between gap-4 mb-4">
-                  <p className="text-sm font-medium">
-                    <span className="text-primary">{selectedMembers.length}</span> member(s) selected
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Active")}>
-                      <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                      Set Active
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Inactive")}>
-                      <XCircle className="w-4 h-4 mr-1 text-red-500" />
-                      Set Inactive
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Pending")}>
-                      <Clock className="w-4 h-4 mr-1 text-yellow-500" />
-                      Set Pending
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={handleBulkSendInvites}
-                      disabled={sendingInviteId === "bulk"}
-                    >
-                      {sendingInviteId === "bulk" ? (
-                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4 mr-1 text-primary" />
-                      )}
-                      Send Invites
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Delete
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setSelectedMembers([])}>
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-              )}
+                )}
 
-              <div className="card-glass rounded-2xl overflow-hidden">
-                {filteredMembers.length > 0 ? (
-                  <table className="w-full">
+                {/* Right Column: Bulk Actions + Member Table */}
+                <div className="space-y-4 min-w-0">
+                  {/* Bulk Actions Bar */}
+                  {selectedMembers.length > 0 && canEditMembers(effectiveUser) && (
+                    <div className="card-glass rounded-xl p-3 flex items-center justify-between gap-4">
+                      <p className="text-sm font-medium">
+                        <span className="text-primary">{selectedMembers.length}</span> member(s) selected
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Active")}>
+                          <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                          Set Active
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Inactive")}>
+                          <XCircle className="w-4 h-4 mr-1 text-red-500" />
+                          Set Inactive
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Pending")}>
+                          <Clock className="w-4 h-4 mr-1 text-yellow-500" />
+                          Set Pending
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={handleBulkSendInvites}
+                          disabled={sendingInviteId === "bulk"}
+                        >
+                          {sendingInviteId === "bulk" ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4 mr-1 text-primary" />
+                          )}
+                          Send Invites
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setSelectedMembers([])}>
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="card-glass rounded-2xl overflow-hidden">
+                    {filteredMembers.length > 0 ? (
+                      <table className="w-full">
                     <thead className="bg-secondary/50">
                       <tr>
                         {canEditMembers(effectiveUser) && (
@@ -1614,7 +1680,9 @@ export default function Admin() {
                       </Button>
                     )}
                   </div>
-                )}
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

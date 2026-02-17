@@ -107,12 +107,36 @@ import { exportMemberStatement } from "@/lib/exportUtils";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
+const NAVIGABLE_VIEWS = new Set<View>(["dashboard", "attendance", "contributions", "requests", "leave-form"]);
+
 export default function MemberPortal() {
   useDocumentTitle("Member Portal");
   const { toast } = useToast();
 
-  // State
-  const [view, setView] = useState<View>("pin");
+  // State — hash-based navigation for sub-pages
+  const [view, setViewState] = useState<View>("pin");
+
+  const setView = (newView: View) => {
+    setViewState(newView);
+    if (NAVIGABLE_VIEWS.has(newView)) {
+      const hash = newView === "dashboard" ? "" : newView;
+      window.history.pushState(null, "", hash ? `#${hash}` : window.location.pathname);
+    }
+  };
+
+  // Listen for browser back/forward (only when logged in)
+  useEffect(() => {
+    const onPopState = () => {
+      const hash = window.location.hash.replace("#", "") as View;
+      if (hash && NAVIGABLE_VIEWS.has(hash)) {
+        setViewState(hash);
+      } else if (view !== "pin") {
+        setViewState("dashboard");
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [view]);
   const [pin, setPin] = useState(["", "", "", ""]);
   const [isPinError, setIsPinError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
