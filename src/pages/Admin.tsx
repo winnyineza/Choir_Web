@@ -266,6 +266,9 @@ export default function Admin() {
     item => accessibleTabs.includes(item.id)
   );
 
+  // Loading state for tab content
+  const [tabLoading, setTabLoading] = useState(true);
+
   // Data states
   const [members, setMembers] = useState<Member[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -351,25 +354,31 @@ export default function Admin() {
 
   // Load core data (members, events, dashboard essentials)
   const loadCoreData = async () => {
-    const [
-      membersData,
-      eventsData,
-      dashboardData,
-      unreadCount,
-    ] = await Promise.all([
-      getAllMembers(),
-      getAllEvents(),
-      getDashboardStats(),
-      getUnreadContactCount(),
-    ]);
-    setMembers(membersData);
-    setEvents(eventsData);
-    setDashboardStats(dashboardData);
-    setUnreadMessages(unreadCount);
+    try {
+      const [
+        membersData,
+        eventsData,
+        dashboardData,
+        unreadCount,
+      ] = await Promise.all([
+        getAllMembers(),
+        getAllEvents(),
+        getDashboardStats(),
+        getUnreadContactCount(),
+      ]);
+      setMembers(membersData);
+      setEvents(eventsData);
+      setDashboardStats(dashboardData);
+      setUnreadMessages(unreadCount);
+    } catch (err) {
+      console.error("[Admin] Error loading core data:", err);
+    }
   };
 
   // Load tab-specific data on demand
   const loadTabData = async (tab: string) => {
+    setTabLoading(true);
+    try {
     switch (tab) {
       case "dashboard": {
         const [allOrders, contributions, donations, expensesData] = await Promise.all([
@@ -474,6 +483,11 @@ export default function Admin() {
         } catch { /* table may not exist yet */ }
         break;
       }
+    }
+    } catch (err) {
+      console.error(`[Admin] Error loading tab "${tab}":`, err);
+    } finally {
+      setTabLoading(false);
     }
   };
 
@@ -1059,7 +1073,14 @@ export default function Admin() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto relative">
+          {/* Tab loading indicator */}
+          {tabLoading && (
+            <div className="absolute top-0 left-0 right-0 z-10 h-1 bg-primary/20 overflow-hidden">
+              <div className="h-full bg-primary animate-[loading_1s_ease-in-out_infinite] w-1/3" 
+                style={{ animation: "loading 1s ease-in-out infinite" }} />
+            </div>
+          )}
           {/* Birthday Alert */}
           <BirthdayAlert 
             currentUserEmail={currentUser?.email} 
@@ -1450,110 +1471,69 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Two-column layout: Stats on left, Table on right */}
-              <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
-                {/* Left Column: Chart + Quick Stats */}
-                {members.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="card-glass rounded-xl p-4">
-                      <h3 className="font-semibold text-sm text-muted-foreground mb-3">Voice Distribution</h3>
-                      <div className="h-48">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={getMembersByVoice()}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={35}
-                              outerRadius={65}
-                              paddingAngle={3}
-                              dataKey="value"
-                            >
-                              {getMembersByVoice().map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{ backgroundColor: "#1a1a2e", border: "1px solid #333", borderRadius: "8px", color: "#fff" }}
-                              itemStyle={{ color: "#d4af37" }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {/* Legend below chart */}
-                      <div className="flex flex-wrap justify-center gap-3 mt-2">
-                        {getMembersByVoice().map((voice, i) => (
-                          <div key={voice.name} className="flex items-center gap-1.5">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                            <span className="text-xs text-muted-foreground">{voice.name}: <strong className="text-foreground">{voice.value}</strong></span>
-                          </div>
-                        ))}
-                      </div>
+              {/* Voice Distribution - compact inline badges */}
+              {members.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {getMembersByVoice().map((voice, i) => (
+                    <div
+                      key={voice.name}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 border border-primary/10"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      <span className="text-sm text-muted-foreground">{voice.name}</span>
+                      <span className="text-sm font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>{voice.value}</span>
                     </div>
-                    <div className="card-glass rounded-xl p-4">
-                      <h3 className="font-semibold text-sm text-muted-foreground mb-3">Quick Stats</h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        {getMembersByVoice().map((voice, i) => (
-                          <div key={voice.name} className="p-3 rounded-lg bg-secondary/50">
-                            <p className="text-lg font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                              {voice.value}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{voice.name}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Bulk Actions Bar */}
+              {selectedMembers.length > 0 && canEditMembers(effectiveUser) && (
+                <div className="card-glass rounded-xl p-3 flex items-center justify-between gap-4">
+                  <p className="text-sm font-medium">
+                    <span className="text-primary">{selectedMembers.length}</span> member(s) selected
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Active")}>
+                      <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                      Set Active
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Inactive")}>
+                      <XCircle className="w-4 h-4 mr-1 text-red-500" />
+                      Set Inactive
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Pending")}>
+                      <Clock className="w-4 h-4 mr-1 text-yellow-500" />
+                      Set Pending
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleBulkSendInvites}
+                      disabled={sendingInviteId === "bulk"}
+                    >
+                      {sendingInviteId === "bulk" ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-1 text-primary" />
+                      )}
+                      Send Invites
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedMembers([])}>
+                      Clear
+                    </Button>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Right Column: Bulk Actions + Member Table */}
-                <div className="space-y-4 min-w-0">
-                  {/* Bulk Actions Bar */}
-                  {selectedMembers.length > 0 && canEditMembers(effectiveUser) && (
-                    <div className="card-glass rounded-xl p-3 flex items-center justify-between gap-4">
-                      <p className="text-sm font-medium">
-                        <span className="text-primary">{selectedMembers.length}</span> member(s) selected
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Active")}>
-                          <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
-                          Set Active
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Inactive")}>
-                          <XCircle className="w-4 h-4 mr-1 text-red-500" />
-                          Set Inactive
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleBulkStatusUpdate("Pending")}>
-                          <Clock className="w-4 h-4 mr-1 text-yellow-500" />
-                          Set Pending
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={handleBulkSendInvites}
-                          disabled={sendingInviteId === "bulk"}
-                        >
-                          {sendingInviteId === "bulk" ? (
-                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4 mr-1 text-primary" />
-                          )}
-                          Send Invites
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Delete
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setSelectedMembers([])}>
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="card-glass rounded-2xl overflow-hidden">
-                    {filteredMembers.length > 0 ? (
-                      <table className="w-full">
+              {/* Full-width Member Table */}
+              <div className="card-glass rounded-2xl overflow-hidden">
+                {filteredMembers.length > 0 ? (
+                  <table className="w-full">
                     <thead className="bg-secondary/50">
                       <tr>
                         {canEditMembers(effectiveUser) && (
@@ -1680,9 +1660,7 @@ export default function Admin() {
                       </Button>
                     )}
                   </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}

@@ -235,7 +235,7 @@ export function AuditLogPage() {
   const loadData = async () => {
     setIsLoading(true);
     const [logsData, adminsData] = await Promise.all([
-      getAuditLog(10000),
+      getAuditLog(500),
       getAllAdminUsers(),
     ]);
     setAllLogs(logsData);

@@ -18,26 +18,80 @@ function getConfig(storageKey: string) {
   return config;
 }
 
+// ============ IN-MEMORY CACHE ============
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  promise?: Promise<T>;
+}
+
+const dataCache = new Map<string, CacheEntry<any>>();
+const CACHE_TTL = 30_000; // 30 seconds
+const pendingRequests = new Map<string, Promise<any>>();
+
+function getCached<T>(key: string): T | null {
+  const entry = dataCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    dataCache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setCache<T>(key: string, data: T): void {
+  dataCache.set(key, { data, timestamp: Date.now() });
+}
+
+/** Invalidate cache for a specific table (called after mutations) */
+export function invalidateCache(storageKey?: string): void {
+  if (storageKey) {
+    dataCache.delete(storageKey);
+    pendingRequests.delete(storageKey);
+  } else {
+    dataCache.clear();
+    pendingRequests.clear();
+  }
+}
+
 // ============ GENERIC CRUD ============
 
-/** Get all rows from a table */
+/** Get all rows from a table (with in-memory caching + request deduplication) */
 export async function dbGetAll<T>(storageKey: string): Promise<T[]> {
-  try {
-    const config = getConfig(storageKey);
-    let query = supabase.from(config.table).select('*');
-    if (config.orderBy) {
-      query = query.order(config.orderBy, { ascending: config.orderAsc ?? true });
-    }
-    const { data, error } = await query;
-    if (error) {
-      console.error(`[DB] Error fetching ${config.table}:`, error.message);
+  // Check cache first
+  const cached = getCached<T[]>(storageKey);
+  if (cached) return cached;
+
+  // Deduplicate concurrent requests for the same key
+  const pending = pendingRequests.get(storageKey);
+  if (pending) return pending;
+
+  const request = (async () => {
+    try {
+      const config = getConfig(storageKey);
+      let query = supabase.from(config.table).select('*');
+      if (config.orderBy) {
+        query = query.order(config.orderBy, { ascending: config.orderAsc ?? true });
+      }
+      const { data, error } = await query;
+      if (error) {
+        console.error(`[DB] Error fetching ${config.table}:`, error.message);
+        return [];
+      }
+      const result = (data || []).map(row => config.fromDb(row) as T);
+      setCache(storageKey, result);
+      return result;
+    } catch (e: any) {
+      console.error(`[DB] ${storageKey} getAll error:`, e.message);
       return [];
+    } finally {
+      pendingRequests.delete(storageKey);
     }
-    return (data || []).map(row => config.fromDb(row) as T);
-  } catch (e: any) {
-    console.error(`[DB] ${storageKey} getAll error:`, e.message);
-    return [];
-  }
+  })();
+
+  pendingRequests.set(storageKey, request);
+  return request;
 }
 
 /** Get a single row by ID */
@@ -84,6 +138,7 @@ export async function dbInsert<T>(storageKey: string, item: any): Promise<T> {
     .select()
     .single();
   if (error) throw error;
+  invalidateCache(storageKey);
   return config.fromDb(data) as T;
 }
 
@@ -100,6 +155,7 @@ export async function dbUpdate<T>(storageKey: string, id: string, updates: any):
     .select()
     .single();
   if (error) throw error;
+  invalidateCache(storageKey);
   return config.fromDb(data) as T;
 }
 
@@ -115,6 +171,7 @@ export async function dbUpsert<T>(storageKey: string, item: any): Promise<T> {
     .select()
     .single();
   if (error) throw error;
+  invalidateCache(storageKey);
   return config.fromDb(data) as T;
 }
 
@@ -126,6 +183,7 @@ export async function dbDelete(storageKey: string, id: string): Promise<void> {
     .delete()
     .eq('id', id);
   if (error) throw error;
+  invalidateCache(storageKey);
 }
 
 /** Delete rows matching a condition */
@@ -136,6 +194,7 @@ export async function dbDeleteWhere(storageKey: string, column: string, value: a
     .delete()
     .eq(column, value);
   if (error) throw error;
+  invalidateCache(storageKey);
 }
 
 /** Count rows in a table */
@@ -188,6 +247,7 @@ export async function dbSaveSettings(settings: Record<string, any>): Promise<voi
       .from('choir_settings')
       .upsert({ key, value: val }, { onConflict: 'key' });
   }
+  invalidateCache('settings');
 }
 
 // ============ RAW SUPABASE ACCESS ============

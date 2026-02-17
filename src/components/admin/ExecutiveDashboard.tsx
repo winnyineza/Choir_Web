@@ -100,24 +100,26 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
   }, []);
 
   const loadDashboardData = async () => {
-    // Load all data
-    const [members, events, expenses, leaveRequests, birthdays, unreadMessages] = await Promise.all([
+    // Load all data in a single parallel batch
+    const [
+      members, events, expenses, leaveRequests, birthdays, unreadMessages,
+      orders, donations, attendanceStats, sessions,
+      contributions, contributionStats, analyticsStats,
+    ] = await Promise.all([
       getAllMembers(),
       getUpcomingEvents(),
       getAllExpenses(),
       getAllLeaveRequests(),
       getUpcomingBirthdays(7),
       getUnreadContactCount(),
-    ]);
-    const [orders, donations, attendanceStats, sessions] = await Promise.all([
       getAllOrders(),
       getAllDonations(),
       getOverallAttendanceStats(),
       getRecentSessions(10),
+      getAllContributions(),
+      getContributionStats(),
+      getPageViewStats(),
     ]);
-    const contributions = await getAllContributions();
-    const contributionStats = await getContributionStats();
-    const analyticsStats = await getPageViewStats();
 
     // Set page stats
     setPageStats(analyticsStats);
