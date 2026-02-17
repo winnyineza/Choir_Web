@@ -460,7 +460,7 @@ export default function Admin() {
   const [attendanceTimePeriod, setAttendanceTimePeriod] = useState<"10" | "30" | "year" | "all">("10");
 
   // Chart colors
-  const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+  const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#f59e0b", "#14b8a6"];
 
   // Time period filter helper
   const getTimeCutoff = (period: string): number => {
@@ -1390,24 +1390,38 @@ export default function Admin() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="card-glass rounded-xl p-4">
                     <h3 className="font-semibold text-sm text-muted-foreground mb-3">Voice Distribution</h3>
-                    <div className="h-40">
+                    <div className="h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
                             data={getMembersByVoice()}
                             cx="50%"
                             cy="50%"
-                            innerRadius={30}
-                            outerRadius={60}
-                            paddingAngle={2}
+                            innerRadius={40}
+                            outerRadius={75}
+                            paddingAngle={3}
                             dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
+                            label={({ name, value, cx: cxPos, cy: cyPos, midAngle, outerRadius: oR }) => {
+                              const RADIAN = Math.PI / 180;
+                              const radius = (oR || 75) + 20;
+                              const x = cxPos + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cyPos + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#e0e0e0" fontSize={12} fontWeight={600} textAnchor={x > cxPos ? "start" : "end"} dominantBaseline="central">
+                                  {name}: {value}
+                                </text>
+                              );
+                            }}
+                            labelLine={{ stroke: "#888", strokeWidth: 1 }}
                           >
                             {getMembersByVoice().map((_, index) => (
                               <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#1a1a2e", border: "1px solid #333", borderRadius: "8px", color: "#fff" }}
+                            itemStyle={{ color: "#d4af37" }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
