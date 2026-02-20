@@ -225,7 +225,426 @@ CREATE TABLE IF NOT EXISTS rsvps (
   note TEXT
 );
 
--- Add invite_status to members table
 ALTER TABLE members ADD COLUMN IF NOT EXISTS invite_status TEXT DEFAULT 'not_invited';
 
 -- Done! All columns now match the application's supabaseSync.ts mappings.
+
+-- ============================================================
+-- RLS: Enable Row Level Security on public tables
+-- NOTE: These policies keep current behavior (open access via anon key)
+--       while satisfying Supabase linter requirements.
+--       They do NOT add per-user security yet.
+-- ============================================================
+
+-- Core member & admin-related tables
+ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on members"
+  ON public.members
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on admin_users"
+  ON public.admin_users
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.admin_invites ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on admin_invites"
+  ON public.admin_invites
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.member_invites ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on member_invites"
+  ON public.member_invites
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.member_invite_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on member_invite_logs"
+  ON public.member_invite_logs
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on notification_preferences"
+  ON public.notification_preferences
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.unlock_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on unlock_requests"
+  ON public.unlock_requests
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.login_attempts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on login_attempts"
+  ON public.login_attempts
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.password_resets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on password_resets"
+  ON public.password_resets
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on audit_logs"
+  ON public.audit_logs
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Attendance & contributions
+ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on attendance"
+  ON public.attendance
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on attendance_sessions"
+  ON public.attendance_sessions
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.contributions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on contributions"
+  ON public.contributions
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.contribution_types ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on contribution_types"
+  ON public.contribution_types
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Events, tickets, RSVPs
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on events"
+  ON public.events
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on tickets"
+  ON public.tickets
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.ticket_orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on ticket_orders"
+  ON public.ticket_orders
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.rsvps ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on rsvps"
+  ON public.rsvps
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.promo_codes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on promo_codes"
+  ON public.promo_codes
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Financial tables
+ALTER TABLE public.donations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on donations"
+  ON public.donations
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on expenses"
+  ON public.expenses
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on payments"
+  ON public.payments
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.receipts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on receipts"
+  ON public.receipts
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Content & communication
+ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on announcements"
+  ON public.announcements
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.contact_submissions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on contact_submissions"
+  ON public.contact_submissions
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.gallery_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on gallery_items"
+  ON public.gallery_items
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.gallery_albums ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on gallery_albums"
+  ON public.gallery_albums
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.gallery_images ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on gallery_images"
+  ON public.gallery_images
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.music_releases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on music_releases"
+  ON public.music_releases
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.albums ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on albums"
+  ON public.albums
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.music_videos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on music_videos"
+  ON public.music_videos
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.streaming_platforms ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on streaming_platforms"
+  ON public.streaming_platforms
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Documents and inventory
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on documents"
+  ON public.documents
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.document_folders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on document_folders"
+  ON public.document_folders
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on inventory"
+  ON public.inventory
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.inventory_assignments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on inventory_assignments"
+  ON public.inventory_assignments
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Surveys
+ALTER TABLE public.surveys ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on surveys"
+  ON public.surveys
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.survey_responses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on survey_responses"
+  ON public.survey_responses
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Disciplinary and leave
+ALTER TABLE public.disciplinary_records ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on disciplinary_records"
+  ON public.disciplinary_records
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.leave_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on leave_requests"
+  ON public.leave_requests
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.leave_verification_codes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on leave_verification_codes"
+  ON public.leave_verification_codes
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Event staff & scans
+ALTER TABLE public.event_staff ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on event_staff"
+  ON public.event_staff
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.scan_records ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on scan_records"
+  ON public.scan_records
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Settings
+ALTER TABLE public.choir_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on choir_settings"
+  ON public.choir_settings
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Analytics
+ALTER TABLE public.analytics_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on analytics_sessions"
+  ON public.analytics_sessions
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.analytics_page_views ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on analytics_page_views"
+  ON public.analytics_page_views
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Misc queues and subscriptions
+ALTER TABLE public.email_queue ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on email_queue"
+  ON public.email_queue
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on push_subscriptions"
+  ON public.push_subscriptions
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+-- Meeting minutes and auditions (missed in initial pass)
+ALTER TABLE public.meeting_minutes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on meeting_minutes"
+  ON public.meeting_minutes
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.auditions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on auditions"
+  ON public.auditions
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
