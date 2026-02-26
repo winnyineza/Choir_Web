@@ -178,7 +178,7 @@ export interface Database {
           email: string;
           name: string;
           password_hash: string;
-          role: 'super_admin' | 'main_admin' | 'finance' | 'secretary' | 'disciplinary' | 'reviewer';
+          role: 'super_admin' | 'main_admin' | 'finance' | 'secretary' | 'disciplinary' | 'reviewer' | 'social_affairs' | 'coach';
           member_id: string | null;
           is_active: boolean;
           last_login: string | null;
@@ -191,7 +191,7 @@ export interface Database {
           email: string;
           name: string;
           password_hash: string;
-          role?: 'super_admin' | 'main_admin' | 'finance' | 'secretary' | 'disciplinary' | 'reviewer';
+          role?: 'super_admin' | 'main_admin' | 'finance' | 'secretary' | 'disciplinary' | 'reviewer' | 'social_affairs' | 'coach';
           member_id?: string | null;
           is_active?: boolean;
           last_login?: string | null;
@@ -203,7 +203,7 @@ export interface Database {
           email?: string;
           name?: string;
           password_hash?: string;
-          role?: 'super_admin' | 'main_admin' | 'finance' | 'secretary' | 'disciplinary' | 'reviewer';
+          role?: 'super_admin' | 'main_admin' | 'finance' | 'secretary' | 'disciplinary' | 'reviewer' | 'social_affairs' | 'coach';
           member_id?: string | null;
           is_active?: boolean;
           last_login?: string | null;

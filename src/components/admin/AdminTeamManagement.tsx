@@ -364,6 +364,12 @@ export function AdminTeamManagement() {
             <span className="px-2 py-1 rounded-full text-xs bg-cyan-500/20 text-cyan-400">
               {admins.filter(a => a.role === "reviewer" && a.isActive).length} Reviewer
             </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-pink-500/20 text-pink-400">
+              {admins.filter(a => a.role === "social_affairs" && a.isActive).length} Social Affairs
+            </span>
+            <span className="px-2 py-1 rounded-full text-xs bg-indigo-500/20 text-indigo-400">
+              {admins.filter(a => a.role === "coach" && a.isActive).length} Coach
+            </span>
           </div>
         </div>
       </div>
@@ -395,7 +401,9 @@ export function AdminTeamManagement() {
                     admin.role === "main_admin" ? "bg-blue-500/20" :
                     admin.role === "finance" ? "bg-green-500/20" :
                     admin.role === "secretary" ? "bg-purple-500/20" :
-                    admin.role === "disciplinary" ? "bg-orange-500/20" : "bg-secondary"
+                    admin.role === "disciplinary" ? "bg-orange-500/20" :
+                    admin.role === "social_affairs" ? "bg-pink-500/20" :
+                    admin.role === "coach" ? "bg-indigo-500/20" : "bg-secondary"
                   }`}>
                     {admin.role === "super_admin" ? (
                       <Crown className="w-5 h-5 text-primary" />
@@ -407,6 +415,10 @@ export function AdminTeamManagement() {
                       <FileText className="w-5 h-5 text-purple-500" />
                     ) : admin.role === "disciplinary" ? (
                       <Gavel className="w-5 h-5 text-orange-500" />
+                    ) : admin.role === "social_affairs" ? (
+                      <Users className="w-5 h-5 text-pink-500" />
+                    ) : admin.role === "coach" ? (
+                      <UserCheck className="w-5 h-5 text-indigo-500" />
                     ) : (
                       <Shield className="w-5 h-5 text-muted-foreground" />
                     )}
@@ -672,6 +684,18 @@ export function AdminTeamManagement() {
                     <div className="flex flex-col">
                       <span className="font-medium">Reviewer</span>
                       <span className="text-xs text-muted-foreground">View-only access, can only approve leave requests</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="social_affairs">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Social Affairs</span>
+                      <span className="text-xs text-muted-foreground">View-only access to members and attendance</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="coach">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Coach</span>
+                      <span className="text-xs text-muted-foreground">View-only access to members and attendance</span>
                     </div>
                   </SelectItem>
                 </SelectContent>

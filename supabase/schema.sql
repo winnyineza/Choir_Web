@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role VARCHAR(50) DEFAULT 'reviewer' CHECK (role IN ('super_admin', 'main_admin', 'finance', 'secretary', 'disciplinary', 'reviewer')),
+  role VARCHAR(50) DEFAULT 'reviewer' CHECK (role IN ('super_admin', 'main_admin', 'finance', 'secretary', 'disciplinary', 'reviewer', 'social_affairs', 'coach')),
   member_id TEXT,
   is_active BOOLEAN DEFAULT true,
   last_login TIMESTAMPTZ,

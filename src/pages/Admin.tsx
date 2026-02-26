@@ -259,6 +259,8 @@ export default function Admin() {
     ...currentUser,
     role: previewRole as any,
   } : currentUser;
+  const canManageMembers = canEditMembers(effectiveUser) && hasWriteAccess(effectiveUser, "members");
+  const canManageAttendance = hasWriteAccess(effectiveUser, "attendance");
 
   // Filter sidebar items based on role permissions (use effectiveUser for preview)
   const accessibleTabs = getAccessibleTabs(effectiveUser);
@@ -1127,6 +1129,8 @@ export default function Admin() {
                         <option value="secretary">Secretary</option>
                         <option value="disciplinary">Disciplinary</option>
                         <option value="reviewer">Reviewer</option>
+                        <option value="social_affairs">Social Affairs</option>
+                        <option value="coach">Coach</option>
                       </select>
                       {previewRole && (
                         <Button
@@ -1442,7 +1446,7 @@ export default function Admin() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="font-display text-lg font-semibold">All Members ({members.length})</h2>
-                  {!canEditMembers(effectiveUser) && (
+                  {!canManageMembers && (
                     <p className="text-xs text-muted-foreground mt-1">View only mode</p>
                   )}
                 </div>
@@ -1456,7 +1460,7 @@ export default function Admin() {
                       className="pl-10 bg-secondary border-primary/20"
                     />
                   </div>
-                  {canEditMembers(effectiveUser) && (
+                  {canManageMembers && (
                     <div className="flex gap-2">
                       <Button variant="gold" onClick={() => { setEditingMember(null); setShowAddMember(true); }}>
                         <Plus className="w-4 h-4 mr-2" />
@@ -1488,7 +1492,7 @@ export default function Admin() {
               )}
 
               {/* Bulk Actions Bar */}
-              {selectedMembers.length > 0 && canEditMembers(effectiveUser) && (
+              {selectedMembers.length > 0 && canManageMembers && (
                 <div className="card-glass rounded-xl p-3 flex items-center justify-between gap-4">
                   <p className="text-sm font-medium">
                     <span className="text-primary">{selectedMembers.length}</span> member(s) selected
@@ -1536,7 +1540,7 @@ export default function Admin() {
                   <table className="w-full">
                     <thead className="bg-secondary/50">
                       <tr>
-                        {canEditMembers(effectiveUser) && (
+                        {canManageMembers && (
                           <th className="w-12 p-4">
                             <input
                               type="checkbox"
@@ -1560,7 +1564,7 @@ export default function Admin() {
                           "border-t border-primary/10",
                           selectedMembers.includes(member.id) && "bg-primary/5"
                         )}>
-                          {canEditMembers(effectiveUser) && (
+                          {canManageMembers && (
                             <td className="w-12 p-4">
                               <input
                                 type="checkbox"
@@ -1615,27 +1619,31 @@ export default function Admin() {
                             >
                               <Eye className="w-4 h-4 text-muted-foreground" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              title="Send Portal Invite"
-                              onClick={() => handleSendInvite(member)}
-                              disabled={sendingInviteId === member.id || !member.email}
-                            >
-                              {sendingInviteId === member.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Send className="w-4 h-4 text-primary" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => { setEditingMember(member); setShowAddMember(true); }}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            {canEditMembers(effectiveUser) && (
+                            {canManageMembers && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Send Portal Invite"
+                                onClick={() => handleSendInvite(member)}
+                                disabled={sendingInviteId === member.id || !member.email}
+                              >
+                                {sendingInviteId === member.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Send className="w-4 h-4 text-primary" />
+                                )}
+                              </Button>
+                            )}
+                            {canManageMembers && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setEditingMember(member); setShowAddMember(true); }}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canManageMembers && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1653,7 +1661,7 @@ export default function Admin() {
                   <div className="p-8 text-center text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                     <p>{memberSearch ? "No members match your search." : "No members yet. Add your first member!"}</p>
-                    {!memberSearch && (
+                    {!memberSearch && canManageMembers && (
                       <Button variant="gold" className="mt-4" onClick={() => setShowAddMember(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Member
@@ -2272,7 +2280,7 @@ export default function Admin() {
                   <div>
                     <h2 className="font-display text-lg font-semibold">Take Attendance</h2>
                     <p className="text-sm text-muted-foreground">
-                      Mark attendance for choir members
+                      {canManageAttendance ? "Mark attendance for choir members" : "View only mode"}
                     </p>
                   </div>
                   
@@ -2298,14 +2306,16 @@ export default function Admin() {
                         return null;
                       })()}
                     </div>
-                    <Input
-                      type="text"
-                      placeholder="Session title"
-                      value={sessionTitle}
-                      onChange={(e) => setSessionTitle(e.target.value)}
-                      className="w-48 bg-secondary border-primary/20"
-                    />
-                    {!isTakingAttendance ? (
+                    {canManageAttendance && (
+                      <Input
+                        type="text"
+                        placeholder="Session title"
+                        value={sessionTitle}
+                        onChange={(e) => setSessionTitle(e.target.value)}
+                        className="w-48 bg-secondary border-primary/20"
+                      />
+                    )}
+                    {canManageAttendance && !isTakingAttendance ? (
                       <Button
                         variant="gold"
                         onClick={async () => {
@@ -2357,7 +2367,7 @@ export default function Admin() {
                         <UserCheck className="w-4 h-4 mr-2" />
                         {attendanceSessions.some(s => s.date === attendanceDate) ? 'Edit Attendance' : 'Start Attendance'}
                       </Button>
-                    ) : (
+                    ) : canManageAttendance ? (
                       <div className="flex gap-2">
                         <Button
                           variant="gold"
@@ -2404,12 +2414,12 @@ export default function Admin() {
                           Cancel
                         </Button>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
                 {/* Attendance Form */}
-                {isTakingAttendance && (
+                {canManageAttendance && isTakingAttendance && (
                   <div className="space-y-4">
                     {/* Quick Actions */}
                     <div className="flex flex-wrap gap-2 pb-4 border-b border-primary/10">
@@ -2559,39 +2569,43 @@ export default function Admin() {
                             <span className="text-yellow-400">{session.totalExcused}</span>
                           </td>
                           <td className="p-4 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={async () => {
-                                setAttendanceDate(session.date);
-                                setSessionTitle(session.title);
-                                const existing = await getAttendanceByDate(session.date);
-                                const existingMap: { [key: string]: AttendanceStatus } = {};
-                                existing.forEach(r => { existingMap[r.memberId] = r.status; });
-                                const onLeave = await getMembersToExcuse(session.date);
-                                setMembersOnLeave(onLeave);
-                                onLeave.forEach(l => {
-                                  if (!existingMap[l.memberId]) existingMap[l.memberId] = 'excused';
-                                });
-                                setAttendanceRecords(existingMap);
-                                setIsTakingAttendance(true);
-                              }}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={async () => {
-                                if (confirm(`Delete attendance for ${new Date(session.date).toLocaleDateString()}?`)) {
-                                  await deleteAttendanceForDate(session.date);
-                                  loadData();
-                                  toast({ title: "Attendance Deleted" });
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
+                            {canManageAttendance && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={async () => {
+                                  setAttendanceDate(session.date);
+                                  setSessionTitle(session.title);
+                                  const existing = await getAttendanceByDate(session.date);
+                                  const existingMap: { [key: string]: AttendanceStatus } = {};
+                                  existing.forEach(r => { existingMap[r.memberId] = r.status; });
+                                  const onLeave = await getMembersToExcuse(session.date);
+                                  setMembersOnLeave(onLeave);
+                                  onLeave.forEach(l => {
+                                    if (!existingMap[l.memberId]) existingMap[l.memberId] = 'excused';
+                                  });
+                                  setAttendanceRecords(existingMap);
+                                  setIsTakingAttendance(true);
+                                }}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canManageAttendance && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={async () => {
+                                  if (confirm(`Delete attendance for ${new Date(session.date).toLocaleDateString()}?`)) {
+                                    await deleteAttendanceForDate(session.date);
+                                    loadData();
+                                    toast({ title: "Attendance Deleted" });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))}

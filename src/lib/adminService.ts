@@ -11,7 +11,15 @@ const ADMIN_INVITES_KEY = "choir_admin_invites";
 const AUDIT_LOG_KEY = "choir_audit_log";
 const PASSWORD_RESET_KEY = "choir_password_resets";
 
-export type AdminRole = "super_admin" | "main_admin" | "finance" | "secretary" | "disciplinary" | "reviewer";
+export type AdminRole =
+  | "super_admin"
+  | "main_admin"
+  | "finance"
+  | "secretary"
+  | "disciplinary"
+  | "reviewer"
+  | "social_affairs"
+  | "coach";
 
 export interface AdminUser {
   id: string;
@@ -501,6 +509,8 @@ export function getRoleLabel(role: AdminRole): string {
     case "secretary": return "Secretary";
     case "disciplinary": return "Disciplinary Officer";
     case "reviewer": return "Reviewer";
+    case "social_affairs": return "Social Affairs";
+    case "coach": return "Coach";
     default: return role;
   }
 }
@@ -561,6 +571,12 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "contributions", "expenses", "treasury", "announcements", "messages",
     "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "settings"
   ],
+  social_affairs: [
+    "dashboard", "members", "attendance", "settings"
+  ],
+  coach: [
+    "dashboard", "members", "attendance", "settings"
+  ],
 };
 
 export function hasPermission(user: AdminUser | null, permission: Permission): boolean {
@@ -592,6 +608,10 @@ export function hasWriteAccess(user: AdminUser | null, area: string): boolean {
 
   if (user.role === "reviewer") {
     return area === "leave";
+  }
+
+  if (user.role === "social_affairs" || user.role === "coach") {
+    return !["members", "attendance"].includes(area);
   }
 
   return true;
