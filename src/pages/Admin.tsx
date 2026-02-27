@@ -3041,7 +3041,9 @@ export default function Admin() {
             <div className="space-y-6">
               <h2 className="font-display text-lg font-semibold">Settings</h2>
 
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-primary" />
                   Google Meet Integration
@@ -3090,7 +3092,7 @@ export default function Admin() {
               </div>
 
               {/* My Account Section */}
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                   <UserCheck className="w-5 h-5 text-primary" />
                   My Account
@@ -3244,8 +3246,8 @@ export default function Admin() {
 
               {/* System settings - only for super_admin and main_admin */}
               {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
-              <div className="space-y-6">
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <>
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4">Choir Information</h3>
                 <div className="space-y-4">
                   <div>
@@ -3289,7 +3291,7 @@ export default function Admin() {
               </div>
 
               {/* Member Portal Settings */}
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                   <Shield className="w-5 h-5 text-primary" />
                   Member Portal
@@ -3325,7 +3327,7 @@ export default function Admin() {
               </div>
 
               {/* Ticket Scanner Settings */}
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
                   <QrCode className="w-5 h-5 text-primary" />
                   Ticket Scanner
@@ -3363,7 +3365,7 @@ export default function Admin() {
               </div>
 
               {/* Contribution Lock Settings */}
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                   <Lock className="w-5 h-5 text-primary" />
                   Contribution Month Locking
@@ -3408,7 +3410,7 @@ export default function Admin() {
 
               {/* Unlock Requests Management */}
               {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                   <Lock className="w-5 h-5 text-yellow-500" />
                   Unlock Requests
@@ -3497,7 +3499,7 @@ export default function Admin() {
               )}
 
               {/* Data Export Section */}
-              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+              <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                   <Download className="w-5 h-5 text-primary" />
                   Export Data
@@ -3535,11 +3537,13 @@ export default function Admin() {
               </div>
 
               {/* Backup & Restore Section */}
-              <div className="max-w-2xl">
+              <div className="w-full">
                 <BackupRestore />
               </div>
-              </div>
+              </>
               )}
+
+              </div>
 
             </div>
           )}
