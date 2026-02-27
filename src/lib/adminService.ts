@@ -575,7 +575,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "dashboard", "members", "attendance", "settings"
   ],
   coach: [
-    "dashboard", "members", "attendance", "settings"
+    "dashboard", "members", "attendance", "voice_balance", "settings"
   ],
 };
 
