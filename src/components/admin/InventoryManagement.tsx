@@ -71,6 +71,29 @@ const categoryIcons: Record<ItemCategory, any> = {
   other: Package,
 };
 
+const defaultStats: InventoryStats = {
+  totalItems: 0,
+  totalQuantity: 0,
+  totalValue: 0,
+  byCategory: {
+    robes: 0,
+    instruments: 0,
+    electronics: 0,
+    furniture: 0,
+    music_stands: 0,
+    other: 0,
+  },
+  byCondition: {
+    excellent: 0,
+    good: 0,
+    fair: 0,
+    needs_repair: 0,
+    unusable: 0,
+  },
+  assignedCount: 0,
+  needsRepairCount: 0,
+};
+
 export function InventoryManagement() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -104,21 +127,32 @@ export function InventoryManagement() {
   const [assignQuantity, setAssignQuantity] = useState(1);
   const [assignNotes, setAssignNotes] = useState("");
 
+  const safeStats = stats ?? defaultStats;
+
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [itemsData, membersData, statsData, assignmentsData] = await Promise.all([
-      getAllInventoryItems(),
-      getAllMembers(),
-      getInventoryStats(),
-      getAllAssignments(),
-    ]);
-    setItems(itemsData);
-    setMembers(membersData.filter(m => m.status === "Active"));
-    setStats(statsData);
-    setAssignments(assignmentsData.filter(a => !a.returnedAt));
+    try {
+      const [itemsData, membersData, statsData, assignmentsData] = await Promise.all([
+        getAllInventoryItems(),
+        getAllMembers(),
+        getInventoryStats(),
+        getAllAssignments(),
+      ]);
+      setItems(itemsData);
+      setMembers(membersData.filter(m => m.status === "Active"));
+      setStats(statsData ?? defaultStats);
+      setAssignments(assignmentsData.filter(a => !a.returnedAt));
+    } catch {
+      setStats(defaultStats);
+      toast({
+        title: "Error",
+        description: "Failed to load inventory data",
+        variant: "destructive",
+      });
+    }
   };
 
   // Filter items
@@ -300,42 +334,42 @@ export function InventoryManagement() {
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Package className="w-4 h-4 text-primary" />
-            <span className="text-xl font-bold">{stats.totalItems}</span>
+            <span className="text-xl font-bold">{safeStats.totalItems}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Item Types</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Box className="w-4 h-4 text-blue-400" />
-            <span className="text-xl font-bold">{stats?.totalQuantity ?? 0}</span>
+            <span className="text-xl font-bold">{safeStats.totalQuantity}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Total Items</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Users className="w-4 h-4 text-purple-400" />
-            <span className="text-xl font-bold">{stats.assignedCount}</span>
+            <span className="text-xl font-bold">{safeStats.assignedCount}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Assigned</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <CheckCircle className="w-4 h-4 text-green-400" />
-            <span className="text-xl font-bold">{stats.totalQuantity - stats.assignedCount}</span>
+            <span className="text-xl font-bold">{safeStats.totalQuantity - safeStats.assignedCount}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Available</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <AlertTriangle className="w-4 h-4 text-orange-400" />
-            <span className="text-xl font-bold text-orange-400">{stats?.needsRepairCount ?? 0}</span>
+            <span className="text-xl font-bold text-orange-400">{safeStats.needsRepairCount}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Needs Repair</p>
         </div>
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Value</span>
-            <span className="text-lg font-bold">{stats.totalValue.toLocaleString()}</span>
+            <span className="text-lg font-bold">{safeStats.totalValue.toLocaleString()}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">RWF</p>
         </div>
