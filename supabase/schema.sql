@@ -391,7 +391,7 @@ CREATE TABLE IF NOT EXISTS meeting_minutes (
   id TEXT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   date DATE NOT NULL,
-  type VARCHAR(50) DEFAULT 'regular',
+  type VARCHAR(50) DEFAULT 'general',
   start_time VARCHAR(20),
   end_time VARCHAR(20),
   location VARCHAR(255),

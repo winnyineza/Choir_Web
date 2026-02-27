@@ -2,7 +2,7 @@
 
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 
-export type MeetingType = "general" | "committee" | "rehearsal" | "emergency" | "agm";
+export type MeetingType = "general" | "committee";
 
 export interface MeetingAgendaItem {
   id: string;
@@ -52,11 +52,15 @@ export interface MeetingStats {
 
 const MEETINGS_KEY = "choir_meeting_minutes";
 
+function normalizeMeetingType(type: string | undefined): MeetingType {
+  return type === "committee" ? "committee" : "general";
+}
+
 // ============ CRUD OPERATIONS ============
 
 export async function getAllMeetings(): Promise<MeetingMinutes[]> {
   const meetings = await dbGetAll<MeetingMinutes>(MEETINGS_KEY);
-  return meetings.sort((a, b) =>
+  return meetings.map(m => ({ ...m, type: normalizeMeetingType(m.type) })).sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 }
@@ -68,7 +72,7 @@ export async function getMeetingById(id: string): Promise<MeetingMinutes | undef
 
 export async function getMeetingsByType(type: MeetingType): Promise<MeetingMinutes[]> {
   const meetings = await dbQuery<MeetingMinutes>(MEETINGS_KEY, 'type', type);
-  return meetings.sort((a, b) =>
+  return meetings.map(m => ({ ...m, type: normalizeMeetingType(m.type) })).sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 }
@@ -76,6 +80,7 @@ export async function getMeetingsByType(type: MeetingType): Promise<MeetingMinut
 export async function getMeetingsByDateRange(startDate: string, endDate: string): Promise<MeetingMinutes[]> {
   const meetings = await dbGetAll<MeetingMinutes>(MEETINGS_KEY);
   return meetings
+    .map(m => ({ ...m, type: normalizeMeetingType(m.type) }))
     .filter(m => m.date >= startDate && m.date <= endDate)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
@@ -186,9 +191,6 @@ export async function getMeetingStats(): Promise<MeetingStats> {
   const byType: Record<MeetingType, number> = {
     general: 0,
     committee: 0,
-    rehearsal: 0,
-    emergency: 0,
-    agm: 0,
   };
 
   let drafts = 0;
@@ -196,7 +198,8 @@ export async function getMeetingStats(): Promise<MeetingStats> {
   let thisMonthCount = 0;
 
   meetings.forEach(m => {
-    byType[m.type]++;
+    const normalizedType = normalizeMeetingType(m.type);
+    byType[normalizedType]++;
     if (m.status === "draft") drafts++;
     else approved++;
     if (m.date.startsWith(thisMonth)) thisMonthCount++;
@@ -217,9 +220,6 @@ export function getMeetingTypeLabel(type: MeetingType): string {
   const labels: Record<MeetingType, string> = {
     general: "General Meeting",
     committee: "Committee Meeting",
-    rehearsal: "Rehearsal Meeting",
-    emergency: "Emergency Meeting",
-    agm: "Annual General Meeting",
   };
   return labels[type];
 }
@@ -228,9 +228,6 @@ export function getMeetingTypeColor(type: MeetingType): string {
   const colors: Record<MeetingType, string> = {
     general: "text-blue-400 bg-blue-400/20",
     committee: "text-purple-400 bg-purple-400/20",
-    rehearsal: "text-green-400 bg-green-400/20",
-    emergency: "text-red-400 bg-red-400/20",
-    agm: "text-primary bg-primary/20",
   };
   return colors[type];
 }

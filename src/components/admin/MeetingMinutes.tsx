@@ -108,7 +108,7 @@ export function MeetingMinutesComponent() {
   const [stats, setStats] = useState<MeetingStats>({
     totalMeetings: 0,
     thisMonth: 0,
-    byType: { general: 0, committee: 0, rehearsal: 0, emergency: 0, agm: 0 },
+    byType: { general: 0, committee: 0 },
     drafts: 0,
     approved: 0,
   });
@@ -194,13 +194,13 @@ export function MeetingMinutesComponent() {
         if (currentUser) {
           addAuditLog(currentUser, "UPDATE_MEETING", `Updated meeting minutes: ${formData.title}`);
         }
-        toast({ title: "Meeting Updated", description: "Meeting minutes have been updated." });
+        toast({ title: "Meeting Updated", description: "Meeting details have been updated." });
       } else {
         savedMeeting = await createMeeting(meetingData);
         if (currentUser) {
           addAuditLog(currentUser, "CREATE_MEETING", `Created meeting minutes: ${formData.title}`);
         }
-        toast({ title: "Meeting Created", description: "New meeting minutes have been created." });
+        toast({ title: "Meeting Created", description: "New meeting has been created." });
       }
 
       if (!savedMeeting) {
@@ -267,7 +267,7 @@ export function MeetingMinutesComponent() {
         if (currentUser && meeting) {
           addAuditLog(currentUser, "DELETE_MEETING", `Deleted meeting minutes: ${meeting.title}`);
         }
-        toast({ title: "Meeting Deleted", description: "Meeting minutes have been deleted." });
+        toast({ title: "Meeting Deleted", description: "Meeting has been deleted." });
         await loadData();
       } else {
         toast({ title: "Error", description: "Meeting not found or could not be deleted", variant: "destructive" });
@@ -462,9 +462,9 @@ export function MeetingMinutesComponent() {
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Users className="w-4 h-4 text-green-400" />
-            <span className="text-xl font-bold">{stats.byType.rehearsal}</span>
+            <span className="text-xl font-bold">{stats.byType.committee}</span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">Rehearsals</p>
+          <p className="text-xs text-muted-foreground mt-1">Committee</p>
         </div>
       </div>
 
@@ -489,9 +489,6 @@ export function MeetingMinutesComponent() {
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="general">General</SelectItem>
             <SelectItem value="committee">Committee</SelectItem>
-            <SelectItem value="rehearsal">Rehearsal</SelectItem>
-            <SelectItem value="emergency">Emergency</SelectItem>
-            <SelectItem value="agm">AGM</SelectItem>
           </SelectContent>
         </Select>
 
@@ -532,7 +529,7 @@ export function MeetingMinutesComponent() {
       {filteredMeetings.length === 0 ? (
         <div className="card-glass rounded-xl p-8 text-center">
           <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No meeting minutes found</p>
+          <p className="text-muted-foreground">No meetings found</p>
           <Button variant="gold" className="mt-4" onClick={() => { resetForm(); setShowAddModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
             Create First Meeting
@@ -647,10 +644,10 @@ export function MeetingMinutesComponent() {
         <DialogContent className="sm:max-w-2xl bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">
-              {selectedMeeting ? "Edit Meeting Minutes" : "New Meeting Minutes"}
+              {selectedMeeting ? "Edit Meeting" : "New Meeting"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
-              {selectedMeeting ? "Update meeting minutes details" : "Record new meeting minutes"}
+              {selectedMeeting ? "Update meeting details and minutes" : "Create a meeting first, then add minutes (optional)"}
             </DialogDescription>
           </DialogHeader>
 
@@ -675,9 +672,6 @@ export function MeetingMinutesComponent() {
                   <SelectContent>
                     <SelectItem value="general">General Meeting</SelectItem>
                     <SelectItem value="committee">Committee Meeting</SelectItem>
-                    <SelectItem value="rehearsal">Rehearsal Meeting</SelectItem>
-                    <SelectItem value="emergency">Emergency Meeting</SelectItem>
-                    <SelectItem value="agm">Annual General Meeting</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -864,7 +858,7 @@ export function MeetingMinutesComponent() {
                 Cancel
               </Button>
               <Button variant="gold" className="flex-1" onClick={handleSubmit}>
-                {selectedMeeting ? "Update" : "Save"} Minutes
+                {selectedMeeting ? "Update Meeting" : "Save Meeting"}
               </Button>
             </div>
           </div>
@@ -875,9 +869,9 @@ export function MeetingMinutesComponent() {
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
         <DialogContent className="sm:max-w-2xl bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display gold-text">Meeting Minutes</DialogTitle>
+            <DialogTitle className="font-display gold-text">Meeting Details</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
-              View meeting minutes details
+              View meeting details and minutes
             </DialogDescription>
           </DialogHeader>
 

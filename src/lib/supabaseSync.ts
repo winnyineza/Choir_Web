@@ -524,10 +524,12 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     table: 'meeting_minutes',
     orderBy: 'date',
     orderAsc: false,
+    
+    
     toDb: (m: any) => ({
       id: m.id,
       title: m.title,
-      type: m.type || 'regular',
+      type: m.type === 'committee' ? 'committee' : 'general',
       date: m.date,
       start_time: m.startTime || null,
       end_time: m.endTime || null,
@@ -557,7 +559,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     fromDb: (r: any) => ({
       id: r.id,
       title: r.title,
-      type: r.type || 'regular',
+      type: r.type === 'committee' ? 'committee' : 'general',
       date: r.date,
       startTime: r.start_time || '',
       endTime: r.end_time || '',
