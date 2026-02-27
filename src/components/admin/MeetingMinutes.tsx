@@ -34,6 +34,13 @@ import {
   type MeetingAgendaItem,
   type MeetingStats,
 } from "@/lib/meetingService";
+import {
+  createOrUpdateGoogleMeeting,
+  deleteGoogleMeeting,
+  getGoogleConnectionStatus,
+  getGoogleOAuthStartUrl,
+  type GoogleConnectionStatus,
+} from "@/lib/googleMeetService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
@@ -69,8 +76,14 @@ export function MeetingMinutesComponent() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingMinutesType | null>(null);
   const [expandedAgenda, setExpandedAgenda] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const { toast } = useToast();
+  const [googleConnection, setGoogleConnection] = useState<GoogleConnectionStatus>({
+    connected: false,
+    googleEmail: null,
+    connectedAt: null,
+  });
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -88,6 +101,7 @@ export function MeetingMinutesComponent() {
     closingPrayer: "",
     nextMeetingDate: "",
     notes: "",
+    createGoogleMeet: true,
   });
 
   const [agendaItems, setAgendaItems] = useState<Omit<MeetingAgendaItem, "id">[]>([]);
@@ -101,7 +115,7 @@ export function MeetingMinutesComponent() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser?.id]);
 
   const loadData = async () => {
     const [meetingsData, statsData, membersData] = await Promise.all([
@@ -109,9 +123,40 @@ export function MeetingMinutesComponent() {
       getMeetingStats(),
       getAllMembers(),
     ]);
+
+    if (currentUser?.id) {
+      try {
+        const status = await getGoogleConnectionStatus(currentUser.id);
+        setGoogleConnection(status);
+      } catch {
+        setGoogleConnection({ connected: false, googleEmail: null, connectedAt: null });
+      }
+    }
+
     setMeetings(meetingsData);
     setStats(statsData);
     setMembers(membersData);
+  };
+
+  const handleConnectGoogle = async () => {
+    if (!currentUser?.id) {
+      toast({ title: "Error", description: "Admin authentication required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setGoogleBusy(true);
+      const authUrl = await getGoogleOAuthStartUrl(currentUser.id, "/admin");
+      window.location.href = authUrl;
+    } catch (error: any) {
+      toast({
+        title: "Google Connection Failed",
+        description: error.message || "Unable to start Google OAuth",
+        variant: "destructive",
+      });
+    } finally {
+      setGoogleBusy(false);
+    }
   };
 
   // Filter meetings
@@ -142,19 +187,65 @@ export function MeetingMinutesComponent() {
     };
 
     try {
+      let savedMeeting: MeetingMinutesType | null = null;
+
       if (selectedMeeting) {
-        await updateMeeting(selectedMeeting.id, meetingData);
-        if (user) {
-          addAuditLog(user, "UPDATE_MEETING", `Updated meeting minutes: ${formData.title}`);
+        savedMeeting = await updateMeeting(selectedMeeting.id, meetingData);
+        if (currentUser) {
+          addAuditLog(currentUser, "UPDATE_MEETING", `Updated meeting minutes: ${formData.title}`);
         }
         toast({ title: "Meeting Updated", description: "Meeting minutes have been updated." });
       } else {
-        await createMeeting(meetingData);
-        if (user) {
-          addAuditLog(user, "CREATE_MEETING", `Created meeting minutes: ${formData.title}`);
+        savedMeeting = await createMeeting(meetingData);
+        if (currentUser) {
+          addAuditLog(currentUser, "CREATE_MEETING", `Created meeting minutes: ${formData.title}`);
         }
         toast({ title: "Meeting Created", description: "New meeting minutes have been created." });
       }
+
+      if (!savedMeeting) {
+        throw new Error("Failed to save meeting");
+      }
+
+      if (formData.createGoogleMeet && currentUser?.id && googleConnection.connected) {
+        try {
+          const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
+            meetingId: savedMeeting.id,
+            googleEventId: selectedMeeting?.googleEventId || undefined,
+            title: savedMeeting.title,
+            description: savedMeeting.notes || "Choir meeting",
+            location: savedMeeting.location,
+            date: savedMeeting.date,
+            startTime: savedMeeting.startTime || "09:00",
+            endTime: savedMeeting.endTime || undefined,
+            timezone: "Africa/Lagos",
+          });
+
+          await updateMeeting(savedMeeting.id, {
+            googleEventId: synced.googleEventId,
+            googleMeetLink: synced.googleMeetLink,
+            googleEventLink: synced.googleEventLink || undefined,
+            googleConferenceId: synced.googleConferenceId || undefined,
+          });
+
+          toast({
+            title: "Google Meet Synced",
+            description: "Meeting event and Google Meet link were updated in Google Calendar.",
+          });
+        } catch (error: any) {
+          toast({
+            title: "Saved Locally",
+            description: error.message || "Meeting was saved, but Google sync failed.",
+            variant: "destructive",
+          });
+        }
+      } else if (formData.createGoogleMeet && !googleConnection.connected) {
+        toast({
+          title: "Google Not Connected",
+          description: "Meeting saved, but Google Calendar is not connected yet.",
+        });
+      }
+
       await loadData();
       setShowAddModal(false);
       resetForm();
@@ -167,10 +258,14 @@ export function MeetingMinutesComponent() {
     if (!confirm("Delete this meeting record?")) return;
     const meeting = meetings.find(m => m.id === id);
     try {
+      if (meeting?.googleEventId && currentUser?.id) {
+        await deleteGoogleMeeting(currentUser.id, id, meeting.googleEventId);
+      }
+
       const deleted = await deleteMeeting(id);
       if (deleted) {
-        if (user && meeting) {
-          addAuditLog(user, "DELETE_MEETING", `Deleted meeting minutes: ${meeting.title}`);
+        if (currentUser && meeting) {
+          addAuditLog(currentUser, "DELETE_MEETING", `Deleted meeting minutes: ${meeting.title}`);
         }
         toast({ title: "Meeting Deleted", description: "Meeting minutes have been deleted." });
         await loadData();
@@ -185,14 +280,14 @@ export function MeetingMinutesComponent() {
   const handleApprove = async (id: string) => {
     const meeting = meetings.find(m => m.id === id);
     try {
-      const result = await approveMeeting(id, user?.name || "Admin");
+      const result = await approveMeeting(id, currentUser?.name || "Admin");
       if (result) {
-        if (user && meeting) {
-          addAuditLog(user, "APPROVE_MEETING", `Approved meeting minutes: ${meeting.title}`);
+        if (currentUser && meeting) {
+          addAuditLog(currentUser, "APPROVE_MEETING", `Approved meeting minutes: ${meeting.title}`);
         }
         // Notify all members that meeting minutes are available
         if (meeting) {
-          notifyMeetingMinutesApproved(meeting.title, meeting.date, user?.name || "Admin");
+          notifyMeetingMinutesApproved(meeting.title, meeting.date, currentUser?.name || "Admin");
         }
         toast({ title: "Meeting Approved", description: "Meeting minutes have been approved and members will be notified." });
         await loadData();
@@ -247,6 +342,7 @@ export function MeetingMinutesComponent() {
       closingPrayer: "",
       nextMeetingDate: "",
       notes: "",
+      createGoogleMeet: true,
     });
     setAgendaItems([]);
   };
@@ -268,6 +364,7 @@ export function MeetingMinutesComponent() {
       closingPrayer: meeting.closingPrayer || "",
       nextMeetingDate: meeting.nextMeetingDate || "",
       notes: meeting.notes || "",
+      createGoogleMeet: true,
     });
     setAgendaItems(meeting.agenda.map(({ id, ...rest }) => rest));
     setShowAddModal(true);
@@ -414,11 +511,22 @@ export function MeetingMinutesComponent() {
           Export All
         </Button>
 
+        <Button variant="outline" onClick={handleConnectGoogle} disabled={googleBusy || !currentUser?.id}>
+          <Calendar className="w-4 h-4 mr-2" />
+          {googleConnection.connected ? "Reconnect Google" : "Connect Google"}
+        </Button>
+
         <Button variant="gold" onClick={() => { resetForm(); setShowAddModal(true); }}>
           <Plus className="w-4 h-4 mr-2" />
           New Meeting
         </Button>
       </div>
+
+      {googleConnection.connected && (
+        <p className="text-xs text-muted-foreground">
+          Google Calendar connected as <span className="text-primary">{googleConnection.googleEmail}</span>
+        </p>
+      )}
 
       {/* Meetings List */}
       {filteredMeetings.length === 0 ? (
@@ -474,6 +582,16 @@ export function MeetingMinutesComponent() {
                   <p className="text-xs text-muted-foreground mt-2">
                     Chaired by: {meeting.chairperson} | Secretary: {meeting.secretary}
                   </p>
+                  {meeting.googleMeetLink && (
+                    <a
+                      href={meeting.googleMeetLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex mt-2 text-xs text-primary hover:underline"
+                    >
+                      Open Google Meet
+                    </a>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -722,6 +840,24 @@ export function MeetingMinutesComponent() {
                 className="mt-1 bg-secondary"
               />
             </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="createGoogleMeet"
+                type="checkbox"
+                checked={formData.createGoogleMeet}
+                onChange={(e) => setFormData({ ...formData, createGoogleMeet: e.target.checked })}
+                className="h-4 w-4 accent-primary"
+              />
+              <Label htmlFor="createGoogleMeet" className="text-sm">
+                Create/update Google Meet link
+              </Label>
+            </div>
+            {!googleConnection.connected && formData.createGoogleMeet && (
+              <p className="text-xs text-orange-400">
+                Google Calendar is not connected yet. Save will work, but no Meet link will be created.
+              </p>
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button variant="outline" className="flex-1" onClick={() => { setShowAddModal(false); resetForm(); }}>

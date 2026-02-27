@@ -114,6 +114,7 @@ import {
   type AttendanceStatus,
 } from "@/lib/attendanceService";
 import { useToast } from "@/hooks/use-toast";
+import { getGoogleConnectionStatus, getGoogleOAuthStartUrl, type GoogleConnectionStatus } from "@/lib/googleMeetService";
 import { Switch } from "@/components/ui/switch";
 import { AddMemberModal } from "@/components/admin/AddMemberModal";
 import { BulkAddMembersModal } from "@/components/admin/BulkAddMembersModal";
@@ -342,6 +343,12 @@ export default function Admin() {
   // Settings state
   const [settings, setSettingsState] = useState<Awaited<ReturnType<typeof getSettings>> | null>(null);
   const [backupStats, setBackupStats] = useState<Awaited<ReturnType<typeof getBackupStats>> | null>(null);
+  const [googleConnectionStatus, setGoogleConnectionStatus] = useState<GoogleConnectionStatus>({
+    connected: false,
+    googleEmail: null,
+    connectedAt: null,
+  });
+  const [googleConnectionLoading, setGoogleConnectionLoading] = useState(false);
 
   // My Account state
   const [accountName, setAccountName] = useState(currentUser?.name || "");
@@ -507,6 +514,44 @@ export default function Admin() {
     });
   }, []);
 
+  const refreshGoogleIntegrationStatus = async () => {
+    if (!currentUser?.id) return;
+    setGoogleConnectionLoading(true);
+    try {
+      const status = await getGoogleConnectionStatus(currentUser.id);
+      setGoogleConnectionStatus(status);
+    } catch (error: any) {
+      setGoogleConnectionStatus({ connected: false, googleEmail: null, connectedAt: null });
+      toast({
+        title: "Google Status Check Failed",
+        description: error.message || "Could not load Google integration status",
+        variant: "destructive",
+      });
+    } finally {
+      setGoogleConnectionLoading(false);
+    }
+  };
+
+  const handleConnectGoogleFromSettings = async () => {
+    if (!currentUser?.id) {
+      toast({ title: "Error", description: "Admin authentication required", variant: "destructive" });
+      return;
+    }
+
+    setGoogleConnectionLoading(true);
+    try {
+      const authUrl = await getGoogleOAuthStartUrl(currentUser.id, "/admin#settings");
+      window.location.href = authUrl;
+    } catch (error: any) {
+      toast({
+        title: "Google Connect Failed",
+        description: error.message || "Unable to start Google OAuth flow",
+        variant: "destructive",
+      });
+      setGoogleConnectionLoading(false);
+    }
+  };
+
   // Load core data on mount, then tab-specific data
   useEffect(() => {
     loadCoreData();
@@ -517,6 +562,12 @@ export default function Admin() {
   useEffect(() => {
     loadTabData(activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "settings" && currentUser?.id) {
+      refreshGoogleIntegrationStatus();
+    }
+  }, [activeTab, currentUser?.id]);
 
   // Filtered data
   const filteredOrders = orders
@@ -2989,6 +3040,54 @@ export default function Admin() {
           {activeTab === "settings" && settings && (
             <div className="space-y-6">
               <h2 className="font-display text-lg font-semibold">Settings</h2>
+
+              <div className="card-glass rounded-2xl p-6 max-w-2xl">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  Google Meet Integration
+                </h3>
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "inline-flex h-2.5 w-2.5 rounded-full",
+                      googleConnectionStatus.connected ? "bg-green-500" : "bg-red-500"
+                    )} />
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className={cn(
+                      "font-medium",
+                      googleConnectionStatus.connected ? "text-green-500" : "text-red-500"
+                    )}>
+                      {googleConnectionStatus.connected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-muted-foreground">Connected account:</span>{" "}
+                    <span className="text-foreground">{googleConnectionStatus.googleEmail || "Not connected"}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-muted-foreground">Last connected:</span>{" "}
+                    <span className="text-foreground">
+                      {googleConnectionStatus.connectedAt
+                        ? new Date(googleConnectionStatus.connectedAt).toLocaleString()
+                        : "N/A"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <Button variant="gold" onClick={handleConnectGoogleFromSettings} disabled={googleConnectionLoading || !currentUser?.id}>
+                    {googleConnectionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Calendar className="w-4 h-4 mr-2" />}
+                    {googleConnectionStatus.connected ? "Reconnect Google" : "Connect Google"}
+                  </Button>
+                  <Button variant="outline" onClick={refreshGoogleIntegrationStatus} disabled={googleConnectionLoading || !currentUser?.id}>
+                    <RefreshCw className={cn("w-4 h-4 mr-2", googleConnectionLoading && "animate-spin")} />
+                    Refresh Status
+                  </Button>
+                </div>
+              </div>
 
               {/* My Account Section */}
               <div className="card-glass rounded-2xl p-6 max-w-2xl">

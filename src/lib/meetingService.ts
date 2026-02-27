@@ -36,6 +36,10 @@ export interface MeetingMinutes {
   updatedAt?: string;
   approvedBy?: string;
   approvedAt?: string;
+  googleEventId?: string;
+  googleMeetLink?: string;
+  googleEventLink?: string;
+  googleConferenceId?: string;
 }
 
 export interface MeetingStats {
