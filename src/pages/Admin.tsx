@@ -3037,7 +3037,7 @@ export default function Admin() {
           )}
 
           {/* Settings */}
-          {activeTab === "settings" && settings && (
+          {activeTab === "settings" && (
             <div className="space-y-6">
               <h2 className="font-display text-lg font-semibold">Settings</h2>
 
@@ -3245,7 +3245,7 @@ export default function Admin() {
               </div>
 
               {/* System settings - only for super_admin and main_admin */}
-              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
+              {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && settings && (
               <>
               <div className="card-glass rounded-2xl p-6 w-full">
                 <h3 className="font-semibold text-foreground mb-4">Choir Information</h3>
@@ -3541,6 +3541,14 @@ export default function Admin() {
                 <BackupRestore />
               </div>
               </>
+              )}
+
+              {!settings && (
+                <div className="card-glass rounded-2xl p-6 w-full xl:col-span-2">
+                  <p className="text-sm text-muted-foreground">
+                    Settings data is still loading. Google Meet connection is available above.
+                  </p>
+                </div>
               )}
 
               </div>
