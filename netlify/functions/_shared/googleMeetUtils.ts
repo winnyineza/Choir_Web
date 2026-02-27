@@ -39,8 +39,12 @@ export function getSupabaseAdminClient() {
   const url = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !serviceKey) {
-    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  const missing: string[] = [];
+  if (!url) missing.push("SUPABASE_URL");
+  if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (missing.length > 0) {
+    throw new Error(`Missing environment variable(s): ${missing.join(", ")}`);
   }
 
   return createClient(url, serviceKey, {
