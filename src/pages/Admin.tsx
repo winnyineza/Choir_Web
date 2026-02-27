@@ -2967,8 +2967,8 @@ export default function Admin() {
             <EventStaffManagement />
           )}
 
-          {/* Admin Team (Super Admin Only) */}
-          {activeTab === "team" && isSuperAdmin && (
+          {/* Admin Team */}
+          {activeTab === "team" && hasPermission(effectiveUser, "team") && (
             <AdminTeamManagement />
           )}
 

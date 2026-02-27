@@ -69,7 +69,7 @@ export function AdminTeamManagement() {
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<AdminRole>("secretary");
+  const [inviteRole, setInviteRole] = useState<AdminRole | "">("");
   
   const { currentUser } = useAuth();
   const { toast } = useToast();
@@ -84,9 +84,18 @@ export function AdminTeamManagement() {
     setInvites(invitesList.filter(i => !i.used));
     setMembers(membersList);
 
-    // Filter out members who are already admins
+    // Filter out members who are already admins or already have pending invites
     const adminMemberIds = new Set(adminsList.filter(a => a.memberId).map(a => a.memberId));
-    setAvailableMembers(membersList.filter(m => !adminMemberIds.has(m.id)));
+    const pendingInviteMemberIds = new Set(
+      invitesList
+        .filter(i => !i.used && i.memberId)
+        .map(i => i.memberId as string)
+    );
+    setAvailableMembers(
+      membersList.filter(
+        (m) => !adminMemberIds.has(m.id) && !pendingInviteMemberIds.has(m.id)
+      )
+    );
   };
 
   useEffect(() => {
@@ -98,6 +107,8 @@ export function AdminTeamManagement() {
     if (!admin.memberId) return undefined;
     return members.find(m => m.id === admin.memberId);
   };
+
+  const selectableMembers = availableMembers.filter(m => m.id !== selectedMemberId);
 
   // Handle member selection - auto-fill name and email
   const handleMemberSelect = (memberId: string) => {
@@ -128,6 +139,15 @@ export function AdminTeamManagement() {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!inviteRole) {
+      toast({
+        title: "Select a Role",
+        description: "Please select an admin role before sending the invite",
         variant: "destructive",
       });
       return;
@@ -165,7 +185,7 @@ export function AdminTeamManagement() {
       setSelectedMemberId("");
       setInviteEmail("");
       setInviteName("");
-      setInviteRole("secretary");
+      setInviteRole("");
       await loadData();
     } catch (err: any) {
       toast({
@@ -593,12 +613,12 @@ export function AdminTeamManagement() {
                   <SelectValue placeholder="Choose a member to promote..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableMembers.length === 0 ? (
+                  {selectableMembers.length === 0 ? (
                     <SelectItem value="none" disabled>
                       No available members
                     </SelectItem>
                   ) : (
-                    availableMembers.map((member) => (
+                    selectableMembers.map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         <div className="flex items-center gap-2">
                           <span>{member.name}</span>
@@ -721,6 +741,7 @@ export function AdminTeamManagement() {
                   setSelectedMemberId("");
                   setInviteName("");
                   setInviteEmail("");
+                  setInviteRole("");
                 }}
               >
                 Cancel
@@ -729,7 +750,7 @@ export function AdminTeamManagement() {
                 variant="gold"
                 className="flex-1"
                 onClick={handleCreateInvite}
-                disabled={!selectedMemberId}
+                disabled={!selectedMemberId || !inviteRole}
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Send Invite

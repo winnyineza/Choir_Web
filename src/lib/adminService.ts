@@ -554,7 +554,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   main_admin: [
     "dashboard", "members", "members_edit", "events", "tickets", "attendance",
     "leave", "disciplinary", "contributions", "expenses", "treasury", "announcements", "messages",
-    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "surveys", "analytics", "settings"
+    "releases", "promos", "gallery", "inventory", "minutes", "documents", "voice_balance", "surveys", "analytics", "team", "settings"
   ],
   finance: [
     "dashboard", "members", "tickets", "contributions", "expenses", "treasury", "settings"
