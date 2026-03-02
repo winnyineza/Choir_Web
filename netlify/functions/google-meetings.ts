@@ -21,6 +21,7 @@ type GoogleMeetingPayload = {
   endTime?: string;
   timezone?: string;
   includeMeetLink?: boolean;
+  attendeeEmails?: string[];
 };
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -183,6 +184,10 @@ const handler: Handler = async (event) => {
       location: payload.location || "",
       start: dateTimes.start,
       end: dateTimes.end,
+      attendees: Array.from(new Set((payload.attendeeEmails || [])
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+      )).map((email) => ({ email })),
     };
     const includeMeetLink = payload.includeMeetLink !== false;
 

@@ -603,6 +603,11 @@ export function canApproveLeave(user: AdminUser | null): boolean {
   return ["super_admin", "main_admin", "secretary", "disciplinary", "reviewer"].includes(user.role);
 }
 
+export function canApproveMeetingMinutes(user: AdminUser | null): boolean {
+  if (!user) return false;
+  return ["super_admin", "main_admin", "secretary"].includes(user.role);
+}
+
 export function hasWriteAccess(user: AdminUser | null, area: string): boolean {
   if (!user) return false;
 

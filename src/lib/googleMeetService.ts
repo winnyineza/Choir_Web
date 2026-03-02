@@ -15,6 +15,7 @@ export interface GoogleMeetingPayload {
   endTime?: string;
   timezone?: string;
   includeMeetLink?: boolean;
+  attendeeEmails?: string[];
 }
 
 export interface GoogleMeetingResult {

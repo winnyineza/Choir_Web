@@ -43,8 +43,9 @@ import {
 } from "@/lib/googleMeetService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
-import { addAuditLog } from "@/lib/adminService";
+import { addAuditLog, canApproveMeetingMinutes } from "@/lib/adminService";
 import { notifyMeetingMinutesApproved } from "@/lib/notificationEmailService";
+import { getMembersOnLeaveForDate } from "@/lib/leaveService";
 import { cn } from "@/lib/utils";
 import {
   FileText,
@@ -210,6 +211,12 @@ export function MeetingMinutesComponent() {
 
       if (formData.syncGoogleCalendar && currentUser?.id && googleConnection.connected) {
         try {
+          const membersOnLeave = await getMembersOnLeaveForDate(savedMeeting.date);
+          const membersOnLeaveIds = new Set(membersOnLeave.map((leave) => leave.memberId));
+          const attendeeEmails = members
+            .filter((member) => member.status === "Active" && Boolean(member.email) && !membersOnLeaveIds.has(member.id))
+            .map((member) => member.email.trim());
+
           const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
             meetingId: savedMeeting.id,
             googleEventId: selectedMeeting?.googleEventId || undefined,
@@ -221,6 +228,7 @@ export function MeetingMinutesComponent() {
             endTime: savedMeeting.endTime || undefined,
             timezone: "Africa/Lagos",
             includeMeetLink: formData.createGoogleMeet,
+            attendeeEmails,
           });
 
           await updateMeeting(savedMeeting.id, {
@@ -233,8 +241,8 @@ export function MeetingMinutesComponent() {
           toast({
             title: "Google Calendar Synced",
             description: formData.createGoogleMeet
-              ? "Meeting event and Google Meet link were updated in Google Calendar."
-              : "Meeting event was updated in Google Calendar without a Meet link.",
+              ? `Meeting event and Google Meet link were updated. ${attendeeEmails.length} invitee(s) were notified via Google Calendar.`
+              : `Meeting event was updated without a Meet link. ${attendeeEmails.length} invitee(s) were notified via Google Calendar.`,
           });
         } catch (error: any) {
           toast({
@@ -301,6 +309,15 @@ export function MeetingMinutesComponent() {
   };
 
   const handleApprove = async (id: string) => {
+    if (!canApproveMeetingMinutes(currentUser)) {
+      toast({
+        title: "Not Allowed",
+        description: "Only Super Admin, Main Admin, or Secretary can approve meeting minutes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const meeting = meetings.find(m => m.id === id);
     try {
       const result = await approveMeeting(id, currentUser?.name || "Admin");
@@ -635,7 +652,7 @@ export function MeetingMinutesComponent() {
                   <Button variant="ghost" size="sm" onClick={() => handleExportMeeting(meeting)}>
                     <Download className="w-4 h-4" />
                   </Button>
-                  {meeting.status === "draft" && (
+                  {meeting.status === "draft" && canApproveMeetingMinutes(currentUser) && (
                     <Button variant="ghost" size="sm" onClick={() => handleApprove(meeting.id)}>
                       <CheckCircle className="w-4 h-4 text-green-400" />
                     </Button>
