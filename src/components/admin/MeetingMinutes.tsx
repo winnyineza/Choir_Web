@@ -106,6 +106,7 @@ export function MeetingMinutesComponent() {
     closingPrayer: "",
     nextMeetingDate: "",
     notes: "",
+    autoCreateAttendance: true,
     syncGoogleCalendar: true,
     createGoogleMeet: true,
     inviteScope: "all_active" as InviteScope,
@@ -260,12 +261,19 @@ export function MeetingMinutesComponent() {
       setShowAddModal(false);
       resetForm();
 
+      const selectedNamesForTargeting = formSnapshot.inviteeNames.length > 0
+        ? formSnapshot.inviteeNames
+        : formSnapshot.attendees;
+      const activeMembers = members.filter((member) => member.status === "Active");
+      const attendanceTargetMembers = formSnapshot.inviteScope === "selected_people"
+        ? activeMembers.filter((member) => selectedNamesForTargeting.includes(member.name))
+        : activeMembers;
+
       const hasAttendance = await hasAttendanceForDate(savedMeeting.date);
-      if (!hasAttendance) {
+      if (formSnapshot.autoCreateAttendance && !hasAttendance) {
         const membersOnLeave = await getMembersOnLeaveForDate(savedMeeting.date);
         const membersOnLeaveIds = new Set(membersOnLeave.map((leave) => leave.memberId));
-        const attendanceSeed = members
-          .filter((member) => member.status === "Active")
+        const attendanceSeed = attendanceTargetMembers
           .map((member) => ({
             memberId: member.id,
             memberName: member.name,
@@ -284,6 +292,11 @@ export function MeetingMinutesComponent() {
           toast({
             title: "Attendance Draft Created",
             description: "Attendance was auto-created for this meeting date. You can edit it on the attendance tab.",
+          });
+        } else {
+          toast({
+            title: "Attendance Draft Skipped",
+            description: "No target participants were selected for attendance draft creation.",
           });
         }
       }
@@ -493,6 +506,7 @@ export function MeetingMinutesComponent() {
       closingPrayer: "",
       nextMeetingDate: "",
       notes: "",
+      autoCreateAttendance: true,
       syncGoogleCalendar: true,
       createGoogleMeet: true,
       inviteScope: "all_active",
@@ -518,6 +532,7 @@ export function MeetingMinutesComponent() {
       closingPrayer: meeting.closingPrayer || "",
       nextMeetingDate: meeting.nextMeetingDate || "",
       notes: meeting.notes || "",
+      autoCreateAttendance: true,
       syncGoogleCalendar: Boolean(meeting.googleEventId),
       createGoogleMeet: Boolean(meeting.googleMeetLink),
       inviteScope: meeting.type === "committee" ? "selected_people" : "all_active",
@@ -958,6 +973,21 @@ export function MeetingMinutesComponent() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Click to mark present. {formData.attendees.length} present, {formData.absentees.length} absent.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  id="autoCreateAttendance"
+                  type="checkbox"
+                  checked={formData.autoCreateAttendance}
+                  onChange={(e) => setFormData({ ...formData, autoCreateAttendance: e.target.checked })}
+                  className="h-4 w-4 accent-primary"
+                />
+                <Label htmlFor="autoCreateAttendance" className="text-sm">
+                  Auto-create attendance draft from this meeting's participant target
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                For "Selected people only", draft attendance includes only selected invitees (or selected attendance chips as fallback).
               </p>
             </div>
 
