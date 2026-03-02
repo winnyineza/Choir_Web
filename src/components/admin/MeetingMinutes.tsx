@@ -34,7 +34,7 @@ import {
   type MeetingAgendaItem,
   type MeetingStats,
 } from "@/lib/meetingService";
-import { getAttendanceByDate, hasAttendanceForDate, saveAttendance } from "@/lib/attendanceService";
+import { getAttendanceByDate, hasAttendanceForDate, saveAttendance, getSessionByDate, deleteAttendanceForDate } from "@/lib/attendanceService";
 import {
   createOrUpdateGoogleMeeting,
   deleteGoogleMeeting,
@@ -266,7 +266,7 @@ export function MeetingMinutesComponent() {
           await saveAttendance(
             savedMeeting.date,
             attendanceSeed,
-            savedMeeting.title || "Meeting Session",
+            `[Meeting] ${savedMeeting.title || "Meeting Session"}`,
             currentUser?.name || "Admin",
           );
           toast({
@@ -376,10 +376,30 @@ export function MeetingMinutesComponent() {
 
       const deleted = await deleteMeeting(id);
       if (deleted) {
+        let attendanceDeleted = false;
+        if (meeting?.date) {
+          const linkedSession = await getSessionByDate(meeting.date);
+          const isLinkedAttendance = Boolean(
+            linkedSession && meeting.title && (
+              linkedSession.title === `[Meeting] ${meeting.title}` ||
+              linkedSession.title === meeting.title
+            ),
+          );
+
+          if (isLinkedAttendance) {
+            attendanceDeleted = await deleteAttendanceForDate(meeting.date);
+          }
+        }
+
         if (currentUser && meeting) {
           addAuditLog(currentUser, "DELETE_MEETING", `Deleted meeting minutes: ${meeting.title}`);
         }
-        toast({ title: "Meeting Deleted", description: "Meeting has been deleted." });
+        toast({
+          title: "Meeting Deleted",
+          description: attendanceDeleted
+            ? "Meeting and its linked attendance were deleted."
+            : "Meeting has been deleted.",
+        });
         await loadData();
       } else {
         toast({ title: "Error", description: "Meeting not found or could not be deleted", variant: "destructive" });
