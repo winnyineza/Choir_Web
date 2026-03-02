@@ -34,7 +34,7 @@ import {
   type MeetingAgendaItem,
   type MeetingStats,
 } from "@/lib/meetingService";
-import { getAttendanceByDate } from "@/lib/attendanceService";
+import { getAttendanceByDate, hasAttendanceForDate, saveAttendance } from "@/lib/attendanceService";
 import {
   createOrUpdateGoogleMeeting,
   deleteGoogleMeeting,
@@ -245,6 +245,34 @@ export function MeetingMinutesComponent() {
 
       if (!savedMeeting) {
         throw new Error("Failed to save meeting");
+      }
+
+      const hasAttendance = await hasAttendanceForDate(savedMeeting.date);
+      if (!hasAttendance) {
+        const membersOnLeave = await getMembersOnLeaveForDate(savedMeeting.date);
+        const membersOnLeaveIds = new Set(membersOnLeave.map((leave) => leave.memberId));
+        const attendanceSeed = members
+          .filter((member) => member.status === "Active")
+          .map((member) => ({
+            memberId: member.id,
+            memberName: member.name,
+            memberEmail: member.email,
+            memberVoice: member.voice,
+            status: membersOnLeaveIds.has(member.id) ? "excused" as const : "absent" as const,
+          }));
+
+        if (attendanceSeed.length > 0) {
+          await saveAttendance(
+            savedMeeting.date,
+            attendanceSeed,
+            savedMeeting.title || "Meeting Session",
+            currentUser?.name || "Admin",
+          );
+          toast({
+            title: "Attendance Draft Created",
+            description: "Attendance was auto-created for this meeting date. You can edit it on the attendance tab.",
+          });
+        }
       }
 
       if (formData.syncGoogleCalendar && currentUser?.id && googleConnection.connected) {
