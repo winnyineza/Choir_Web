@@ -94,6 +94,7 @@ import {
   type Contribution,
   type MemberContributionStatus,
 } from "@/lib/contributionService";
+import { getAllMeetings, type MeetingMinutes } from "@/lib/meetingService";
 import { formatCurrency } from "@/lib/flutterwave";
 import { cn } from "@/lib/utils";
 import {
@@ -164,6 +165,7 @@ export default function MemberPortal() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [myContributions, setMyContributions] = useState<Contribution[]>([]);
   const [contributionStatus, setContributionStatus] = useState<MemberContributionStatus | null>(null);
+  const [upcomingMeetings, setUpcomingMeetings] = useState<MeetingMinutes[]>([]);
 
   // Profile editing
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -345,6 +347,30 @@ export default function MemberPortal() {
     }
   };
 
+  const loadUpcomingMeetingsForMember = async (member: Member) => {
+    const meetings = await getAllMeetings();
+    const today = new Date().toISOString().split("T")[0];
+    const memberName = member.name.trim().toLowerCase();
+
+    const visibleUpcoming = meetings
+      .filter((meeting) => {
+        if (meeting.date < today) return false;
+        if (meeting.type === "committee") {
+          const committeeNames = (meeting.attendees || []).map((name) => String(name).trim().toLowerCase());
+          return committeeNames.includes(memberName);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aDateTime = new Date(`${a.date}T${a.startTime || "00:00"}:00`).getTime();
+        const bDateTime = new Date(`${b.date}T${b.startTime || "00:00"}:00`).getTime();
+        return aDateTime - bDateTime;
+      })
+      .slice(0, 6);
+
+    setUpcomingMeetings(visibleUpcoming);
+  };
+
   const handlePinSubmit = (pinValue?: string) => {
     const pinToCheck = pinValue || pin.join("");
     if (verifyPortalPin(pinToCheck)) {
@@ -396,6 +422,7 @@ export default function MemberPortal() {
     setMyAttendance(attendance);
     setAttendanceStats(attStats);
     setMyRequests(requests);
+    await loadUpcomingMeetingsForMember(member);
     
     toast({
       title: `Welcome, ${member.name}! 👋`,
@@ -415,6 +442,7 @@ export default function MemberPortal() {
         setAttendanceStats(attStats);
         setMyRequests(reqs);
       });
+      loadUpcomingMeetingsForMember(memberInfo);
     }
   }, [memberInfo, email]);
 
@@ -919,6 +947,35 @@ export default function MemberPortal() {
                     </div>
                   </button>
                 </div>
+
+                {/* Upcoming Meetings */}
+                {memberInfo && upcomingMeetings.length > 0 && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      Upcoming Meetings
+                    </h2>
+                    <div className="space-y-3">
+                      {upcomingMeetings.map((meeting) => (
+                        <div key={meeting.id} className="p-3 rounded-lg bg-secondary/30 border border-primary/10">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium text-foreground">{meeting.title}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                              {meeting.type === "committee" ? "Committee" : "General"}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {new Date(meeting.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                            {meeting.startTime ? ` • ${meeting.startTime}` : ""}
+                          </p>
+                          {meeting.location && (
+                            <p className="text-xs text-muted-foreground mt-1">📍 {meeting.location}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Profile & Settings (if logged in but no emergency contact) */}
                 {memberInfo && !memberInfo.emergencyContact && (

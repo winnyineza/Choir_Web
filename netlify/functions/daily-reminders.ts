@@ -26,6 +26,25 @@ interface Event {
   location?: string;
 }
 
+interface MeetingSchedule {
+  id: string;
+  title: string;
+  date: string;
+  start_time?: string;
+  location?: string;
+  type?: "general" | "committee";
+  attendees?: string[];
+  google_meet_link?: string;
+  google_event_link?: string;
+}
+
+interface ApprovedLeave {
+  member_id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+}
+
 interface Contribution {
   id: string;
   member_id: string;
@@ -108,6 +127,17 @@ function getTomorrowEvents(events: Event[]): Event[] {
   return events.filter(event => {
     const eventDate = new Date(event.date).toISOString().split('T')[0];
     return eventDate === tomorrowStr;
+  });
+}
+
+function getTomorrowMeetings(meetings: MeetingSchedule[]): MeetingSchedule[] {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  return meetings.filter((meeting) => {
+    const meetingDate = new Date(meeting.date).toISOString().split('T')[0];
+    return meetingDate === tomorrowStr;
   });
 }
 
@@ -618,6 +648,44 @@ function generateEventReminderEmail(events: Event[]): string {
   `;
 }
 
+function generateMeetingReminderEmail(memberName: string, meetings: MeetingSchedule[]): string {
+  const meetingList = meetings.map((meeting) => `
+    <div style="padding: 15px; background: #2a2a2a; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #d4a537;">
+      <strong style="color: #d4a537; font-size: 16px;">${meeting.title}</strong><br>
+      <span style="color: #aaa;">📅 ${new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span><br>
+      ${meeting.start_time ? `<span style="color: #aaa;">⏰ ${meeting.start_time}</span><br>` : ''}
+      ${meeting.location ? `<span style="color: #aaa;">📍 ${meeting.location}</span><br>` : ''}
+      ${meeting.google_meet_link ? `<a href="${meeting.google_meet_link}" style="color: #d4a537; text-decoration: none;">🎥 Join Google Meet</a>` : ''}
+    </div>
+  `).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; }
+        h1 { color: #d4a537; margin-bottom: 20px; }
+        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>📅 Meeting Reminder - Tomorrow</h1>
+        <p>Hi ${memberName},</p>
+        <p>This is a reminder for your upcoming meeting${meetings.length > 1 ? 's' : ''} tomorrow:</p>
+        ${meetingList}
+        <p style="margin-top: 20px;">Please be prepared and on time. Blessings!</p>
+        <div class="footer">
+          <p>Serenades of Praise Choir</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 // Send email via Gmail SMTP
 async function sendEmail(to: string[], subject: string, html: string): Promise<boolean> {
   const GMAIL_USER = process.env.GMAIL_USER;
@@ -699,6 +767,9 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       // Event reminders
       eventsSent: false,
       eventCount: 0,
+      meetingRemindersSent: 0,
+      meetingCount: 0,
+      meetingRecipients: 0,
       // Contribution reminders
       contributionRemindersSent: 0,
       overdueRemindersSent: 0,
@@ -713,6 +784,8 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
     let members: Member[] = [];
     let events: Event[] = [];
+    let meetings: MeetingSchedule[] = [];
+    let approvedLeave: ApprovedLeave[] = [];
     let contributions: Contribution[] = [];
     let contributionTypes: ContributionType[] = [];
 
@@ -742,6 +815,38 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         }
       } catch (e) {
         console.error("Failed to fetch events:", e);
+      }
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      // Fetch tomorrow's meetings
+      try {
+        const meetingsRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/meeting_minutes?select=id,title,date,start_time,location,type,attendees,google_meet_link,google_event_link&date=eq.${tomorrowStr}`,
+          { headers },
+        );
+        if (meetingsRes.ok) {
+          meetings = await meetingsRes.json();
+          console.log(`Fetched ${meetings.length} meetings for tomorrow`);
+        }
+      } catch (e) {
+        console.error("Failed to fetch meetings:", e);
+      }
+
+      // Fetch approved leave for tomorrow
+      try {
+        const leaveRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/leave_requests?select=member_id,start_date,end_date,status&status=eq.approved&start_date=lte.${tomorrowStr}&end_date=gte.${tomorrowStr}`,
+          { headers },
+        );
+        if (leaveRes.ok) {
+          approvedLeave = await leaveRes.json();
+          console.log(`Fetched ${approvedLeave.length} approved leave record(s) for tomorrow`);
+        }
+      } catch (e) {
+        console.error("Failed to fetch approved leave:", e);
       }
 
       // Fetch all contributions for the current year
@@ -881,6 +986,49 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       }
     }
 
+    // Check for tomorrow's meetings and notify intended members
+    const tomorrowMeetings = getTomorrowMeetings(meetings);
+    if (tomorrowMeetings.length > 0) {
+      const onLeaveIds = new Set(approvedLeave.map((leave) => leave.member_id));
+      const eligibleMembers = members.filter((member) => member.email && !onLeaveIds.has(member.id));
+
+      const recipientMap = new Map<string, { name: string; meetings: MeetingSchedule[] }>();
+
+      for (const meeting of tomorrowMeetings) {
+        let recipients = eligibleMembers;
+
+        if (meeting.type === 'committee' && Array.isArray(meeting.attendees) && meeting.attendees.length > 0) {
+          const attendeeNames = new Set(meeting.attendees.map((name) => String(name).trim().toLowerCase()));
+          recipients = eligibleMembers.filter((member) => attendeeNames.has(member.name.trim().toLowerCase()));
+        }
+
+        for (const recipient of recipients) {
+          if (!recipient.email) continue;
+          const key = recipient.email.toLowerCase();
+          const existing = recipientMap.get(key);
+          if (existing) {
+            existing.meetings.push(meeting);
+          } else {
+            recipientMap.set(key, { name: recipient.name, meetings: [meeting] });
+          }
+        }
+      }
+
+      let meetingEmailsSent = 0;
+      for (const [email, payload] of recipientMap.entries()) {
+        const subject = payload.meetings.length > 1
+          ? `📅 Reminder: ${payload.meetings.length} Meetings Tomorrow`
+          : `📅 Reminder: ${payload.meetings[0].title} Tomorrow`;
+
+        const sent = await sendEmail([email], subject, generateMeetingReminderEmail(payload.name, payload.meetings));
+        if (sent) meetingEmailsSent += 1;
+      }
+
+      results.meetingCount = tomorrowMeetings.length;
+      results.meetingRecipients = recipientMap.size;
+      results.meetingRemindersSent = meetingEmailsSent;
+    }
+
     // ===== CONTRIBUTION REMINDERS =====
     // Find the monthly dues amount
     const monthlyType = contributionTypes.find(t => t.category === 'monthly');
@@ -971,12 +1119,14 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         data: {
           membersFound: members.length,
           eventsFound: events.length,
+          meetingsFound: meetings.length,
           contributionsFound: contributions.length,
           contributionTypesFound: contributionTypes.length,
           monthlyDuesAmount: monthlyAmount,
           todayBirthdays: todayBirthdays.map(m => m.name),
           upcomingBirthdays: upcomingBirthdays.map(m => m.name),
           tomorrowEvents: tomorrowEvents.map(e => e.title),
+          tomorrowMeetings: tomorrowMeetings.map(m => m.title),
         },
         timestamp: new Date().toISOString(),
       }),
