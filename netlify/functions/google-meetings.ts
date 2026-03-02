@@ -20,6 +20,7 @@ type GoogleMeetingPayload = {
   startTime?: string;
   endTime?: string;
   timezone?: string;
+  includeMeetLink?: boolean;
 };
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -183,6 +184,7 @@ const handler: Handler = async (event) => {
       start: dateTimes.start,
       end: dateTimes.end,
     };
+    const includeMeetLink = payload.includeMeetLink !== false;
 
     let response: Response;
     const conferenceRequest = {
@@ -193,8 +195,9 @@ const handler: Handler = async (event) => {
     };
 
     if (event.httpMethod === "PATCH" && payload.googleEventId) {
+      const query = includeMeetLink ? "conferenceDataVersion=1&sendUpdates=all" : "sendUpdates=all";
       response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(payload.googleEventId)}?conferenceDataVersion=1&sendUpdates=all`,
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(payload.googleEventId)}?${query}`,
         {
           method: "PATCH",
           headers: {
@@ -203,13 +206,14 @@ const handler: Handler = async (event) => {
           },
           body: JSON.stringify({
             ...baseEvent,
-            conferenceData: conferenceRequest,
+            ...(includeMeetLink ? { conferenceData: conferenceRequest } : { conferenceData: null }),
           }),
         },
       );
     } else {
+      const query = includeMeetLink ? "conferenceDataVersion=1&sendUpdates=all" : "sendUpdates=all";
       response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`,
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${query}`,
         {
           method: "POST",
           headers: {
@@ -218,7 +222,7 @@ const handler: Handler = async (event) => {
           },
           body: JSON.stringify({
             ...baseEvent,
-            conferenceData: conferenceRequest,
+            ...(includeMeetLink ? { conferenceData: conferenceRequest } : {}),
           }),
         },
       );
@@ -237,15 +241,17 @@ const handler: Handler = async (event) => {
 
     const eventData = await response.json();
     const meetLink = extractMeetLink(eventData);
+    const conferenceId = includeMeetLink ? eventData.conferenceData?.conferenceId || null : null;
+    const meetLinkValue = includeMeetLink ? meetLink || null : null;
 
     if (payload.meetingId) {
       await supabase
         .from("meeting_minutes")
         .update({
           google_event_id: eventData.id || null,
-          google_meet_link: meetLink || null,
+          google_meet_link: meetLinkValue,
           google_event_link: eventData.htmlLink || null,
-          google_conference_id: eventData.conferenceData?.conferenceId || null,
+          google_conference_id: conferenceId,
           updated_at: new Date().toISOString(),
         })
         .eq("id", payload.meetingId);
@@ -260,9 +266,9 @@ const handler: Handler = async (event) => {
       body: JSON.stringify({
         success: true,
         googleEventId: eventData.id,
-        googleMeetLink: meetLink,
+        googleMeetLink: meetLinkValue,
         googleEventLink: eventData.htmlLink || null,
-        googleConferenceId: eventData.conferenceData?.conferenceId || null,
+        googleConferenceId: conferenceId,
       }),
     };
   } catch (error: any) {

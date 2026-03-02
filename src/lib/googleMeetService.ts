@@ -14,12 +14,13 @@ export interface GoogleMeetingPayload {
   startTime?: string;
   endTime?: string;
   timezone?: string;
+  includeMeetLink?: boolean;
 }
 
 export interface GoogleMeetingResult {
   success: boolean;
   googleEventId: string;
-  googleMeetLink: string;
+  googleMeetLink: string | null;
   googleEventLink: string | null;
   googleConferenceId: string | null;
 }

@@ -101,6 +101,7 @@ export function MeetingMinutesComponent() {
     closingPrayer: "",
     nextMeetingDate: "",
     notes: "",
+    syncGoogleCalendar: true,
     createGoogleMeet: true,
   });
 
@@ -207,7 +208,7 @@ export function MeetingMinutesComponent() {
         throw new Error("Failed to save meeting");
       }
 
-      if (formData.createGoogleMeet && currentUser?.id && googleConnection.connected) {
+      if (formData.syncGoogleCalendar && currentUser?.id && googleConnection.connected) {
         try {
           const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
             meetingId: savedMeeting.id,
@@ -219,6 +220,7 @@ export function MeetingMinutesComponent() {
             startTime: savedMeeting.startTime || "09:00",
             endTime: savedMeeting.endTime || undefined,
             timezone: "Africa/Lagos",
+            includeMeetLink: formData.createGoogleMeet,
           });
 
           await updateMeeting(savedMeeting.id, {
@@ -229,8 +231,10 @@ export function MeetingMinutesComponent() {
           });
 
           toast({
-            title: "Google Meet Synced",
-            description: "Meeting event and Google Meet link were updated in Google Calendar.",
+            title: "Google Calendar Synced",
+            description: formData.createGoogleMeet
+              ? "Meeting event and Google Meet link were updated in Google Calendar."
+              : "Meeting event was updated in Google Calendar without a Meet link.",
           });
         } catch (error: any) {
           toast({
@@ -239,7 +243,7 @@ export function MeetingMinutesComponent() {
             variant: "destructive",
           });
         }
-      } else if (formData.createGoogleMeet && !googleConnection.connected) {
+      } else if (formData.syncGoogleCalendar && !googleConnection.connected) {
         toast({
           title: "Google Not Connected",
           description: "Meeting saved, but Google Calendar is not connected yet.",
@@ -342,6 +346,7 @@ export function MeetingMinutesComponent() {
       closingPrayer: "",
       nextMeetingDate: "",
       notes: "",
+      syncGoogleCalendar: true,
       createGoogleMeet: true,
     });
     setAgendaItems([]);
@@ -364,7 +369,8 @@ export function MeetingMinutesComponent() {
       closingPrayer: meeting.closingPrayer || "",
       nextMeetingDate: meeting.nextMeetingDate || "",
       notes: meeting.notes || "",
-      createGoogleMeet: true,
+      syncGoogleCalendar: Boolean(meeting.googleEventId),
+      createGoogleMeet: Boolean(meeting.googleMeetLink),
     });
     setAgendaItems(meeting.agenda.map(({ id, ...rest }) => rest));
     setShowAddModal(true);
@@ -837,19 +843,39 @@ export function MeetingMinutesComponent() {
 
             <div className="flex items-center gap-2">
               <input
+                id="syncGoogleCalendar"
+                type="checkbox"
+                checked={formData.syncGoogleCalendar}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    syncGoogleCalendar: e.target.checked,
+                    createGoogleMeet: e.target.checked ? formData.createGoogleMeet : false,
+                  })
+                }
+                className="h-4 w-4 accent-primary"
+              />
+              <Label htmlFor="syncGoogleCalendar" className="text-sm">
+                Sync this meeting to Google Calendar
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2 pl-6">
+              <input
                 id="createGoogleMeet"
                 type="checkbox"
                 checked={formData.createGoogleMeet}
+                disabled={!formData.syncGoogleCalendar}
                 onChange={(e) => setFormData({ ...formData, createGoogleMeet: e.target.checked })}
                 className="h-4 w-4 accent-primary"
               />
               <Label htmlFor="createGoogleMeet" className="text-sm">
-                Create/update Google Meet link
+                Add Google Meet link to Google Calendar event
               </Label>
             </div>
-            {!googleConnection.connected && formData.createGoogleMeet && (
+            {!googleConnection.connected && formData.syncGoogleCalendar && (
               <p className="text-xs text-orange-400">
-                Google Calendar is not connected yet. Save will work, but no Meet link will be created.
+                Google Calendar is not connected yet. Save will work, but event sync will be skipped.
               </p>
             )}
 
