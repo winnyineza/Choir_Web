@@ -348,27 +348,38 @@ export default function MemberPortal() {
   };
 
   const loadUpcomingMeetingsForMember = async (member: Member) => {
-    const meetings = await getAllMeetings();
-    const today = new Date().toISOString().split("T")[0];
-    const memberName = member.name.trim().toLowerCase();
+    try {
+      const meetings = await getAllMeetings();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const memberName = member.name.trim().toLowerCase();
 
-    const visibleUpcoming = meetings
-      .filter((meeting) => {
-        if (meeting.date < today) return false;
-        if (meeting.type === "committee") {
-          const committeeNames = (meeting.attendees || []).map((name) => String(name).trim().toLowerCase());
-          return committeeNames.includes(memberName);
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        const aDateTime = new Date(`${a.date}T${a.startTime || "00:00"}:00`).getTime();
-        const bDateTime = new Date(`${b.date}T${b.startTime || "00:00"}:00`).getTime();
-        return aDateTime - bDateTime;
-      })
-      .slice(0, 6);
+      const visibleUpcoming = meetings
+        .filter((meeting) => {
+          const meetingDateOnly = String(meeting.date || "").slice(0, 10);
+          const meetingDate = new Date(`${meetingDateOnly}T00:00:00`);
+          if (Number.isNaN(meetingDate.getTime())) return false;
+          if (meetingDate < today) return false;
 
-    setUpcomingMeetings(visibleUpcoming);
+          if (meeting.type === "committee") {
+            const committeeNames = (meeting.attendees || []).map((name) => String(name).trim().toLowerCase());
+            if (committeeNames.length === 0) return true;
+            return committeeNames.includes(memberName);
+          }
+
+          return true;
+        })
+        .sort((a, b) => {
+          const aDateTime = new Date(`${String(a.date).slice(0, 10)}T${a.startTime || "00:00"}:00`).getTime();
+          const bDateTime = new Date(`${String(b.date).slice(0, 10)}T${b.startTime || "00:00"}:00`).getTime();
+          return aDateTime - bDateTime;
+        })
+        .slice(0, 6);
+
+      setUpcomingMeetings(visibleUpcoming);
+    } catch {
+      setUpcomingMeetings([]);
+    }
   };
 
   const handlePinSubmit = (pinValue?: string) => {
@@ -949,31 +960,35 @@ export default function MemberPortal() {
                 </div>
 
                 {/* Upcoming Meetings */}
-                {memberInfo && upcomingMeetings.length > 0 && (
+                {memberInfo && (
                   <div className="card-glass rounded-2xl p-6">
                     <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
                       <Calendar className="w-5 h-5 text-primary" />
                       Upcoming Meetings
                     </h2>
-                    <div className="space-y-3">
-                      {upcomingMeetings.map((meeting) => (
-                        <div key={meeting.id} className="p-3 rounded-lg bg-secondary/30 border border-primary/10">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-foreground">{meeting.title}</p>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">
-                              {meeting.type === "committee" ? "Committee" : "General"}
-                            </span>
+                    {upcomingMeetings.length > 0 ? (
+                      <div className="space-y-3">
+                        {upcomingMeetings.map((meeting) => (
+                          <div key={meeting.id} className="p-3 rounded-lg bg-secondary/30 border border-primary/10">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-medium text-foreground">{meeting.title}</p>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                                {meeting.type === "committee" ? "Committee" : "General"}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {new Date(meeting.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                              {meeting.startTime ? ` • ${meeting.startTime}` : ""}
+                            </p>
+                            {meeting.location && (
+                              <p className="text-xs text-muted-foreground mt-1">📍 {meeting.location}</p>
+                            )}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {new Date(meeting.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                            {meeting.startTime ? ` • ${meeting.startTime}` : ""}
-                          </p>
-                          {meeting.location && (
-                            <p className="text-xs text-muted-foreground mt-1">📍 {meeting.location}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No upcoming meetings available right now.</p>
+                    )}
                   </div>
                 )}
 
