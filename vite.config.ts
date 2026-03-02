@@ -49,6 +49,9 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         importScripts: ["/push-sw.js"],
+        navigateFallbackDenylist: [
+          /^\/\.netlify\/functions\//,
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
