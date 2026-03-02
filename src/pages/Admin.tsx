@@ -193,7 +193,6 @@ const DocumentManagement = lazy(() => import("@/components/admin/DocumentManagem
 const VoiceBalanceTracker = lazy(() => import("@/components/admin/VoiceBalanceTracker").then(m => ({ default: m.VoiceBalanceTracker })));
 const SurveyManagement = lazy(() => import("@/components/admin/SurveyManagement").then(m => ({ default: m.SurveyManagement })));
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2, ClipboardList } from "lucide-react";
-import { PageSkeleton } from "@/components/ui/skeleton";
 import { BackupRestore } from "@/components/admin/BackupRestore";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "analytics" | "event-staff" | "team" | "audit" | "settings";
@@ -1140,7 +1139,7 @@ export default function Admin() {
             currentUserName={currentUser?.name}
           />
           
-          <Suspense fallback={<PageSkeleton />}>
+          <Suspense fallback={null}>
           <div className="p-4 lg:p-8">
           {/* Dashboard */}
           {activeTab === "dashboard" && (
