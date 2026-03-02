@@ -226,6 +226,13 @@ export function MeetingMinutesComponent() {
         id: `agenda_${Date.now()}_${i}`,
       })),
     };
+    const formSnapshot = {
+      ...formData,
+      attendees: [...formData.attendees],
+      absentees: [...formData.absentees],
+      inviteeNames: [...formData.inviteeNames],
+    };
+    const editingGoogleEventId = selectedMeeting?.googleEventId;
 
     try {
       let savedMeeting: MeetingMinutesType | null = null;
@@ -247,6 +254,10 @@ export function MeetingMinutesComponent() {
       if (!savedMeeting) {
         throw new Error("Failed to save meeting");
       }
+
+      // Close modal immediately after local save; continue integrations in background.
+      setShowAddModal(false);
+      resetForm();
 
       const hasAttendance = await hasAttendanceForDate(savedMeeting.date);
       if (!hasAttendance) {
@@ -283,12 +294,12 @@ export function MeetingMinutesComponent() {
           const eligibleMembers = members.filter(
             (member) => member.status === "Active" && Boolean(member.email) && !membersOnLeaveIds.has(member.id),
           );
-          const selectedNames = formData.inviteeNames.length > 0 ? formData.inviteeNames : formData.attendees;
+          const selectedNames = formSnapshot.inviteeNames.length > 0 ? formSnapshot.inviteeNames : formSnapshot.attendees;
           const selectedPeopleEmails = eligibleMembers
             .filter((member) => selectedNames.includes(member.name))
             .map((member) => member.email.trim());
 
-          const audienceEmails = formData.inviteScope === "selected_people"
+          const audienceEmails = formSnapshot.inviteScope === "selected_people"
             ? selectedPeopleEmails
             : eligibleMembers.map((member) => member.email.trim());
 
@@ -300,7 +311,7 @@ export function MeetingMinutesComponent() {
 
           const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
             meetingId: savedMeeting.id,
-            googleEventId: selectedMeeting?.googleEventId || undefined,
+            googleEventId: editingGoogleEventId || undefined,
             title: savedMeeting.title,
             description: savedMeeting.notes || "Choir meeting",
             location: savedMeeting.location,
@@ -308,7 +319,7 @@ export function MeetingMinutesComponent() {
             startTime: savedMeeting.startTime || "09:00",
             endTime: savedMeeting.endTime || undefined,
             timezone: "Africa/Lagos",
-            includeMeetLink: formData.createGoogleMeet,
+            includeMeetLink: formSnapshot.createGoogleMeet,
             attendeeEmails,
           });
 
@@ -321,7 +332,7 @@ export function MeetingMinutesComponent() {
 
           toast({
             title: "Google Calendar Synced",
-            description: formData.createGoogleMeet
+            description: formSnapshot.createGoogleMeet
               ? `Meeting event and Google Meet link were updated. ${attendeeEmails.length} invitee(s) were notified via Google Calendar.`
               : `Meeting event was updated without a Meet link. ${attendeeEmails.length} invitee(s) were notified via Google Calendar.`,
           });
@@ -332,19 +343,19 @@ export function MeetingMinutesComponent() {
             variant: "destructive",
           });
         }
-      } else if (formData.syncGoogleCalendar && !googleConnection.connected) {
+      } else if (formSnapshot.syncGoogleCalendar && !googleConnection.connected) {
         toast({
           title: "Google Not Connected",
           description: "Meeting saved, but Google Calendar is not connected yet.",
         });
       } else if (
-        !formData.syncGoogleCalendar &&
-        selectedMeeting?.googleEventId &&
+        !formSnapshot.syncGoogleCalendar &&
+        editingGoogleEventId &&
         currentUser?.id &&
         googleConnection.connected
       ) {
         try {
-          await deleteGoogleMeeting(currentUser.id, savedMeeting.id, selectedMeeting.googleEventId);
+          await deleteGoogleMeeting(currentUser.id, savedMeeting.id, editingGoogleEventId);
           toast({
             title: "Google Calendar Unsynced",
             description: "Google Calendar event was removed for this meeting.",
@@ -359,8 +370,6 @@ export function MeetingMinutesComponent() {
       }
 
       await loadData();
-      setShowAddModal(false);
-      resetForm();
     } catch (e) {
       toast({ title: "Error", description: "Failed to save meeting", variant: "destructive" });
     }
