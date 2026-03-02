@@ -248,6 +248,25 @@ export function MeetingMinutesComponent() {
           title: "Google Not Connected",
           description: "Meeting saved, but Google Calendar is not connected yet.",
         });
+      } else if (
+        !formData.syncGoogleCalendar &&
+        selectedMeeting?.googleEventId &&
+        currentUser?.id &&
+        googleConnection.connected
+      ) {
+        try {
+          await deleteGoogleMeeting(currentUser.id, savedMeeting.id, selectedMeeting.googleEventId);
+          toast({
+            title: "Google Calendar Unsynced",
+            description: "Google Calendar event was removed for this meeting.",
+          });
+        } catch (error: any) {
+          toast({
+            title: "Saved Locally",
+            description: error.message || "Meeting was saved, but Google event removal failed.",
+            variant: "destructive",
+          });
+        }
       }
 
       await loadData();
@@ -585,16 +604,28 @@ export function MeetingMinutesComponent() {
                   <p className="text-xs text-muted-foreground mt-2">
                     Chaired by: {meeting.chairperson} | Secretary: {meeting.secretary}
                   </p>
-                  {meeting.googleMeetLink && (
-                    <a
-                      href={meeting.googleMeetLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex mt-2 text-xs text-primary hover:underline"
-                    >
-                      Open Google Meet
-                    </a>
-                  )}
+                  <div className="mt-2 flex flex-col gap-1">
+                    {meeting.googleMeetLink && (
+                      <a
+                        href={meeting.googleMeetLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex text-xs text-primary hover:underline"
+                      >
+                        Open Google Meet
+                      </a>
+                    )}
+                    {meeting.googleEventLink && (
+                      <a
+                        href={meeting.googleEventLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex text-xs text-primary/90 hover:underline"
+                      >
+                        Open Google Calendar Event
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -934,6 +965,31 @@ export function MeetingMinutesComponent() {
                   <span className="text-muted-foreground">Chairperson:</span> {selectedMeeting.chairperson}
                 </div>
               </div>
+
+              {(selectedMeeting.googleMeetLink || selectedMeeting.googleEventLink) && (
+                <div className="flex flex-wrap gap-3 text-sm">
+                  {selectedMeeting.googleMeetLink && (
+                    <a
+                      href={selectedMeeting.googleMeetLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Open Google Meet
+                    </a>
+                  )}
+                  {selectedMeeting.googleEventLink && (
+                    <a
+                      href={selectedMeeting.googleEventLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary/90 hover:underline"
+                    >
+                      Open Google Calendar Event
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div>
                 <h3 className="font-medium mb-2">Attendees ({selectedMeeting.attendees.length})</h3>
