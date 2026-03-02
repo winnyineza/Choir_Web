@@ -10,10 +10,9 @@ interface TicketConfirmationProps {
   onClose: () => void;
 }
 
-// Generate real scannable QR code with fallback
+// Generate real scannable QR code
 async function generateQRCodeAsync(data: string, size: number = 150): Promise<string> {
   try {
-    // Try to use the qrcode library
     const qrDataUrl = await QRCode.toDataURL(data, {
       width: size,
       margin: 1,
@@ -26,69 +25,8 @@ async function generateQRCodeAsync(data: string, size: number = 150): Promise<st
     return qrDataUrl;
   } catch (error) {
     console.error("Error generating QR code with library:", error);
-    // Fallback: Generate a simple placeholder QR-like pattern
-    return generateFallbackQR(data, size);
+    return "";
   }
-}
-
-// Fallback QR code generator (creates a visual pattern that looks like a QR code)
-function generateFallbackQR(data: string, size: number): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  
-  if (!ctx) return "";
-
-  // Background
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, size, size);
-
-  // Create a pattern based on the data hash
-  ctx.fillStyle = "#000000";
-  const cellSize = size / 25;
-  
-  // Generate pseudo-random pattern from data
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash) + data.charCodeAt(i);
-    hash = hash & hash;
-  }
-
-  // Position detection patterns (corners) - standard QR code pattern
-  const drawFinderPattern = (x: number, y: number) => {
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x, y, cellSize * 7, cellSize * 7);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x + cellSize, y + cellSize, cellSize * 5, cellSize * 5);
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(x + cellSize * 2, y + cellSize * 2, cellSize * 3, cellSize * 3);
-  };
-
-  drawFinderPattern(0, 0);
-  drawFinderPattern(size - cellSize * 7, 0);
-  drawFinderPattern(0, size - cellSize * 7);
-
-  // Data modules based on hash
-  const seedRandom = (seed: number) => {
-    return () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-  };
-
-  const random = seedRandom(Math.abs(hash));
-
-  ctx.fillStyle = "#000000";
-  for (let row = 8; row < 17; row++) {
-    for (let col = 8; col < 17; col++) {
-      if (random() > 0.5) {
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-      }
-    }
-  }
-
-  return canvas.toDataURL("image/png");
 }
 
 // Color themes based on ticket tier
@@ -339,23 +277,11 @@ function generateTicketImage(order: TicketOrder, qrCodeData: string): Promise<st
         finishStub();
       };
       qrImg.onerror = () => {
-        // Fallback placeholder
-        ctx.fillStyle = colors.primary;
-        ctx.font = "bold 10px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("SCAN ME", stubCenter, qrY + qrSize / 2 + 4);
-        finishStub();
+        resolve("");
       };
       qrImg.src = qrCodeData;
     } else {
-      // QR placeholder pattern
-      ctx.fillStyle = "#cccccc";
-      ctx.fillRect(qrX, qrY, qrSize, qrSize);
-      ctx.fillStyle = colors.primary;
-      ctx.font = "bold 10px Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("QR CODE", stubCenter, qrY + qrSize / 2 + 4);
-      finishStub();
+      resolve("");
     }
 
     function finishStub() {

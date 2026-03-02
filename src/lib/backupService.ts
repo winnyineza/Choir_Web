@@ -1,53 +1,16 @@
 // Backup & Restore Service - Export/Import data as ZIP
-// Reads from and writes to Supabase when configured
+// Reads from and writes to Supabase
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { supabase, isSupabaseConfigured } from './supabaseDB';
-
-// Define all data keys for backup (used for localStorage fallback and key mapping)
-const BACKUP_KEYS = {
-  // Main data
-  members: 'serenades_members',
-  events: 'serenades_events',
-  gallery: 'serenades_gallery',
-  donations: 'serenades_donations',
-  settings: 'serenades_settings',
-  eventStaff: 'serenades_event_staff',
-  scanRecords: 'serenades_scan_records',
-
-  // Admin & Auth
-  adminUsers: 'choir_admin_users',
-  auditLogs: 'choir_audit_logs',
-
-  // Financial
-  contributions: 'choir_contributions',
-  expenses: 'choir_expenses',
-
-  // Records
-  attendance: 'choir_attendance',
-  leaveRequests: 'choir_leave_requests',
-  disciplinaryRecords: 'choir_disciplinary_records',
-
-  // Content
-  announcements: 'choir_announcements',
-  documents: 'choir_documents',
-  meetingMinutes: 'choir_meeting_minutes',
-  inventory: 'choir_inventory',
-
-  // Other
-  promoCodes: 'choir_promo_codes',
-  musicReleases: 'choir_music_releases',
-  contactSubmissions: 'choir_contact_submissions',
-  auditions: 'choir_auditions',
-};
 
 const LAST_BACKUP_KEY = 'choir_last_backup';
 
 export interface BackupMetadata {
   version: string;
   createdAt: string;
-  source: 'localStorage' | 'supabase';
+  source: 'supabase';
   recordCounts: Record<string, number>;
 }
 
@@ -85,36 +48,11 @@ const SUPABASE_TABLES = [
 // ============ EXPORT FUNCTIONS ============
 
 /**
- * Export all data from localStorage as a backup (fallback when Supabase not configured)
- */
-export function exportLocalStorageBackup(): BackupData {
-  const data: Record<string, any[]> = {};
-  const recordCounts: Record<string, number> = {};
-
-  for (const [key, storageKey] of Object.entries(BACKUP_KEYS)) {
-    const stored = localStorage.getItem(storageKey);
-    const parsed = stored ? JSON.parse(stored) : [];
-    data[key] = Array.isArray(parsed) ? parsed : [parsed];
-    recordCounts[key] = Array.isArray(parsed) ? parsed.length : parsed ? 1 : 0;
-  }
-
-  return {
-    metadata: {
-      version: '1.0.0',
-      createdAt: new Date().toISOString(),
-      source: 'localStorage',
-      recordCounts,
-    },
-    data,
-  };
-}
-
-/**
  * Export all data from Supabase as a backup
  */
 export async function exportSupabaseBackup(): Promise<BackupData> {
   if (!isSupabaseConfigured()) {
-    return exportLocalStorageBackup();
+    throw new Error('Supabase is not configured. Backup is unavailable.');
   }
 
   const data: Record<string, any[]> = {};
@@ -153,16 +91,14 @@ export async function exportSupabaseBackup(): Promise<BackupData> {
  * Create and download a ZIP backup file
  */
 export async function downloadBackup(
-  source: 'localStorage' | 'supabase' | 'auto' = 'auto'
+  source: 'supabase' = 'supabase'
 ): Promise<{ success: boolean; fileName: string; recordCount: number }> {
   try {
-    let backupData: BackupData;
-
-    if (source === 'supabase' || (source === 'auto' && isSupabaseConfigured())) {
-      backupData = await exportSupabaseBackup();
-    } else {
-      backupData = exportLocalStorageBackup();
+    if (source !== 'supabase') {
+      throw new Error('Only Supabase backup source is supported.');
     }
+
+    const backupData = await exportSupabaseBackup();
 
     // Create ZIP file
     const zip = new JSZip();
@@ -239,69 +175,6 @@ export async function readBackupFile(file: File): Promise<BackupData | null> {
 }
 
 /**
- * Restore backup to localStorage (fallback when Supabase not configured)
- */
-export function restoreToLocalStorage(backupData: BackupData): {
-  success: boolean;
-  restored: number;
-  errors: string[];
-} {
-  const errors: string[] = [];
-  let restored = 0;
-
-  const keyMapping: Record<string, string> = {
-    members: BACKUP_KEYS.members,
-    events: BACKUP_KEYS.events,
-    gallery: BACKUP_KEYS.gallery,
-    donations: BACKUP_KEYS.donations,
-    settings: BACKUP_KEYS.settings,
-    eventStaff: BACKUP_KEYS.eventStaff,
-    scanRecords: BACKUP_KEYS.scanRecords,
-    adminUsers: BACKUP_KEYS.adminUsers,
-    admin_users: BACKUP_KEYS.adminUsers,
-    auditLogs: BACKUP_KEYS.auditLogs,
-    audit_logs: BACKUP_KEYS.auditLogs,
-    contributions: BACKUP_KEYS.contributions,
-    expenses: BACKUP_KEYS.expenses,
-    attendance: BACKUP_KEYS.attendance,
-    leaveRequests: BACKUP_KEYS.leaveRequests,
-    leave_requests: BACKUP_KEYS.leaveRequests,
-    disciplinaryRecords: BACKUP_KEYS.disciplinaryRecords,
-    disciplinary_records: BACKUP_KEYS.disciplinaryRecords,
-    announcements: BACKUP_KEYS.announcements,
-    documents: BACKUP_KEYS.documents,
-    meetingMinutes: BACKUP_KEYS.meetingMinutes,
-    meeting_minutes: BACKUP_KEYS.meetingMinutes,
-    inventory: BACKUP_KEYS.inventory,
-    promoCodes: BACKUP_KEYS.promoCodes,
-    promo_codes: BACKUP_KEYS.promoCodes,
-    musicReleases: BACKUP_KEYS.musicReleases,
-    music_releases: BACKUP_KEYS.musicReleases,
-    contactSubmissions: BACKUP_KEYS.contactSubmissions,
-    contact_submissions: BACKUP_KEYS.contactSubmissions,
-    auditions: BACKUP_KEYS.auditions,
-  };
-
-  for (const [key, records] of Object.entries(backupData.data)) {
-    try {
-      const storageKey = keyMapping[key];
-      if (storageKey && records && records.length > 0) {
-        localStorage.setItem(storageKey, JSON.stringify(records));
-        restored += records.length;
-      }
-    } catch (error) {
-      errors.push(`Failed to restore ${key}: ${error}`);
-    }
-  }
-
-  return {
-    success: errors.length === 0,
-    restored,
-    errors,
-  };
-}
-
-/**
  * Restore backup to Supabase
  */
 export async function restoreToSupabase(backupData: BackupData): Promise<{
@@ -310,7 +183,11 @@ export async function restoreToSupabase(backupData: BackupData): Promise<{
   errors: string[];
 }> {
   if (!isSupabaseConfigured()) {
-    return restoreToLocalStorage(backupData);
+    return {
+      success: false,
+      restored: 0,
+      errors: ['Supabase is not configured. Restore is unavailable.'],
+    };
   }
 
   const errors: string[] = [];
@@ -376,7 +253,7 @@ export async function restoreToSupabase(backupData: BackupData): Promise<{
  */
 export async function restoreFromFile(
   file: File,
-  target: 'localStorage' | 'supabase' | 'both' = 'both'
+  target: 'supabase' = 'supabase'
 ): Promise<{
   success: boolean;
   restored: number;
@@ -397,16 +274,12 @@ export async function restoreFromFile(
   let totalRestored = 0;
   const allErrors: string[] = [];
 
-  if (target === 'localStorage' || target === 'both') {
-    const localResult = restoreToLocalStorage(backupData);
-    totalRestored += localResult.restored;
-    allErrors.push(...localResult.errors.map((e) => `[localStorage] ${e}`));
-  }
-
-  if ((target === 'supabase' || target === 'both') && isSupabaseConfigured()) {
+  if (target === 'supabase') {
     const supaResult = await restoreToSupabase(backupData);
     totalRestored += supaResult.restored;
     allErrors.push(...supaResult.errors.map((e) => `[Supabase] ${e}`));
+  } else {
+    allErrors.push('Only Supabase restore target is supported.');
   }
 
   return {
@@ -427,76 +300,52 @@ export async function getBackupStats(): Promise<{
   supabase?: { tables: number; records: number };
   lastBackup?: string;
 }> {
-  if (isSupabaseConfigured()) {
-    let records = 0;
-    let tables = 0;
-
-    for (const table of SUPABASE_TABLES) {
-      try {
-        const { count, error } = await supabase
-          .from(table)
-          .select('*', { count: 'exact', head: true });
-
-        if (!error && count !== null && count > 0) {
-          tables++;
-          records += count;
-        }
-      } catch {
-        // Table may not exist
-      }
-    }
-
-    // Get last backup from choir_settings
-    let lastBackup: string | undefined;
-    try {
-      const { data } = await supabase
-        .from('choir_settings')
-        .select('value')
-        .eq('key', LAST_BACKUP_KEY)
-        .maybeSingle();
-      if (data?.value) {
-        try {
-          lastBackup = JSON.parse(data.value);
-        } catch {
-          lastBackup = data.value;
-        }
-      }
-    } catch {
-      // Ignore
-    }
-
-    // Fallback to localStorage for lastBackup if not in Supabase
-    if (!lastBackup && typeof localStorage !== 'undefined') {
-      lastBackup = localStorage.getItem(LAST_BACKUP_KEY) || undefined;
-    }
-
+  if (!isSupabaseConfigured()) {
     return {
       localStorage: { tables: 0, records: 0 },
-      supabase: { tables, records },
-      lastBackup,
+      supabase: { tables: 0, records: 0 },
+      lastBackup: undefined,
     };
   }
 
-  // Fallback to localStorage
   let records = 0;
   let tables = 0;
-  for (const storageKey of Object.values(BACKUP_KEYS)) {
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      const count = Array.isArray(parsed) ? parsed.length : parsed ? 1 : 0;
-      if (count > 0) {
+  for (const table of SUPABASE_TABLES) {
+    try {
+      const { count, error } = await supabase
+        .from(table)
+        .select('*', { count: 'exact', head: true });
+
+      if (!error && count !== null && count > 0) {
         tables++;
         records += count;
       }
+    } catch {
+      // Table may not exist
     }
   }
 
-  const lastBackup =
-    typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_BACKUP_KEY) || undefined : undefined;
+  let lastBackup: string | undefined;
+  try {
+    const { data } = await supabase
+      .from('choir_settings')
+      .select('value')
+      .eq('key', LAST_BACKUP_KEY)
+      .maybeSingle();
+    if (data?.value) {
+      try {
+        lastBackup = JSON.parse(data.value);
+      } catch {
+        lastBackup = data.value;
+      }
+    }
+  } catch {
+    // Ignore
+  }
 
   return {
-    localStorage: { tables, records },
+    localStorage: { tables: 0, records: 0 },
+    supabase: { tables, records },
     lastBackup,
   };
 }
@@ -507,18 +356,16 @@ export async function getBackupStats(): Promise<{
 export async function recordBackupTimestamp(): Promise<void> {
   const timestamp = new Date().toISOString();
 
-  if (isSupabaseConfigured()) {
-    try {
-      await supabase.from('choir_settings').upsert(
-        { key: LAST_BACKUP_KEY, value: JSON.stringify(timestamp) },
-        { onConflict: 'key' }
-      );
-    } catch (e) {
-      console.debug('[Backup] Failed to save timestamp to Supabase:', e);
-    }
+  if (!isSupabaseConfigured()) {
+    return;
   }
 
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(LAST_BACKUP_KEY, timestamp);
+  try {
+    await supabase.from('choir_settings').upsert(
+      { key: LAST_BACKUP_KEY, value: JSON.stringify(timestamp) },
+      { onConflict: 'key' }
+    );
+  } catch (e) {
+    console.debug('[Backup] Failed to save timestamp to Supabase:', e);
   }
 }

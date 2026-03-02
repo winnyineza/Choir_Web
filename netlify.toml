@@ -6,7 +6,7 @@
 [functions]
   node_bundler = "esbuild"
 
-# Ensure function routes are never rewritten by SPA fallback
+# Ensure function routes are never rewritten by SPA router
 [[redirects]]
   from = "/.netlify/functions/*"
   to = "/.netlify/functions/:splat"

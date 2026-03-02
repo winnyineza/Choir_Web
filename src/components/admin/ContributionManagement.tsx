@@ -372,7 +372,7 @@ export function ContributionManagement() {
       year,
       // Show current amount if already paid (for editing), otherwise start empty
       amount: paymentDetails.amountPaid > 0 ? paymentDetails.amountPaid.toString() : "",
-      expectedAmount: effectiveExpected || 5000, // Fallback to 5000 if no rate defined
+      expectedAmount: effectiveExpected,
     });
   };
   

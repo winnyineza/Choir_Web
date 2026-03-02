@@ -40,8 +40,7 @@ export function useVisitorCount(): number {
         setCount(initialCount);
       }
     } catch {
-      // Fallback if localStorage fails
-      setCount(BASE_COUNT);
+      console.error('Failed to read visitor count from localStorage');
     }
   }, []);
 

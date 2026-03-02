@@ -34,7 +34,7 @@ export function BackupRestore() {
     setIsExporting(true);
     
     try {
-      const result = await downloadBackup('auto');
+      const result = await downloadBackup('supabase');
       
       if (result.success) {
         await recordBackupTimestamp();
@@ -83,13 +83,13 @@ export function BackupRestore() {
         <div className="grid grid-cols-3 gap-4">
           <div className="p-3 rounded-lg bg-secondary/50 text-center">
             <div className="text-2xl font-bold text-primary">
-              {stats?.supabase?.tables ?? stats?.localStorage.tables ?? 0}
+              {stats?.supabase?.tables ?? 0}
             </div>
             <div className="text-xs text-muted-foreground">Data Tables</div>
           </div>
           <div className="p-3 rounded-lg bg-secondary/50 text-center">
             <div className="text-2xl font-bold text-primary">
-              {stats?.supabase?.records ?? stats?.localStorage.records ?? 0}
+              {stats?.supabase?.records ?? 0}
             </div>
             <div className="text-xs text-muted-foreground">Total Records</div>
           </div>

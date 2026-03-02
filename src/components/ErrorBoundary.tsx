@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  errorContent?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
@@ -44,8 +44,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
+      if (this.props.errorContent) {
+        return this.props.errorContent;
       }
 
       return (
@@ -118,7 +118,7 @@ export function withErrorBoundary<P extends object>(
 export function SectionErrorBoundary({ children, name = "Section" }: ErrorBoundaryWrapperProps) {
   return (
     <ErrorBoundary
-      fallback={
+      errorContent={
         <div className="p-6 rounded-xl bg-red-500/5 border border-red-500/20 text-center">
           <AlertTriangle className="w-6 h-6 text-red-500 mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">

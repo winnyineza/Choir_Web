@@ -203,13 +203,10 @@ export default function AdminLogin() {
             if (emailRes.ok) {
               setSuccess("A password reset link has been sent to your email. Check your inbox.");
             } else {
-              // Email failed, show link as fallback
-              setSuccess(`Reset link generated but email failed to send.\n\nReset Link: ${resetLink}`);
-              navigator.clipboard.writeText(resetLink).catch(() => {});
+              setError("Reset link was generated but email could not be sent. Please try again.");
             }
           } catch {
-            setSuccess(`Reset link generated but email failed to send.\n\nReset Link: ${resetLink}`);
-            navigator.clipboard.writeText(resetLink).catch(() => {});
+            setError("Reset link was generated but email could not be sent. Please try again.");
           }
         }
       } else {

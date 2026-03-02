@@ -100,19 +100,8 @@ export async function showNotification(options: PushNotificationOptions): Promis
     
     return true;
   } catch (error) {
-    // Fallback to regular Notification API
-    try {
-      new Notification(options.title, {
-        body: options.body,
-        icon: options.icon || '/icon-192x192.png',
-        tag: options.tag,
-        data: options.data,
-      });
-      return true;
-    } catch (e) {
-      console.error('Error showing notification:', e);
-      return false;
-    }
+    console.error('Error showing notification:', error);
+    return false;
   }
 }
 

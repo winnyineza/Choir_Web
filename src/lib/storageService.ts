@@ -26,13 +26,8 @@ export async function uploadFile(
   path?: string
 ): Promise<string | null> {
   if (!isSupabaseConfigured()) {
-    console.warn('Supabase not configured, storing as base64');
-    // Fallback: Convert to base64 for localStorage
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
+    console.error('Supabase not configured. Upload aborted.');
+    return null;
   }
 
   try {
@@ -48,12 +43,7 @@ export async function uploadFile(
 
     if (error) {
       console.error('Upload error:', error);
-      // Fallback to base64
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
+      return null;
     }
 
     // Get public URL
@@ -77,8 +67,8 @@ export async function uploadBase64Image(
   fileName?: string
 ): Promise<string | null> {
   if (!isSupabaseConfigured()) {
-    // Already base64, just return it
-    return base64String;
+    console.error('Supabase not configured. Base64 upload aborted.');
+    return null;
   }
 
   // Check if it's already a URL (not base64)
@@ -105,7 +95,7 @@ export async function uploadBase64Image(
     return uploadFile(bucket, blob, name);
   } catch (error) {
     console.error('Base64 upload failed:', error);
-    return base64String; // Return original base64 as fallback
+    return null;
   }
 }
 
@@ -114,7 +104,7 @@ export async function uploadBase64Image(
  */
 export async function deleteFile(bucket: BucketName, path: string): Promise<boolean> {
   if (!isSupabaseConfigured()) {
-    return true; // No-op for localStorage
+    return false;
   }
 
   try {
@@ -142,7 +132,7 @@ export async function deleteFile(bucket: BucketName, path: string): Promise<bool
  */
 export function getPublicUrl(bucket: BucketName, path: string): string {
   if (!isSupabaseConfigured()) {
-    return path; // Return as-is for base64 or local paths
+    return '';
   }
 
   const { data } = supabase.storage

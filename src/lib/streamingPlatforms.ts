@@ -96,18 +96,13 @@ export const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
   },
 };
 
-// Helper to get platform config, with fallback for unknown platforms
+// Helper to get platform config
 export function getPlatformConfig(name: string): PlatformConfig {
-  if (PLATFORM_CONFIGS[name]) {
-    return PLATFORM_CONFIGS[name];
+  const config = PLATFORM_CONFIGS[name];
+  if (!config) {
+    throw new Error(`Unknown streaming platform: ${name}`);
   }
-  // Fallback for unknown platforms
-  return {
-    name,
-    svgPath: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z",
-    color: "#9CA3AF",
-    bgColor: "#1F2937",
-  };
+  return config;
 }
 
 // List of all supported platform names
