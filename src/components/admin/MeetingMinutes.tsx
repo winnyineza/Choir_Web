@@ -69,7 +69,7 @@ import {
 } from "lucide-react";
 
 export function MeetingMinutesComponent() {
-  type InviteScope = "all_active" | "selected_attendees";
+  type InviteScope = "all_active" | "selected_people";
 
   const [meetings, setMeetings] = useState<MeetingMinutesType[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -108,6 +108,7 @@ export function MeetingMinutesComponent() {
     syncGoogleCalendar: true,
     createGoogleMeet: true,
     inviteScope: "all_active" as InviteScope,
+    inviteeNames: [] as string[],
   });
 
   const [agendaItems, setAgendaItems] = useState<Omit<MeetingAgendaItem, "id">[]>([]);
@@ -282,12 +283,13 @@ export function MeetingMinutesComponent() {
           const eligibleMembers = members.filter(
             (member) => member.status === "Active" && Boolean(member.email) && !membersOnLeaveIds.has(member.id),
           );
-          const selectedAttendeeEmails = eligibleMembers
-            .filter((member) => formData.attendees.includes(member.name))
+          const selectedNames = formData.inviteeNames.length > 0 ? formData.inviteeNames : formData.attendees;
+          const selectedPeopleEmails = eligibleMembers
+            .filter((member) => selectedNames.includes(member.name))
             .map((member) => member.email.trim());
 
-          const attendeeEmails = formData.inviteScope === "selected_attendees"
-            ? selectedAttendeeEmails
+          const attendeeEmails = formData.inviteScope === "selected_people"
+            ? selectedPeopleEmails
             : eligibleMembers.map((member) => member.email.trim());
 
           const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
@@ -458,6 +460,7 @@ export function MeetingMinutesComponent() {
       syncGoogleCalendar: true,
       createGoogleMeet: true,
       inviteScope: "all_active",
+      inviteeNames: [],
     });
     setAgendaItems([]);
   };
@@ -481,7 +484,8 @@ export function MeetingMinutesComponent() {
       notes: meeting.notes || "",
       syncGoogleCalendar: Boolean(meeting.googleEventId),
       createGoogleMeet: Boolean(meeting.googleMeetLink),
-      inviteScope: meeting.type === "committee" ? "selected_attendees" : "all_active",
+      inviteScope: meeting.type === "committee" ? "selected_people" : "all_active",
+      inviteeNames: meeting.attendees || [],
     });
     setAgendaItems(meeting.agenda.map(({ id, ...rest }) => rest));
     setShowAddModal(true);
@@ -533,6 +537,20 @@ export function MeetingMinutesComponent() {
         ...formData,
         absentees: [...formData.absentees, memberName],
         attendees: formData.attendees.filter(a => a !== memberName),
+      });
+    }
+  };
+
+  const toggleInvitee = (memberName: string) => {
+    if (formData.inviteeNames.includes(memberName)) {
+      setFormData({
+        ...formData,
+        inviteeNames: formData.inviteeNames.filter((name) => name !== memberName),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        inviteeNames: [...formData.inviteeNames, memberName],
       });
     }
   };
@@ -800,7 +818,7 @@ export function MeetingMinutesComponent() {
                     setFormData({
                       ...formData,
                       type: v as MeetingType,
-                      inviteScope: v === "committee" ? "selected_attendees" : "all_active",
+                      inviteScope: v === "committee" ? "selected_people" : "all_active",
                     })
                   }
                 >
@@ -812,6 +830,9 @@ export function MeetingMinutesComponent() {
                     <SelectItem value="committee">Committee Meeting</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Meeting type is currently limited to General or Committee.
+                </p>
               </div>
               <div>
                 <Label>Location *</Label>
@@ -1011,20 +1032,46 @@ export function MeetingMinutesComponent() {
               <Select
                 value={formData.inviteScope}
                 onValueChange={(value) => setFormData({ ...formData, inviteScope: value as InviteScope })}
-                disabled={!formData.syncGoogleCalendar}
               >
                 <SelectTrigger className="mt-1 bg-secondary">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all_active">All active members (except approved leave)</SelectItem>
-                  <SelectItem value="selected_attendees">Only selected attendees in this form</SelectItem>
+                  <SelectItem value="selected_people">Selected people only</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Tip: for committee meetings, choose "Only selected attendees" and mark the members above.
+                For committee or special targeting, choose "Selected people only" and pick invitees below.
               </p>
             </div>
+            {formData.inviteScope === "selected_people" && (
+              <div className="pl-6">
+                <Label className="text-sm">Select Invitees</Label>
+                <div className="mt-1 max-h-32 overflow-y-auto bg-secondary/50 rounded-lg p-2">
+                  <div className="flex flex-wrap gap-2">
+                    {members.filter((m) => m.status === "Active").map((m) => (
+                      <button
+                        key={`invitee-${m.id}`}
+                        type="button"
+                        onClick={() => toggleInvitee(m.name)}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded-full border transition-colors",
+                          formData.inviteeNames.includes(m.name)
+                            ? "bg-primary/20 border-primary/50 text-primary"
+                            : "bg-secondary border-primary/20 hover:border-primary/40"
+                        )}
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.inviteeNames.length} invitee(s) selected. If none is selected, attendance list is used as fallback.
+                </p>
+              </div>
+            )}
             {!googleConnection.connected && formData.syncGoogleCalendar && (
               <p className="text-xs text-orange-400">
                 Google Calendar is not connected yet. Save will work, but event sync will be skipped.
