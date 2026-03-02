@@ -106,7 +106,7 @@ const handler: Handler = async (event) => {
 
     const refreshToken = decryptRefreshToken(integration);
     const accessToken = await exchangeRefreshTokenForAccessToken(refreshToken);
-    const calendarId = integration.calendar_id || "primary";
+    const calendarId = process.env.GOOGLE_TARGET_CALENDAR_ID || integration.calendar_id || "primary";
     const supabase = getSupabaseAdminClient();
     const clientIp = getClientIp(event.headers);
 

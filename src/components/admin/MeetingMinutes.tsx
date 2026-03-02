@@ -288,9 +288,15 @@ export function MeetingMinutesComponent() {
             .filter((member) => selectedNames.includes(member.name))
             .map((member) => member.email.trim());
 
-          const attendeeEmails = formData.inviteScope === "selected_people"
+          const audienceEmails = formData.inviteScope === "selected_people"
             ? selectedPeopleEmails
             : eligibleMembers.map((member) => member.email.trim());
+
+          const alwaysIncludedEmails = [currentUser.email, googleConnection.googleEmail]
+            .filter((email): email is string => Boolean(email && email.trim()))
+            .map((email) => email.trim());
+
+          const attendeeEmails = Array.from(new Set([...audienceEmails, ...alwaysIncludedEmails]));
 
           const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
             meetingId: savedMeeting.id,
