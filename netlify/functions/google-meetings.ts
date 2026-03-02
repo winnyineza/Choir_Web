@@ -123,16 +123,31 @@ const handler: Handler = async (event) => {
         };
       }
 
-      const deleteRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}?sendUpdates=all`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
+      const eventUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`;
+
+      // Step 1: Explicitly cancel event first so invitees receive cancellation updates.
+      const cancelRes = await fetch(`${eventUrl}?sendUpdates=all&sendNotifications=true`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+
+      if (!cancelRes.ok && cancelRes.status !== 404 && cancelRes.status !== 410) {
+        const text = await cancelRes.text();
+        throw new Error(`Failed to cancel Google event before delete: ${text}`);
+      }
+
+      // Step 2: Delete from organizer calendar to keep data clean.
+      const deleteRes = await fetch(`${eventUrl}?sendUpdates=all&sendNotifications=true`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!deleteRes.ok && deleteRes.status !== 410 && deleteRes.status !== 404) {
         const text = await deleteRes.text();
