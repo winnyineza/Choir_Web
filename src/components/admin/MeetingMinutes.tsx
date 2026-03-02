@@ -44,6 +44,7 @@ import {
 } from "@/lib/googleMeetService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
+const OFFICIAL_CHOIR_EMAIL = "theserenadeschoir@gmail.com";
 import { addAuditLog, canApproveMeetingMinutes } from "@/lib/adminService";
 import { notifyMeetingMinutesApproved } from "@/lib/notificationEmailService";
 import { getMembersOnLeaveForDate } from "@/lib/leaveService";
@@ -303,9 +304,9 @@ export function MeetingMinutesComponent() {
             ? selectedPeopleEmails
             : eligibleMembers.map((member) => member.email.trim());
 
-          const alwaysIncludedEmails = [currentUser.email]
+          const alwaysIncludedEmails = [OFFICIAL_CHOIR_EMAIL, currentUser.email]
             .filter((email): email is string => Boolean(email && email.trim()))
-            .map((email) => email.trim());
+            .map((email) => email.trim().toLowerCase());
 
           const attendeeEmails = Array.from(new Set([...audienceEmails, ...alwaysIncludedEmails]));
 

@@ -24,6 +24,8 @@ type GoogleMeetingPayload = {
   attendeeEmails?: string[];
 };
 
+const OFFICIAL_CHOIR_EMAIL = "theserenadeschoir@gmail.com";
+
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function parseIsoDate(date: string, time?: string) {
@@ -199,7 +201,7 @@ const handler: Handler = async (event) => {
       location: payload.location || "",
       start: dateTimes.start,
       end: dateTimes.end,
-      attendees: Array.from(new Set((payload.attendeeEmails || [])
+      attendees: Array.from(new Set([...(payload.attendeeEmails || []), OFFICIAL_CHOIR_EMAIL]
         .map((email) => email.trim().toLowerCase())
         .filter(Boolean),
       )).map((email) => ({ email })),
