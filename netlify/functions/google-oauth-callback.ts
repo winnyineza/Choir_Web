@@ -111,15 +111,20 @@ const handler: Handler = async (event) => {
       throw new Error("Google did not return a refresh token. Re-consent with prompt=consent.");
     }
 
-    const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!profileResponse.ok) {
-      throw new Error("Failed to fetch Google account profile");
+    let googleEmail = admin.email || "unknown";
+    try {
+      const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json();
+        googleEmail = (profile.email as string | undefined) || googleEmail;
+      }
+    } catch {
+      // Continue with fallback email to avoid blocking successful OAuth token exchange.
     }
 
-    const profile = await profileResponse.json();
-    const googleEmail = (profile.email as string | undefined) || "unknown";
     const encrypted = encryptRefreshToken(refreshToken);
 
     await supabase.from("google_calendar_integrations").upsert(
