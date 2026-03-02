@@ -194,6 +194,8 @@ const handler: Handler = async (event) => {
       };
     }
 
+    const organizerEmail = integration.google_email?.trim().toLowerCase() || "";
+    const shouldForceOfficialAttendee = organizerEmail !== OFFICIAL_CHOIR_EMAIL;
     const dateTimes = buildEventDateTimes(payload);
     const baseEvent = {
       summary: payload.title,
@@ -201,9 +203,12 @@ const handler: Handler = async (event) => {
       location: payload.location || "",
       start: dateTimes.start,
       end: dateTimes.end,
-      attendees: Array.from(new Set([...(payload.attendeeEmails || []), OFFICIAL_CHOIR_EMAIL]
+      attendees: Array.from(new Set([
+        ...(payload.attendeeEmails || []),
+        ...(shouldForceOfficialAttendee ? [OFFICIAL_CHOIR_EMAIL] : []),
+      ]
         .map((email) => email.trim().toLowerCase())
-        .filter(Boolean),
+        .filter((email) => Boolean(email) && email !== organizerEmail),
       )).map((email) => ({ email })),
     };
     const includeMeetLink = payload.includeMeetLink !== false;
