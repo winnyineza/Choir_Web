@@ -34,6 +34,7 @@ import {
   type MeetingAgendaItem,
   type MeetingStats,
 } from "@/lib/meetingService";
+import { getAttendanceByDate } from "@/lib/attendanceService";
 import {
   createOrUpdateGoogleMeeting,
   deleteGoogleMeeting,
@@ -68,6 +69,8 @@ import {
 } from "lucide-react";
 
 export function MeetingMinutesComponent() {
+  type InviteScope = "all_active" | "selected_attendees";
+
   const [meetings, setMeetings] = useState<MeetingMinutesType[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,6 +107,7 @@ export function MeetingMinutesComponent() {
     notes: "",
     syncGoogleCalendar: true,
     createGoogleMeet: true,
+    inviteScope: "all_active" as InviteScope,
   });
 
   const [agendaItems, setAgendaItems] = useState<Omit<MeetingAgendaItem, "id">[]>([]);
@@ -118,6 +122,40 @@ export function MeetingMinutesComponent() {
   useEffect(() => {
     loadData();
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    const prefillAttendance = async () => {
+      if (!formData.date || !showAddModal) return;
+      if (formData.attendees.length > 0 || formData.absentees.length > 0) return;
+
+      try {
+        const records = await getAttendanceByDate(formData.date);
+        if (records.length === 0) return;
+
+        const attendees = records
+          .filter((record) => record.status === "present" || record.status === "late")
+          .map((record) => record.memberName);
+        const absentees = records
+          .filter((record) => record.status === "absent" || record.status === "excused")
+          .map((record) => record.memberName);
+
+        if (attendees.length === 0 && absentees.length === 0) return;
+
+        setFormData((prev) => {
+          if (prev.attendees.length > 0 || prev.absentees.length > 0) return prev;
+          return {
+            ...prev,
+            attendees,
+            absentees,
+          };
+        });
+      } catch {
+        // Best-effort prefill only.
+      }
+    };
+
+    prefillAttendance();
+  }, [formData.date, formData.attendees.length, formData.absentees.length, showAddModal]);
 
   const loadData = async () => {
     const [meetingsData, statsData, membersData] = await Promise.all([
@@ -213,9 +251,16 @@ export function MeetingMinutesComponent() {
         try {
           const membersOnLeave = await getMembersOnLeaveForDate(savedMeeting.date);
           const membersOnLeaveIds = new Set(membersOnLeave.map((leave) => leave.memberId));
-          const attendeeEmails = members
-            .filter((member) => member.status === "Active" && Boolean(member.email) && !membersOnLeaveIds.has(member.id))
+          const eligibleMembers = members.filter(
+            (member) => member.status === "Active" && Boolean(member.email) && !membersOnLeaveIds.has(member.id),
+          );
+          const selectedAttendeeEmails = eligibleMembers
+            .filter((member) => formData.attendees.includes(member.name))
             .map((member) => member.email.trim());
+
+          const attendeeEmails = formData.inviteScope === "selected_attendees"
+            ? selectedAttendeeEmails
+            : eligibleMembers.map((member) => member.email.trim());
 
           const synced = await createOrUpdateGoogleMeeting(currentUser.id, {
             meetingId: savedMeeting.id,
@@ -384,6 +429,7 @@ export function MeetingMinutesComponent() {
       notes: "",
       syncGoogleCalendar: true,
       createGoogleMeet: true,
+      inviteScope: "all_active",
     });
     setAgendaItems([]);
   };
@@ -407,6 +453,7 @@ export function MeetingMinutesComponent() {
       notes: meeting.notes || "",
       syncGoogleCalendar: Boolean(meeting.googleEventId),
       createGoogleMeet: Boolean(meeting.googleMeetLink),
+      inviteScope: meeting.type === "committee" ? "selected_attendees" : "all_active",
     });
     setAgendaItems(meeting.agenda.map(({ id, ...rest }) => rest));
     setShowAddModal(true);
@@ -719,7 +766,16 @@ export function MeetingMinutesComponent() {
               </div>
               <div>
                 <Label>Type</Label>
-                <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as MeetingType })}>
+                <Select
+                  value={formData.type}
+                  onValueChange={(v) =>
+                    setFormData({
+                      ...formData,
+                      type: v as MeetingType,
+                      inviteScope: v === "committee" ? "selected_attendees" : "all_active",
+                    })
+                  }
+                >
                   <SelectTrigger className="mt-1 bg-secondary">
                     <SelectValue />
                   </SelectTrigger>
@@ -920,6 +976,26 @@ export function MeetingMinutesComponent() {
               <Label htmlFor="createGoogleMeet" className="text-sm">
                 Add Google Meet link to Google Calendar event
               </Label>
+            </div>
+
+            <div className="pl-6">
+              <Label className="text-sm">Google Invite Audience</Label>
+              <Select
+                value={formData.inviteScope}
+                onValueChange={(value) => setFormData({ ...formData, inviteScope: value as InviteScope })}
+                disabled={!formData.syncGoogleCalendar}
+              >
+                <SelectTrigger className="mt-1 bg-secondary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all_active">All active members (except approved leave)</SelectItem>
+                  <SelectItem value="selected_attendees">Only selected attendees in this form</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tip: for committee meetings, choose "Only selected attendees" and mark the members above.
+              </p>
             </div>
             {!googleConnection.connected && formData.syncGoogleCalendar && (
               <p className="text-xs text-orange-400">
