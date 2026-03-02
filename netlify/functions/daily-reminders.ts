@@ -45,6 +45,19 @@ interface ApprovedLeave {
   status: string;
 }
 
+interface MeetingReminderDelivery {
+  id: string;
+  meeting_id: string;
+  meeting_title: string;
+  meeting_date: string;
+  recipient_email: string;
+  recipient_name: string;
+  reminder_type: string;
+  reminder_date: string;
+  job_run_id: string;
+  sent_at: string;
+}
+
 interface Contribution {
   id: string;
   member_id: string;
@@ -719,6 +732,7 @@ async function sendEmail(to: string[], subject: string, html: string): Promise<b
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   try {
     console.log("Running daily reminders check...");
+    const jobRunId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     const envStatus = {
       hasGmailUser: !!process.env.GMAIL_USER,
@@ -770,6 +784,8 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       meetingRemindersSent: 0,
       meetingCount: 0,
       meetingRecipients: 0,
+      meetingReminderDuplicatesSkipped: 0,
+      meetingReminderLogsInserted: 0,
       // Contribution reminders
       contributionRemindersSent: 0,
       overdueRemindersSent: 0,
@@ -793,6 +809,54 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       const headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
+      };
+
+      const getExistingMeetingReminderKeys = async (reminderDate: string): Promise<Set<string>> => {
+        try {
+          const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/meeting_reminder_deliveries?select=meeting_id,recipient_email&reminder_type=eq.day_before_meeting&reminder_date=eq.${reminderDate}`,
+            { headers },
+          );
+
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Failed to fetch existing meeting reminder logs:", text);
+            return new Set<string>();
+          }
+
+          const rows = (await res.json()) as Array<{ meeting_id: string; recipient_email: string }>;
+          return new Set(rows.map((row) => `${row.meeting_id}|${row.recipient_email.toLowerCase()}`));
+        } catch (e) {
+          console.error("Failed to query meeting reminder logs:", e);
+          return new Set<string>();
+        }
+      };
+
+      const insertMeetingReminderLogs = async (rows: MeetingReminderDelivery[]): Promise<number> => {
+        if (rows.length === 0) return 0;
+
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/meeting_reminder_deliveries`, {
+            method: "POST",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+              Prefer: "resolution=ignore-duplicates,return=minimal",
+            },
+            body: JSON.stringify(rows),
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Failed to insert meeting reminder logs:", text);
+            return 0;
+          }
+
+          return rows.length;
+        } catch (e) {
+          console.error("Failed to write meeting reminder logs:", e);
+          return 0;
+        }
       };
 
       // Fetch members
@@ -991,8 +1055,10 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     if (tomorrowMeetings.length > 0) {
       const onLeaveIds = new Set(approvedLeave.map((leave) => leave.member_id));
       const eligibleMembers = members.filter((member) => member.email && !onLeaveIds.has(member.id));
+      const reminderDate = tomorrowMeetings[0].date;
+      const existingReminderKeys = await getExistingMeetingReminderKeys(reminderDate);
 
-      const recipientMap = new Map<string, { name: string; meetings: MeetingSchedule[] }>();
+      const recipientMap = new Map<string, { name: string; meetings: MeetingSchedule[]; logs: MeetingReminderDelivery[] }>();
 
       for (const meeting of tomorrowMeetings) {
         let recipients = eligibleMembers;
@@ -1004,29 +1070,59 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
         for (const recipient of recipients) {
           if (!recipient.email) continue;
-          const key = recipient.email.toLowerCase();
-          const existing = recipientMap.get(key);
+          const emailKey = recipient.email.toLowerCase();
+          const uniqueReminderKey = `${meeting.id}|${emailKey}`;
+
+          if (existingReminderKeys.has(uniqueReminderKey)) {
+            results.meetingReminderDuplicatesSkipped += 1;
+            continue;
+          }
+
+          const existing = recipientMap.get(emailKey);
+          const deliveryLog: MeetingReminderDelivery = {
+            id: `mr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            meeting_id: meeting.id,
+            meeting_title: meeting.title,
+            meeting_date: meeting.date,
+            recipient_email: emailKey,
+            recipient_name: recipient.name,
+            reminder_type: "day_before_meeting",
+            reminder_date: reminderDate,
+            job_run_id: jobRunId,
+            sent_at: new Date().toISOString(),
+          };
+
           if (existing) {
-            existing.meetings.push(meeting);
+            if (!existing.meetings.some((item) => item.id === meeting.id)) {
+              existing.meetings.push(meeting);
+            }
+            existing.logs.push(deliveryLog);
           } else {
-            recipientMap.set(key, { name: recipient.name, meetings: [meeting] });
+            recipientMap.set(emailKey, { name: recipient.name, meetings: [meeting], logs: [deliveryLog] });
           }
         }
       }
 
       let meetingEmailsSent = 0;
+      const successfulLogs: MeetingReminderDelivery[] = [];
       for (const [email, payload] of recipientMap.entries()) {
         const subject = payload.meetings.length > 1
           ? `📅 Reminder: ${payload.meetings.length} Meetings Tomorrow`
           : `📅 Reminder: ${payload.meetings[0].title} Tomorrow`;
 
         const sent = await sendEmail([email], subject, generateMeetingReminderEmail(payload.name, payload.meetings));
-        if (sent) meetingEmailsSent += 1;
+        if (sent) {
+          meetingEmailsSent += 1;
+          successfulLogs.push(...payload.logs);
+        }
       }
+
+      const insertedLogs = await insertMeetingReminderLogs(successfulLogs);
 
       results.meetingCount = tomorrowMeetings.length;
       results.meetingRecipients = recipientMap.size;
       results.meetingRemindersSent = meetingEmailsSent;
+      results.meetingReminderLogsInserted = insertedLogs;
     }
 
     // ===== CONTRIBUTION REMINDERS =====
