@@ -6,6 +6,18 @@
 [functions]
   node_bundler = "esbuild"
 
+# Ensure function routes are never rewritten by SPA fallback
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Support trailing-slash callback variants from OAuth providers
+[[redirects]]
+  from = "/.netlify/functions/google-oauth-callback/"
+  to = "/.netlify/functions/google-oauth-callback"
+  status = 301
+
 # Handle client-side routing (React Router)
 [[redirects]]
   from = "/*"

@@ -192,5 +192,9 @@ export function getClientIp(headers: Record<string, string | undefined>) {
 }
 
 export function getBaseUrl() {
-  return process.env.URL || process.env.DEPLOY_URL || "";
+  const raw = process.env.URL || process.env.DEPLOY_URL || "";
+  if (!raw) return "";
+
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return withProtocol.replace(/\/+$/, "");
 }
