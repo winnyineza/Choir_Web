@@ -292,7 +292,7 @@ export function MeetingMinutesComponent() {
             ? selectedPeopleEmails
             : eligibleMembers.map((member) => member.email.trim());
 
-          const alwaysIncludedEmails = [currentUser.email, googleConnection.googleEmail]
+          const alwaysIncludedEmails = [currentUser.email]
             .filter((email): email is string => Boolean(email && email.trim()))
             .map((email) => email.trim());
 
