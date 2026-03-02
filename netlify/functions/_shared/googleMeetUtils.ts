@@ -23,7 +23,11 @@ export interface GoogleIntegrationRecord {
   updated_at: string;
 }
 
-export const ALLOWED_SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
+export const ALLOWED_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "openid",
+];
 export const GOOGLE_INTEGRATION_ID = "primary";
 
 export function buildHeaders() {

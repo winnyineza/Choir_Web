@@ -9,6 +9,19 @@ import {
   getSupabaseAdminClient,
 } from "./_shared/googleMeetUtils";
 
+function decodeJwtEmail(idToken?: string): string | null {
+  if (!idToken) return null;
+  const parts = idToken.split(".");
+  if (parts.length < 2) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return typeof payload?.email === "string" ? payload.email : null;
+  } catch {
+    return null;
+  }
+}
+
 const handler: Handler = async (event) => {
   const headers = buildHeaders();
 
@@ -106,12 +119,13 @@ const handler: Handler = async (event) => {
     const refreshToken = tokenData.refresh_token as string | undefined;
     const accessToken = tokenData.access_token as string | undefined;
     const scope = tokenData.scope as string | undefined;
+    const idToken = tokenData.id_token as string | undefined;
 
     if (!refreshToken || !accessToken) {
       throw new Error("Google did not return a refresh token. Re-consent with prompt=consent.");
     }
 
-    let googleEmail = admin.email || "unknown";
+    let googleEmail: string | null = null;
     try {
       const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -119,10 +133,18 @@ const handler: Handler = async (event) => {
 
       if (profileResponse.ok) {
         const profile = await profileResponse.json();
-        googleEmail = (profile.email as string | undefined) || googleEmail;
+        googleEmail = (profile.email as string | undefined) || null;
       }
     } catch {
-      // Continue with fallback email to avoid blocking successful OAuth token exchange.
+      // noop
+    }
+
+    if (!googleEmail) {
+      googleEmail = decodeJwtEmail(idToken);
+    }
+
+    if (!googleEmail) {
+      throw new Error("Unable to determine the connected Google account email. Please reconnect and approve all requested permissions.");
     }
 
     const encrypted = encryptRefreshToken(refreshToken);
