@@ -605,7 +605,7 @@ export function canApproveLeave(user: AdminUser | null): boolean {
 
 export function canApproveMeetingMinutes(user: AdminUser | null): boolean {
   if (!user) return false;
-  return ["super_admin", "main_admin", "secretary"].includes(user.role);
+  return ["super_admin", "main_admin", "secretary", "reviewer"].includes(user.role);
 }
 
 export function hasWriteAccess(user: AdminUser | null, area: string): boolean {

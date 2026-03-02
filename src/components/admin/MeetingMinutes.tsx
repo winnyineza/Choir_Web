@@ -312,7 +312,7 @@ export function MeetingMinutesComponent() {
     if (!canApproveMeetingMinutes(currentUser)) {
       toast({
         title: "Not Allowed",
-        description: "Only Super Admin, Main Admin, or Secretary can approve meeting minutes.",
+        description: "Only Super Admin, Main Admin, Secretary, or Reviewer can approve meeting minutes.",
         variant: "destructive",
       });
       return;
@@ -325,11 +325,11 @@ export function MeetingMinutesComponent() {
         if (currentUser && meeting) {
           addAuditLog(currentUser, "APPROVE_MEETING", `Approved meeting minutes: ${meeting.title}`);
         }
-        // Notify all members that meeting minutes are available
+        // Notify approvers that meeting minutes are available
         if (meeting) {
           notifyMeetingMinutesApproved(meeting.title, meeting.date, currentUser?.name || "Admin");
         }
-        toast({ title: "Meeting Approved", description: "Meeting minutes have been approved and members will be notified." });
+        toast({ title: "Meeting Approved", description: "Meeting minutes have been approved and approvers will be notified." });
         await loadData();
       }
     } catch (e) {

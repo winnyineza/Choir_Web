@@ -1,6 +1,6 @@
 // Notification Email Service - Send email notifications for requests and approvals
 
-import { getAllAdminUsers, canApproveLeave } from "./adminService";
+import { getAllAdminUsers, canApproveLeave, canApproveMeetingMinutes } from "./adminService";
 import { getSettings, getAllMembers } from "./dataService";
 import { MONTH_NAMES } from "./contributionService";
 
@@ -427,9 +427,9 @@ export async function notifyMeetingMinutesApproved(
   meetingDate: string,
   approvedBy: string
 ): Promise<void> {
-  const [members, settings] = await Promise.all([getAllMembers(), getSettings()]);
-  const activeMembers = members.filter(m => m.status === "Active" && m.email);
-  if (activeMembers.length === 0) return;
+  const [admins, settings] = await Promise.all([getAllAdminUsers(), getSettings()]);
+  const recipients = admins.filter(a => a.isActive && a.email && canApproveMeetingMinutes(a));
+  if (recipients.length === 0) return;
 
   const formattedDate = new Date(meetingDate).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric"
@@ -442,9 +442,9 @@ export async function notifyMeetingMinutesApproved(
       <tr><td style="color: #888; padding: 6px 8px 6px 0;">Date:</td><td style="color: #fff; padding: 6px 0;">${formattedDate}</td></tr>
       <tr><td style="color: #888; padding: 6px 8px 6px 0;">Approved By:</td><td style="color: #fff; padding: 6px 0;">${approvedBy}</td></tr>
     </table>
-    <p style="color: #e0e0e0; margin: 16px 0 0 0;">The meeting minutes have been approved and are now available for review in the member portal.</p>
+    <p style="color: #e0e0e0; margin: 16px 0 0 0;">The meeting minutes have been approved and are now available for leadership review in the admin portal.</p>
   `, settings.choirName);
 
-  const to = activeMembers.map(m => ({ email: m.email, name: m.name }));
+  const to = recipients.map(a => ({ email: a.email, name: a.name }));
   await sendEmail(to, subject, html);
 }
