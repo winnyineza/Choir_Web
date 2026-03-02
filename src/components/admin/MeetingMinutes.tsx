@@ -261,12 +261,9 @@ export function MeetingMinutesComponent() {
       setShowAddModal(false);
       resetForm();
 
-      const selectedNamesForTargeting = formSnapshot.inviteeNames.length > 0
-        ? formSnapshot.inviteeNames
-        : formSnapshot.attendees;
       const activeMembers = members.filter((member) => member.status === "Active");
       const attendanceTargetMembers = formSnapshot.inviteScope === "selected_people"
-        ? activeMembers.filter((member) => selectedNamesForTargeting.includes(member.name))
+        ? activeMembers.filter((member) => formSnapshot.inviteeNames.includes(member.name))
         : activeMembers;
 
       const hasAttendance = await hasAttendanceForDate(savedMeeting.date);
@@ -308,7 +305,7 @@ export function MeetingMinutesComponent() {
           const eligibleMembers = members.filter(
             (member) => member.status === "Active" && Boolean(member.email) && !membersOnLeaveIds.has(member.id),
           );
-          const selectedNames = formSnapshot.inviteeNames.length > 0 ? formSnapshot.inviteeNames : formSnapshot.attendees;
+          const selectedNames = formSnapshot.inviteeNames;
           const selectedPeopleEmails = eligibleMembers
             .filter((member) => selectedNames.includes(member.name))
             .map((member) => member.email.trim());
@@ -532,7 +529,7 @@ export function MeetingMinutesComponent() {
       closingPrayer: meeting.closingPrayer || "",
       nextMeetingDate: meeting.nextMeetingDate || "",
       notes: meeting.notes || "",
-      autoCreateAttendance: true,
+      autoCreateAttendance: meeting.type === "general",
       syncGoogleCalendar: Boolean(meeting.googleEventId),
       createGoogleMeet: Boolean(meeting.googleMeetLink),
       inviteScope: meeting.type === "committee" ? "selected_people" : "all_active",
@@ -869,6 +866,7 @@ export function MeetingMinutesComponent() {
                     setFormData({
                       ...formData,
                       type: v as MeetingType,
+                      autoCreateAttendance: v === "general",
                       inviteScope: v === "committee" ? "selected_people" : "all_active",
                     })
                   }
@@ -987,7 +985,7 @@ export function MeetingMinutesComponent() {
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                For "Selected people only", draft attendance includes only selected invitees (or selected attendance chips as fallback).
+                For "Selected people only", draft attendance includes only selected invitees.
               </p>
             </div>
 
@@ -1134,7 +1132,7 @@ export function MeetingMinutesComponent() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formData.inviteeNames.length} invitee(s) selected. If none is selected, attendance list is used as fallback.
+                  {formData.inviteeNames.length} invitee(s) selected.
                 </p>
               </div>
             )}
