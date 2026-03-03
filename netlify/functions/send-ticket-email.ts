@@ -260,6 +260,34 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     `;
 
     // Send email via Gmail SMTP
+    const normalizeReadableEmailHtml = (rawHtml: string): string => {
+      const tags = ["p", "li", "td", "th", "span", "div", "a"];
+      let normalized = rawHtml;
+
+      for (const tag of tags) {
+        const withStyleRegex = new RegExp(`<${tag}([^>]*?)style=\"([^\"]*)\"([^>]*)>`, "gi");
+        normalized = normalized.replace(withStyleRegex, (_match, before, style, after) => {
+          if (/\bcolor\s*:/i.test(style)) {
+            return `<${tag}${before}style="${style}"${after}>`;
+          }
+          const separator = style.trim().endsWith(";") || style.trim().length === 0 ? "" : ";";
+          return `<${tag}${before}style="${style}${separator} color: #f5f5f5;"${after}>`;
+        });
+
+        const withoutStyleRegex = new RegExp(`<${tag}(?![^>]*style=)([^>]*)>`, "gi");
+        normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #f5f5f5;"$1>`);
+      }
+
+      normalized = normalized.replace(
+        /<body(?![^>]*style=)([^>]*)>/gi,
+        '<body style="margin: 0; padding: 0; background-color: #0a0a0a; color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
+      );
+
+      return normalized;
+    };
+
+    const normalizedHtml = normalizeReadableEmailHtml(emailHtml);
+
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
@@ -269,7 +297,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       from: `"Serenades of Praise" <${GMAIL_USER}>`,
       to: data.to,
       subject: `Your Ticket for ${safeEventTitle} - Confirmed!`,
-      html: emailHtml,
+      html: normalizedHtml,
     });
     
     return {

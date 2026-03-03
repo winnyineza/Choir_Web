@@ -43,6 +43,32 @@ function sanitizeHtml(html: string): string {
     .replace(/on\w+\s*=/gi, "");
 }
 
+function normalizeReadableEmailHtml(html: string): string {
+  const tags = ["p", "li", "td", "th", "span", "div", "a"];
+  let normalized = html;
+
+  for (const tag of tags) {
+    const withStyleRegex = new RegExp(`<${tag}([^>]*?)style=\"([^\"]*)\"([^>]*)>`, "gi");
+    normalized = normalized.replace(withStyleRegex, (_match, before, style, after) => {
+      if (/\bcolor\s*:/i.test(style)) {
+        return `<${tag}${before}style="${style}"${after}>`;
+      }
+      const separator = style.trim().endsWith(";") || style.trim().length === 0 ? "" : ";";
+      return `<${tag}${before}style="${style}${separator} color: #f5f5f5;"${after}>`;
+    });
+
+    const withoutStyleRegex = new RegExp(`<${tag}(?![^>]*style=)([^>]*)>`, "gi");
+    normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #f5f5f5;"$1>`);
+  }
+
+  normalized = normalized.replace(
+    /<body(?![^>]*style=)([^>]*)>/gi,
+    '<body style="margin: 0; padding: 0; background-color: #0a0a0a; color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
+  );
+
+  return normalized;
+}
+
 // Create Gmail SMTP transporter
 function createTransporter() {
   const user = process.env.GMAIL_USER;
@@ -142,6 +168,7 @@ const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) =
 
     // Sanitize HTML content
     const sanitizedHtml = sanitizeHtml(body.html);
+    const normalizedHtml = normalizeReadableEmailHtml(sanitizedHtml);
 
     // Send via Gmail SMTP
     const transporter = createTransporter();
@@ -151,7 +178,7 @@ const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) =
       from: `"Serenades of Praise" <${process.env.GMAIL_USER}>`,
       to: toAddresses,
       subject: body.subject,
-      html: sanitizedHtml,
+      html: normalizedHtml,
     });
 
     return {
