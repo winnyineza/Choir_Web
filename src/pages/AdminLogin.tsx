@@ -187,6 +187,9 @@ export default function AdminLogin() {
                 subject: "Password Reset - Serenades of Praise Admin",
                 html: `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; color: #fff;">
+                    <div style="text-align: center; margin-bottom: 12px;">
+                      <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35);" />
+                    </div>
                     <h1 style="color: #d4a537;">Password Reset</h1>
                     <p>You requested a password reset for your admin account.</p>
                     <p>Click the button below to reset your password. This link expires in 1 hour.</p>

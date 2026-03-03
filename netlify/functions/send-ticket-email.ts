@@ -154,6 +154,7 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
+              <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,0,0,0.2); margin-bottom: 12px;" />
               <h1 style="margin: 0; color: #000; font-size: 24px; font-weight: bold;">🎵 Serenades of Praise</h1>
               <p style="margin: 10px 0 0; color: #000; font-size: 14px;">Ticket Confirmation</p>
             </td>

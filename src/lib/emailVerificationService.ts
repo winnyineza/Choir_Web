@@ -99,6 +99,7 @@ function generateEmailTemplate(memberName: string, code: string): string {
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0c0a09; color: #fafaf9; padding: 40px 20px;">
       <div style="max-width: 500px; margin: 0 auto; background-color: #1c1917; border-radius: 16px; padding: 40px; border: 1px solid rgba(212, 175, 55, 0.2);">
         <div style="text-align: center; margin-bottom: 30px;">
+          <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 175, 55, 0.35); margin-bottom: 12px;" />
           <h1 style="color: #d4af37; font-size: 24px; margin: 0;">Serenades of Praise</h1>
         </div>
 
