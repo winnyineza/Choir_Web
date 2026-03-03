@@ -34,7 +34,7 @@ function emailWrapper(title: string, body: string, choirName: string): string {
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; padding: 32px; color: #e0e0e0;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <img src="${LOGO_URL}" alt="${choirName}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid #d4af37; margin-bottom: 12px;" />
+          <img src="${LOGO_URL}" alt="${choirName}" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
           <h2 style="color: #d4af37; margin: 0; font-size: 20px;">${choirName}</h2>
         </div>
         <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; margin-bottom: 16px;">

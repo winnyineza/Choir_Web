@@ -306,7 +306,7 @@ function generateContributionReminderEmail(
     <body>
       <div class="container">
         <div style="text-align: center; margin-bottom: 16px;">
-          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #d4a537;" />
+          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>💰 Contribution Reminder</h1>
         <p>Dear ${memberName},</p>
@@ -357,7 +357,7 @@ function generateFinanceOverdueEmail(
     <body>
       <div class="container">
         <div style="text-align: center; margin-bottom: 16px;">
-          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #d4a537;" />
+          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>📊 Finance Report: Overdue Contributions</h1>
         
@@ -420,7 +420,7 @@ function generateBirthdayReminderEmail(birthdays: Member[]): string {
     <body>
       <div class="container">
         <div style="text-align: center; margin-bottom: 16px;">
-          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #d4a537;" />
+          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>🎂 Upcoming Birthdays!</h1>
         <p>The following choir members have birthdays coming up in the next 7 days:</p>
@@ -475,7 +475,7 @@ function generatePersonalBirthdayEmail(member: Member): string {
               <!-- Golden Header -->
               <tr>
                 <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 40px; text-align: center;">
-                  <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,0,0,0.2); margin-bottom: 12px;" />
+                  <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
                   <div style="font-size: 60px; margin-bottom: 10px;">🎂</div>
                   <h1 style="margin: 0; color: #000; font-size: 28px; font-weight: bold;">Happy Birthday, ${firstName}!</h1>
                   <p style="margin: 10px 0 0; color: #000; font-size: 16px;">Celebrating you today</p>
@@ -590,7 +590,7 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
               <!-- Header -->
               <tr>
                 <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
-                  <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,0,0,0.2); margin-bottom: 10px;" />
+                  <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
                   <div style="font-size: 40px; margin-bottom: 8px;">🎉</div>
                   <h1 style="margin: 0; color: #000; font-size: 22px; font-weight: bold;">Birthday Celebration!</h1>
                   <p style="margin: 8px 0 0; color: #000; font-size: 14px;">Let's celebrate ${isPlural ? 'our choir members' : 'our choir member'} today</p>
@@ -662,7 +662,7 @@ function generateEventReminderEmail(events: Event[]): string {
     <body>
       <div class="container">
         <div style="text-align: center; margin-bottom: 16px;">
-          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #d4a537;" />
+          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>📅 Event Reminder - Tomorrow!</h1>
         <p>Don't forget! The following events are happening tomorrow:</p>
@@ -702,7 +702,7 @@ function generateMeetingReminderEmail(memberName: string, meetings: MeetingSched
     <body>
       <div class="container">
         <div style="text-align: center; margin-bottom: 16px;">
-          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid #d4a537;" />
+          <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>📅 Meeting Reminder - Tomorrow</h1>
         <p>Hi ${memberName},</p>
