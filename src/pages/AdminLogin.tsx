@@ -262,7 +262,7 @@ export default function AdminLogin() {
   // Show signup success screen
   if (signupSuccess) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
         <div className="relative w-full max-w-md text-center">
           <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-500" />
@@ -284,7 +284,7 @@ export default function AdminLogin() {
   // Show loading while validating invite/reset tokens
   if (validationLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Validating...</p>
@@ -296,7 +296,7 @@ export default function AdminLogin() {
   // Show invalid invite message
   if (inviteCode && !invite && view === "signup") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
         <div className="relative w-full max-w-md text-center">
           <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-10 h-10 text-destructive" />
@@ -318,7 +318,7 @@ export default function AdminLogin() {
   // Show invalid reset token message
   if (resetToken && !validReset && view === "reset") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
         <div className="relative w-full max-w-md text-center">
           <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-10 h-10 text-destructive" />
@@ -338,7 +338,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />

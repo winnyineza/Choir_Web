@@ -204,6 +204,13 @@
     @apply bg-background text-foreground font-body antialiased;
     background: var(--gradient-dark);
   }
+
+  .recharts-text,
+  .recharts-legend-item-text,
+  .recharts-cartesian-axis-tick-value,
+  .recharts-label {
+    font-family: inherit;
+  }
 }
 
 @layer components {
