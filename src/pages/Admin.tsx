@@ -113,6 +113,7 @@ import {
   type AttendanceSession,
   type AttendanceStatus,
 } from "@/lib/attendanceService";
+import { getPageViewStats } from "@/lib/analyticsService";
 import { useToast } from "@/hooks/use-toast";
 import { getGoogleConnectionStatus, getGoogleOAuthStartUrl, type GoogleConnectionStatus } from "@/lib/googleMeetService";
 import { Switch } from "@/components/ui/switch";
@@ -124,7 +125,6 @@ import { TicketDetailModal } from "@/components/admin/TicketDetailModal";
 import { AddAlbumModal } from "@/components/admin/AddAlbumModal";
 import { AddMusicVideoModal } from "@/components/admin/AddMusicVideoModal";
 // Lazy loaded components for code splitting
-const AnalyticsDashboard = lazy(() => import("@/components/admin/AnalyticsDashboard").then(m => ({ default: m.AnalyticsDashboard })));
 const AdminTeamManagement = lazy(() => import("@/components/admin/AdminTeamManagement").then(m => ({ default: m.AdminTeamManagement })));
 const AuditLogPage = lazy(() => import("@/components/admin/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
 // Charts - used inline in dashboard, members, tickets, attendance sections
@@ -196,7 +196,7 @@ const SurveyManagement = lazy(() => import("@/components/admin/SurveyManagement"
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2, ClipboardList } from "lucide-react";
 import { BackupRestore } from "@/components/admin/BackupRestore";
 
-type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "analytics" | "event-staff" | "team" | "audit" | "settings";
+type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "event-staff" | "team" | "audit" | "settings";
 
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
@@ -219,14 +219,13 @@ const sidebarItems = [
   { id: "documents" as Tab, label: "Documents", icon: FolderOpen },
   { id: "voice-balance" as Tab, label: "Voice Balance", icon: Mic2 },
   { id: "surveys" as Tab, label: "Surveys", icon: ClipboardList },
-  { id: "analytics" as Tab, label: "Analytics", icon: BarChart3 },
   { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard },
   { id: "team" as Tab, label: "Admin Team", icon: Shield },
   { id: "audit" as Tab, label: "Audit Log", icon: History },
   { id: "settings" as Tab, label: "Settings", icon: Settings },
 ];
 
-const VALID_TABS = new Set<string>(["dashboard","members","events","tickets","attendance","leave","disciplinary","contributions","expenses","treasury","announcements","messages","releases","promos","gallery","inventory","minutes","documents","voice-balance","surveys","analytics","event-staff","team","audit","settings"]);
+const VALID_TABS = new Set<string>(["dashboard","members","events","tickets","attendance","leave","disciplinary","contributions","expenses","treasury","announcements","messages","releases","promos","gallery","inventory","minutes","documents","voice-balance","surveys","event-staff","team","audit","settings"]);
 
 function getTabFromHash(): Tab {
   if (typeof window === "undefined") return "dashboard";
@@ -298,6 +297,16 @@ export default function Admin() {
   // Order & attendance stats (loaded async)
   const [orderStats, setOrderStats] = useState({ total: 0, pending: 0, confirmed: 0, cancelled: 0, used: 0, archived: 0, revenue: 0 });
   const [overallAttendanceStats, setOverallAttendanceStats] = useState({ totalSessions: 0, avgAttendance: 0, recentTrend: 'stable' as 'up' | 'down' | 'stable' });
+  const [dashboardPageStats, setDashboardPageStats] = useState({
+    totalViews: 0,
+    uniqueVisitors: 0,
+    todayViews: 0,
+    weekViews: 0,
+    monthViews: 0,
+    viewsByPage: [] as { path: string; title: string; count: number }[],
+    viewsByDay: [] as { date: string; views: number }[],
+    viewsByHour: [] as { hour: number; views: number }[],
+  });
   
   // Attendance state
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
@@ -390,13 +399,17 @@ export default function Admin() {
     try {
     switch (tab) {
       case "dashboard": {
-        const [allOrders, contributions, donations, expensesData] = await Promise.all([
+        const [allOrders, contributions, donations, expensesData, recentSessionsData, pageViewStats] = await Promise.all([
           getAllOrders(),
           getAllContributions(),
           getAllDonations(),
           getAllExpenses(),
+          getRecentSessions(20),
+          getPageViewStats(),
         ]);
         setOrders(allOrders);
+        setAttendanceSessions(recentSessionsData);
+        setDashboardPageStats(pageViewStats);
         const confirmedOrders = allOrders.filter(o => o.status === "confirmed");
         const contributionTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
         const donationTotal = donations.reduce((sum, d) => sum + d.amount, 0);
@@ -723,6 +736,18 @@ export default function Admin() {
       tickets: filtered.reduce((sum, o) => sum + o.tickets.reduce((s, t) => s + t.quantity, 0), 0),
     };
   };
+
+  const attendanceTrend = getAttendanceRate();
+  const revenueTrend = getRevenueByDay();
+  const topRevenueEvents = getRevenueByEvent();
+  const topVisitedPages = dashboardPageStats.viewsByPage.slice(0, 6);
+  const ticketPipelineData = [
+    { name: "Pending", count: orderStats.pending },
+    { name: "Confirmed", count: orderStats.confirmed },
+    { name: "Used", count: orderStats.used },
+    { name: "Cancelled", count: orderStats.cancelled },
+    { name: "Archived", count: orderStats.archived },
+  ];
 
   // Order actions
   const handleConfirmOrder = async (orderId: string) => {
@@ -1490,6 +1515,151 @@ export default function Admin() {
                   )}
                 </>
               )}
+
+              {/* Advanced Insights for all admin roles */}
+              <div className="space-y-5 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold">Advanced Command Center</h2>
+                    <p className="text-sm text-muted-foreground">Live performance, engagement, finance, and operational intelligence</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => loadTabData("dashboard")}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Insights
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Weekly Web Visits</p>
+                    <p className="text-2xl font-bold text-foreground">{dashboardPageStats.weekViews.toLocaleString()}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Unique Visitors</p>
+                    <p className="text-2xl font-bold text-foreground">{dashboardPageStats.uniqueVisitors.toLocaleString()}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Ticket Conversion</p>
+                    <p className="text-2xl font-bold text-foreground">{orderStats.total > 0 ? `${Math.round((orderStats.confirmed / orderStats.total) * 100)}%` : "0%"}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Attendance Health</p>
+                    <p className="text-2xl font-bold text-foreground">{Math.round(overallAttendanceStats.avgAttendance)}%</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Net Position</p>
+                    <p className={cn("text-2xl font-bold", financialTotals.balance >= 0 ? "text-green-400" : "text-red-400")}>{formatCurrency(financialTotals.balance)}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Unread Messages</p>
+                    <p className="text-2xl font-bold text-foreground">{unreadMessages}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                  <div className="card-glass rounded-2xl p-5">
+                    <h3 className="font-display text-base font-semibold mb-3">Revenue Momentum</h3>
+                    {revenueTrend.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={240}>
+                        <AreaChart data={revenueTrend}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
+                          <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <Tooltip formatter={(value: number) => [formatCurrency(value), "Revenue"]} />
+                          <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No confirmed ticket revenue in selected time range yet.</p>
+                    )}
+                  </div>
+
+                  <div className="card-glass rounded-2xl p-5">
+                    <h3 className="font-display text-base font-semibold mb-3">Ticket Pipeline Status</h3>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={ticketPipelineData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
+                        <XAxis dataKey="name" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                        <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                        <Tooltip formatter={(value: number) => [value, "Orders"]} />
+                        <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                          {ticketPipelineData.map((entry, index) => (
+                            <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="card-glass rounded-2xl p-5">
+                    <h3 className="font-display text-base font-semibold mb-3">Attendance Trend</h3>
+                    {attendanceTrend.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={240}>
+                        <LineChart data={attendanceTrend.slice(-10)}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
+                          <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <YAxis domain={[0, 100]} tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <Tooltip formatter={(value: number) => [`${value}%`, "Attendance"]} />
+                          <Line type="monotone" dataKey="rate" stroke="#22c55e" strokeWidth={3} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No attendance sessions recorded yet.</p>
+                    )}
+                  </div>
+
+                  <div className="card-glass rounded-2xl p-5">
+                    <h3 className="font-display text-base font-semibold mb-3">Website Traffic (Last 7 Days)</h3>
+                    {dashboardPageStats.viewsByDay.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={240}>
+                        <AreaChart data={dashboardPageStats.viewsByDay}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
+                          <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <Tooltip formatter={(value: number) => [value, "Views"]} />
+                          <Area type="monotone" dataKey="views" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No page-view activity yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                  <div className="card-glass rounded-2xl p-5">
+                    <h3 className="font-display text-base font-semibold mb-3">Top Revenue Events</h3>
+                    {topRevenueEvents.length > 0 ? (
+                      <div className="space-y-2">
+                        {topRevenueEvents.slice(0, 5).map((entry, index) => (
+                          <div key={entry.name} className="flex items-center justify-between rounded-lg bg-secondary/40 px-3 py-2">
+                            <span className="text-sm text-foreground truncate pr-2">{index + 1}. {entry.name}</span>
+                            <span className="text-sm font-semibold text-primary">{formatCurrency(entry.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No event revenue available yet.</p>
+                    )}
+                  </div>
+
+                  <div className="card-glass rounded-2xl p-5">
+                    <h3 className="font-display text-base font-semibold mb-3">Top Visited Pages</h3>
+                    {topVisitedPages.length > 0 ? (
+                      <div className="space-y-2">
+                        {topVisitedPages.map((entry, index) => (
+                          <div key={entry.path} className="flex items-center justify-between rounded-lg bg-secondary/40 px-3 py-2">
+                            <span className="text-sm text-foreground truncate pr-2">{index + 1}. {entry.path === "/" ? "Home" : entry.path}</span>
+                            <span className="text-sm font-semibold text-primary">{entry.count.toLocaleString()} views</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No web traffic recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -2998,19 +3168,6 @@ export default function Admin() {
 
           {/* Releases */}
           {activeTab === "releases" && <MusicReleasesManagement />}
-
-          {/* Analytics */}
-          {activeTab === "analytics" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="font-display text-xl font-semibold">Analytics</h2>
-                <p className="text-sm text-muted-foreground">
-                  Track your website performance
-                </p>
-              </div>
-              <AnalyticsDashboard />
-            </div>
-          )}
 
           {/* Event Staff (Super Admin Only) */}
           {activeTab === "event-staff" && isSuperAdmin && (
