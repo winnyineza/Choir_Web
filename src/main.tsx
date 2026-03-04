@@ -8,7 +8,15 @@ import "@fontsource/montserrat/700.css";
 import "@fontsource/montserrat/800.css";
 import App from "./App.tsx";
 import "./index.css";
+import { registerSW } from "virtual:pwa-register";
 // No localStorage sync needed - all services read/write directly from Supabase
+
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    window.location.reload();
+  },
+});
 
 // Error Boundary to catch rendering errors
 interface ErrorBoundaryState {
