@@ -157,6 +157,7 @@ const EventStaffManagement = lazy(() => import("@/components/admin/EventStaffMan
 import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
 const ContributionManagement = lazy(() => import("@/components/admin/ContributionManagement").then(m => ({ default: m.ContributionManagement })));
 import { getAllContributions, setLockDay, isMonthLocked, getLockDay, MONTH_NAMES as CONTRIB_MONTH_NAMES } from "@/lib/contributionService";
+import logo from "@/assets/LogoTSC.jpg";
 import {
   getAllUnlockRequests,
   getPendingUnlockRequests,
@@ -982,8 +983,8 @@ export default function Admin() {
         <div className="h-full flex flex-col">
           <div className="p-6 border-b border-primary/10">
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center">
-                <Music2 className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary/30 shadow-[0_0_18px_hsl(var(--gold)/0.25)]">
+                <img src={logo} alt="Serenades of Praise Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="font-display text-lg font-bold gold-text">Admin Panel</h1>

@@ -9,8 +9,9 @@ import { validateInvite, redeemInvite, requestPasswordReset, validateResetToken,
 import { sendAdminWelcomeEmail } from "@/lib/memberInviteService";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { validateEmail, validatePassword, checkRateLimit, LOGIN_RATE_LIMIT, sanitizeString } from "@/lib/validation";
-import { Music2, Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, AlertCircle, Loader2, User, Shield, CheckCircle, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router-dom";
+import logo from "@/assets/LogoTSC.jpg";
 
 type View = "login" | "signup" | "forgot" | "reset";
 
@@ -349,8 +350,8 @@ export default function AdminLogin() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 group">
-            <div className="w-14 h-14 rounded-full bg-gold-gradient flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Music2 className="w-7 h-7 text-primary-foreground" />
+            <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-primary/40 shadow-[0_0_24px_hsl(var(--gold)/0.35)] group-hover:scale-110 transition-transform">
+              <img src={logo} alt="Serenades of Praise Logo" className="w-full h-full object-cover" />
             </div>
           </Link>
           <h1 className="font-display text-2xl font-bold mt-4 gold-text">

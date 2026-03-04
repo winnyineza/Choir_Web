@@ -65,7 +65,7 @@ export function Header() {
       <div className="container mx-auto px-4 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl overflow-hidden">
+          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary/30 shadow-[0_0_18px_hsl(var(--gold)/0.25)]">
             <img
               src={logo}
               alt="Serenades of Praise Logo"
