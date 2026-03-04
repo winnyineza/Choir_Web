@@ -555,6 +555,7 @@ export default function Admin() {
   useEffect(() => {
     loadCoreData();
     loadTabData(activeTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load tab-specific data when switching tabs
@@ -566,6 +567,7 @@ export default function Admin() {
     if (activeTab === "settings" && currentUser?.id) {
       refreshGoogleIntegrationStatus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentUser?.id]);
 
   // Filtered data

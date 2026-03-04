@@ -1,32 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Play, Users, Calendar, Music } from "lucide-react";
+import { Play, Calendar } from "lucide-react";
 import choirImage from "@/assets/choir-group.jpg";
 
 export function Hero() {
-  const [visitorCount, setVisitorCount] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
-    // Simulate visitor counter animation
-    const target = 1247; // Placeholder count
-    const duration = 2000;
-    const step = target / (duration / 16);
-    let current = 0;
-    
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) {
-        setVisitorCount(target);
-        clearInterval(timer);
-      } else {
-        setVisitorCount(Math.floor(current));
-      }
-    }, 16);
-
-    return () => clearInterval(timer);
   }, []);
 
   return (
@@ -91,7 +73,7 @@ export function Hero() {
           >
             <div className="text-center">
               <div className="text-4xl md:text-5xl font-bold text-foreground">
-                {visitorCount > 0 ? "2" : "0"}<span className="text-primary">+</span>
+                2<span className="text-primary">+</span>
               </div>
               <div className="text-xs tracking-widest uppercase text-foreground/80 mt-1">Years in MISSION</div>
             </div>
