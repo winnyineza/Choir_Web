@@ -1,5 +1,11 @@
 import { createRoot } from "react-dom/client";
 import { Component, ErrorInfo, ReactNode } from "react";
+import "@fontsource/montserrat/300.css";
+import "@fontsource/montserrat/400.css";
+import "@fontsource/montserrat/500.css";
+import "@fontsource/montserrat/600.css";
+import "@fontsource/montserrat/700.css";
+import "@fontsource/montserrat/800.css";
 import App from "./App.tsx";
 import "./index.css";
 // No localStorage sync needed - all services read/write directly from Supabase
