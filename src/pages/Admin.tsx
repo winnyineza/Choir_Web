@@ -158,6 +158,7 @@ import { EventSummaryModal } from "@/components/admin/EventSummaryModal";
 const ContributionManagement = lazy(() => import("@/components/admin/ContributionManagement").then(m => ({ default: m.ContributionManagement })));
 import { getAllContributions, setLockDay, isMonthLocked, getLockDay, MONTH_NAMES as CONTRIB_MONTH_NAMES } from "@/lib/contributionService";
 import logo from "@/assets/LogoTSC.jpg";
+import { TicketHealthWidget } from "@/components/admin/TicketHealthWidget";
 import {
   getAllUnlockRequests,
   getPendingUnlockRequests,
@@ -1548,6 +1549,15 @@ export default function Admin() {
                   </Button>
                 </div>
 
+                <TicketHealthWidget
+                  title="Ticket Health (Global)"
+                  ticketedEvents={ticketedEventCount}
+                  ticketCapacity={totalTicketCapacity}
+                  ticketsSold={totalTicketsConfiguredSold}
+                  ticketsRemaining={totalTicketsRemaining}
+                  potentialRevenue={ticketRevenuePotential}
+                />
+
                 <div className="grid grid-cols-2 lg:grid-cols-8 gap-3">
                   <div className="card-glass rounded-xl p-4">
                     <p className="text-xs text-muted-foreground">Weekly Web Visits</p>
@@ -1937,6 +1947,14 @@ export default function Admin() {
                   Create Event
                 </Button>
               </div>
+
+              <TicketHealthWidget
+                ticketedEvents={ticketedEventCount}
+                ticketCapacity={totalTicketCapacity}
+                ticketsSold={totalTicketsConfiguredSold}
+                ticketsRemaining={totalTicketsRemaining}
+                potentialRevenue={ticketRevenuePotential}
+              />
               
               <div className="card-glass rounded-2xl overflow-hidden">
                 {events.length > 0 ? (
@@ -2033,24 +2051,13 @@ export default function Admin() {
           {/* Ticket Orders */}
           {activeTab === "tickets" && (
             <div className="space-y-6">
-              {ticketedEventCount > 0 && (
-                <div className="card-glass rounded-xl p-4 border border-primary/20">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-foreground flex items-center gap-2">
-                        <Ticket className="w-4 h-4 text-primary" />
-                        Ticketing Coverage
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {ticketedEventCount} ticketed event(s) configured • {totalTicketsConfiguredSold.toLocaleString()}/{totalTicketCapacity.toLocaleString()} sold • {totalTicketsRemaining.toLocaleString()} remaining
-                      </p>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Potential Revenue: <span className="text-foreground font-semibold">{formatCurrency(ticketRevenuePotential)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <TicketHealthWidget
+                ticketedEvents={ticketedEventCount}
+                ticketCapacity={totalTicketCapacity}
+                ticketsSold={totalTicketsConfiguredSold}
+                ticketsRemaining={totalTicketsRemaining}
+                potentialRevenue={ticketRevenuePotential}
+              />
 
               {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">

@@ -52,6 +52,7 @@ import { getAllDisciplinaryRecords, getOutstandingFineBalanceTotal } from "@/lib
 import { getAllDonations, createDonation, updateDonation, deleteDonation, Donation } from "@/lib/donationService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
+import { TicketHealthWidget } from "@/components/admin/TicketHealthWidget";
 import {
   PieChart,
   Pie,
@@ -569,20 +570,13 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         </div>
       </div>
 
-      {ticketingOverview.ticketedEvents > 0 && (
-        <div className="card-glass rounded-xl p-4 border border-primary/20">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Ticket setup: <span className="text-foreground font-medium">{ticketingOverview.ticketedEvents}</span> event(s) •
-              <span className="text-foreground font-medium"> {ticketingOverview.ticketsSold.toLocaleString()}</span> sold /
-              <span className="text-foreground font-medium"> {ticketingOverview.ticketCapacity.toLocaleString()}</span> capacity
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Potential Ticket Revenue: <span className="text-foreground font-semibold">{formatCurrency(ticketingOverview.potentialRevenue)}</span>
-            </p>
-          </div>
-        </div>
-      )}
+      <TicketHealthWidget
+        ticketedEvents={ticketingOverview.ticketedEvents}
+        ticketCapacity={ticketingOverview.ticketCapacity}
+        ticketsSold={ticketingOverview.ticketsSold}
+        ticketsRemaining={ticketingOverview.ticketsRemaining}
+        potentialRevenue={ticketingOverview.potentialRevenue}
+      />
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-primary/10 pb-2">
