@@ -9,9 +9,42 @@
 import { chromium } from "playwright";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
+import { spawn } from "child_process";
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:8081";
 const SCREENSHOT_DIR = join(process.cwd(), "test-screenshots");
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function canReach(url) {
+  try {
+    const response = await fetch(url, { method: "GET" });
+    return response.ok || response.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForServer(url, timeoutMs = 45000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await canReach(url)) {
+      return true;
+    }
+    await sleep(500);
+  }
+  return false;
+}
+
+function startLocalServer() {
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+  return spawn(npmCmd, ["run", "dev", "--", "--host", "127.0.0.1", "--port", "8081"], {
+    stdio: "inherit",
+    cwd: process.cwd(),
+  });
+}
 
 const pages = [
   { path: "/", name: "Home", checks: ["hero section visible"] },
@@ -26,7 +59,29 @@ const pages = [
 
 async function main() {
   const results = [];
-  const browser = await chromium.launch({ headless: process.env.HEADED === "1" ? false : "new" });
+  let serverProcess = null;
+
+  if (process.env.BASE_URL) {
+    const reachable = await canReach(BASE_URL);
+    if (!reachable) {
+      throw new Error(`BASE_URL is not reachable: ${BASE_URL}`);
+    }
+  } else {
+    const reachable = await canReach(BASE_URL);
+    if (!reachable) {
+      console.log(`Starting local dev server for tests at ${BASE_URL}...`);
+      serverProcess = startLocalServer();
+      const ready = await waitForServer(BASE_URL);
+      if (!ready) {
+        if (serverProcess && !serverProcess.killed) {
+          serverProcess.kill("SIGTERM");
+        }
+        throw new Error(`Timed out waiting for local server at ${BASE_URL}`);
+      }
+    }
+  }
+
+  const browser = await chromium.launch({ headless: process.env.HEADED === "1" ? false : true });
 
   if (!existsSync(SCREENSHOT_DIR)) {
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -163,6 +218,11 @@ async function main() {
   const reportPath = join(SCREENSHOT_DIR, "test-report.json");
   writeFileSync(reportPath, JSON.stringify({ results, timestamp: new Date().toISOString() }, null, 2));
   console.log(`\nReport saved to: ${reportPath}`);
+
+  if (serverProcess && !serverProcess.killed) {
+    serverProcess.kill("SIGTERM");
+  }
+
   process.exit(failed.length > 0 ? 1 : 0);
 }
 
