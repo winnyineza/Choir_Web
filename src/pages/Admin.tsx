@@ -295,7 +295,7 @@ export default function Admin() {
   });
   
   // Order & attendance stats (loaded async)
-  const [orderStats, setOrderStats] = useState({ total: 0, pending: 0, confirmed: 0, cancelled: 0, used: 0, revenue: 0 });
+  const [orderStats, setOrderStats] = useState({ total: 0, pending: 0, confirmed: 0, cancelled: 0, used: 0, archived: 0, revenue: 0 });
   const [overallAttendanceStats, setOverallAttendanceStats] = useState({ totalSessions: 0, avgAttendance: 0, recentTrend: 'stable' as 'up' | 'down' | 'stable' });
   
   // Attendance state
@@ -1894,25 +1894,22 @@ export default function Admin() {
                         size="sm"
                         className="text-red-400 hover:text-red-300"
                         onClick={async () => {
-                          if (confirm("This will permanently delete all pending orders older than 24 hours. This cannot be undone. Continue?")) {
+                          if (confirm("This will archive all pending orders older than 24 hours (kept for records). Continue?")) {
                             const count = await deletePendingOrders(24);
                             if (count > 0) {
                               toast({
-                                title: "Deleted",
-                                description: `${count} pending order(s) permanently deleted.`,
+                                title: "Archived",
+                                description: `${count} pending order(s) archived.`,
                               });
                               loadData();
                             } else {
-                              toast({
-                                title: "No orders to delete",
-                                description: "All pending orders are less than 24 hours old.",
-                              });
+                              toast({ title: "No orders to archive", description: "All pending orders are less than 24 hours old." });
                             }
                           }
                         }}
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Old (24h+)
+                        Archive Old (24h+)
                       </Button>
                     </div>
                   </div>

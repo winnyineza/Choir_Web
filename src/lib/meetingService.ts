@@ -2,7 +2,7 @@
 
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 
-export type MeetingType = "general" | "committee";
+export type MeetingType = "general" | "committee" | "executive" | "rehearsal" | "workshop" | "emergency";
 
 export interface MeetingAgendaItem {
   id: string;
@@ -53,7 +53,12 @@ export interface MeetingStats {
 const MEETINGS_KEY = "choir_meeting_minutes";
 
 function normalizeMeetingType(type: string | undefined): MeetingType {
-  return type === "committee" ? "committee" : "general";
+  if (type === "committee") return "committee";
+  if (type === "executive") return "executive";
+  if (type === "rehearsal") return "rehearsal";
+  if (type === "workshop") return "workshop";
+  if (type === "emergency") return "emergency";
+  return "general";
 }
 
 // ============ CRUD OPERATIONS ============
@@ -191,6 +196,10 @@ export async function getMeetingStats(): Promise<MeetingStats> {
   const byType: Record<MeetingType, number> = {
     general: 0,
     committee: 0,
+    executive: 0,
+    rehearsal: 0,
+    workshop: 0,
+    emergency: 0,
   };
 
   let drafts = 0;
@@ -220,6 +229,10 @@ export function getMeetingTypeLabel(type: MeetingType): string {
   const labels: Record<MeetingType, string> = {
     general: "General Meeting",
     committee: "Committee Meeting",
+    executive: "Executive Meeting",
+    rehearsal: "Rehearsal Session",
+    workshop: "Workshop",
+    emergency: "Emergency Meeting",
   };
   return labels[type];
 }
@@ -228,6 +241,10 @@ export function getMeetingTypeColor(type: MeetingType): string {
   const colors: Record<MeetingType, string> = {
     general: "text-blue-400 bg-blue-400/20",
     committee: "text-purple-400 bg-purple-400/20",
+    executive: "text-amber-400 bg-amber-400/20",
+    rehearsal: "text-emerald-400 bg-emerald-400/20",
+    workshop: "text-cyan-400 bg-cyan-400/20",
+    emergency: "text-red-400 bg-red-400/20",
   };
   return colors[type];
 }

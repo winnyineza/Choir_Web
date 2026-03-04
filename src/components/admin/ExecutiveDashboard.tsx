@@ -147,7 +147,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
     const memberGrowth = membersLastMonth > 0 ? ((members.length - membersLastMonth) / membersLastMonth * 100) : 0;
 
     // Collection rate
-    const expectedTotal = contributionStats.totalCollected + contributionStats.outstandingDues;
+    const expectedTotal = contributionStats.totalCollected + (contributionStats.totalOutstanding ?? contributionStats.outstandingDues);
     const collectionRate = expectedTotal > 0 ? (contributionStats.totalCollected / expectedTotal * 100) : 100;
 
     // Ticket stats

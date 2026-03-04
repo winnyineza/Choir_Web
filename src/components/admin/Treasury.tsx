@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { getAllOrders } from "@/lib/ticketService";
 import { getAllContributions } from "@/lib/contributionService";
 import { getAllExpenses, Expense, getCategoryLabel } from "@/lib/expenseService";
+import { getAllDisciplinaryRecords, getOutstandingFineBalanceTotal } from "@/lib/disciplinaryService";
 import { getAllDonations, createDonation, updateDonation, deleteDonation, Donation } from "@/lib/donationService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
@@ -97,6 +98,7 @@ const INCOME_COLORS = {
   tickets: "#3b82f6",
   contributions: "#8b5cf6",
   donations: "#ec4899",
+  fines: "#f97316",
 };
 
 const EXPENSE_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7"];
@@ -118,6 +120,8 @@ export function Treasury({ onRefresh }: TreasuryProps) {
   const [contributionTotal, setContributionTotal] = useState(0);
   const [donationTotal, setDonationTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
+  const [outstandingFineTotal, setOutstandingFineTotal] = useState(0);
+  const [fineIssuedTotal, setFineIssuedTotal] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [allContributions, setAllContributions] = useState<any[]>([]);
@@ -164,6 +168,17 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     const expTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
     setExpenseTotal(expTotal);
 
+    // Disciplinary fines (receivables)
+    const [allFines, outstandingFines] = await Promise.all([
+      getAllDisciplinaryRecords(),
+      getOutstandingFineBalanceTotal(),
+    ]);
+    const issuedFines = allFines
+      .filter(r => r.type === "fine" && r.status !== "archived")
+      .reduce((sum, r) => sum + (r.fineAmount || 0), 0);
+    setFineIssuedTotal(issuedFines);
+    setOutstandingFineTotal(outstandingFines);
+
     // Recent transactions (combine all sources)
     const transactions = [
       ...confirmedOrders.map(o => ({
@@ -198,6 +213,16 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         date: e.date,
         isIncome: false,
       })),
+      ...allFines
+        .filter(r => r.type === "fine" && !!r.fineAmount)
+        .map(r => ({
+          id: r.id,
+          type: "fine" as const,
+          description: `Disciplinary Fine: ${r.memberName}`,
+          amount: r.fineAmount || 0,
+          date: r.date,
+          isIncome: false,
+        })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
      .slice(0, 20);
 
@@ -368,6 +393,8 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         contributionTotal,
         donationTotal,
         expenseTotal,
+        fineIssuedTotal,
+        outstandingFineTotal,
         balance,
       },
       donations: donations,
@@ -481,6 +508,11 @@ export function Treasury({ onRefresh }: TreasuryProps) {
                 <TrendingDown className="w-5 h-5 text-red-400 mb-2" />
                 <p className="text-xs text-muted-foreground">Expenses</p>
                 <p className="text-lg font-bold text-foreground">{formatCompactCurrency(expenseTotal)}</p>
+              </div>
+              <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                <DollarSign className="w-5 h-5 text-orange-400 mb-2" />
+                <p className="text-xs text-muted-foreground">Fine Outstanding</p>
+                <p className="text-lg font-bold text-foreground">{formatCompactCurrency(outstandingFineTotal)}</p>
               </div>
             </div>
           </div>

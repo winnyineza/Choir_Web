@@ -17,6 +17,12 @@ export interface Survey {
   eventId?: string;
   questions: SurveyQuestion[];
   status: "draft" | "active" | "closed";
+  schedule?: {
+    enabled: boolean;
+    frequency: "once" | "weekly" | "monthly";
+    nextSendAt?: string;
+    lastSentAt?: string;
+  };
   createdAt: string;
 }
 
@@ -60,6 +66,7 @@ export async function getMemberSurveyResponse(surveyId: string, memberId: string
 export async function createSurvey(input: Omit<Survey, "id" | "createdAt">, actor?: AdminUser): Promise<Survey> {
   const survey = await dbInsert<Survey>(KEYS.SURVEYS, {
     ...input,
+    schedule: input.schedule || { enabled: false, frequency: "once" },
     id: `svy_${generateId()}`,
     createdAt: new Date().toISOString(),
   });
@@ -74,6 +81,43 @@ export async function updateSurvey(id: string, updates: Partial<Survey>, actor?:
   const updated = await dbUpdate<Survey>(KEYS.SURVEYS, id, updates);
   if (actor) await addAuditLog(actor, "UPDATE", `Updated survey ${id}`);
   return updated;
+}
+
+export async function getDueScheduledSurveys(nowIso: string = new Date().toISOString()): Promise<Survey[]> {
+  const surveys = await getSurveys();
+  return surveys.filter(survey => {
+    if (!survey.schedule?.enabled) return false;
+    if (survey.status !== "active") return false;
+    if (!survey.schedule.nextSendAt) return false;
+    return survey.schedule.nextSendAt <= nowIso;
+  });
+}
+
+function getNextSendAt(current: string, frequency: "once" | "weekly" | "monthly"): string | undefined {
+  const currentDate = new Date(current);
+  if (frequency === "once") return undefined;
+  if (frequency === "weekly") {
+    currentDate.setDate(currentDate.getDate() + 7);
+    return currentDate.toISOString();
+  }
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  return currentDate.toISOString();
+}
+
+export async function markSurveyScheduleSent(id: string, sentAtIso: string = new Date().toISOString()): Promise<Survey | null> {
+  const survey = await getSurveyById(id);
+  if (!survey) return null;
+  const schedule = survey.schedule || { enabled: false, frequency: "once" as const };
+  if (!schedule.enabled) return survey;
+
+  return updateSurvey(id, {
+    schedule: {
+      ...schedule,
+      lastSentAt: sentAtIso,
+      nextSendAt: getNextSendAt(sentAtIso, schedule.frequency),
+      enabled: schedule.frequency === "once" ? false : schedule.enabled,
+    },
+  });
 }
 
 export async function deleteSurvey(id: string, actor?: AdminUser): Promise<void> {

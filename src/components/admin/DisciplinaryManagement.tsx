@@ -79,6 +79,7 @@ const statusConfig = {
   resolved: { color: "text-green-400", bg: "bg-green-400/20", label: "Resolved" },
   appealed: { color: "text-yellow-400", bg: "bg-yellow-400/20", label: "Under Appeal" },
   expired: { color: "text-muted-foreground", bg: "bg-muted/20", label: "Expired" },
+  archived: { color: "text-slate-400", bg: "bg-slate-400/20", label: "Archived" },
 };
 
 export function DisciplinaryManagement() {
@@ -105,6 +106,9 @@ export function DisciplinaryManagement() {
     date: new Date().toISOString().split("T")[0],
     expiryDate: "",
     actionTaken: "",
+    fineAmount: "",
+    finePaidAmount: "",
+    fineDueDate: "",
   });
   const [selectedWitnesses, setSelectedWitnesses] = useState<string[]>([]);
   const [showWitnessDropdown, setShowWitnessDropdown] = useState(false);
@@ -163,6 +167,9 @@ export function DisciplinaryManagement() {
         await updateDisciplinaryRecord(selectedRecord.id, {
           ...formData,
           memberName: member.name,
+          fineAmount: formData.type === "fine" && formData.fineAmount ? Number(formData.fineAmount) : undefined,
+          finePaidAmount: formData.type === "fine" && formData.finePaidAmount ? Number(formData.finePaidAmount) : undefined,
+          fineDueDate: formData.type === "fine" && formData.fineDueDate ? formData.fineDueDate : undefined,
           witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
             const w = members.find(m => m.id === id);
             return w?.name || id;
@@ -176,6 +183,9 @@ export function DisciplinaryManagement() {
         await createDisciplinaryRecord({
           ...formData,
           memberName: member.name,
+          fineAmount: formData.type === "fine" && formData.fineAmount ? Number(formData.fineAmount) : undefined,
+          finePaidAmount: formData.type === "fine" && formData.finePaidAmount ? Number(formData.finePaidAmount) : undefined,
+          fineDueDate: formData.type === "fine" && formData.fineDueDate ? formData.fineDueDate : undefined,
           issuedBy: currentUser?.id || "",
           issuedByName: currentUser?.name || "Admin",
           witnesses: selectedWitnesses.length > 0 ? selectedWitnesses.map(id => {
@@ -240,15 +250,15 @@ export function DisciplinaryManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this record?")) return;
+    if (!confirm("Archive this record? It will be hidden from active views but retained for history.")) return;
     const record = records.find(r => r.id === id);
     try {
       const deleted = await deleteDisciplinaryRecord(id);
       if (deleted) {
         if (currentUser && record) {
-          addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Deleted disciplinary record for ${record.memberName}`);
+          addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Archived disciplinary record for ${record.memberName}`);
         }
-        toast({ title: "Record Deleted", description: "Disciplinary record has been deleted." });
+        toast({ title: "Record Archived", description: "Disciplinary record has been archived." });
         await loadData();
       } else {
         toast({ title: "Error", description: "Record not found or could not be deleted", variant: "destructive" });
@@ -284,6 +294,9 @@ export function DisciplinaryManagement() {
       date: new Date().toISOString().split("T")[0],
       expiryDate: "",
       actionTaken: "",
+      fineAmount: "",
+      finePaidAmount: "",
+      fineDueDate: "",
     });
     setSelectedWitnesses([]);
     setShowWitnessDropdown(false);
@@ -301,6 +314,9 @@ export function DisciplinaryManagement() {
       date: record.date.split("T")[0],
       expiryDate: record.expiryDate?.split("T")[0] || "",
       actionTaken: record.actionTaken || "",
+      fineAmount: record.fineAmount?.toString() || "",
+      finePaidAmount: record.finePaidAmount?.toString() || "",
+      fineDueDate: record.fineDueDate?.split("T")[0] || "",
     });
     // Find member IDs for witnesses by name
     if (record.witnesses && record.witnesses.length > 0) {
@@ -408,6 +424,7 @@ export function DisciplinaryManagement() {
             <SelectItem value="resolved">Resolved</SelectItem>
             <SelectItem value="appealed">Appealed</SelectItem>
             <SelectItem value="expired">Expired</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
           </SelectContent>
         </Select>
 
@@ -648,6 +665,40 @@ export function DisciplinaryManagement() {
               />
             </div>
 
+            {formData.type === "fine" && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label>Fine Amount (RWF)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.fineAmount}
+                    onChange={(e) => setFormData({ ...formData, fineAmount: e.target.value })}
+                    className="mt-1 bg-secondary"
+                  />
+                </div>
+                <div>
+                  <Label>Paid Amount (RWF)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.finePaidAmount}
+                    onChange={(e) => setFormData({ ...formData, finePaidAmount: e.target.value })}
+                    className="mt-1 bg-secondary"
+                  />
+                </div>
+                <div>
+                  <Label>Fine Due Date</Label>
+                  <Input
+                    type="date"
+                    value={formData.fineDueDate}
+                    onChange={(e) => setFormData({ ...formData, fineDueDate: e.target.value })}
+                    className="mt-1 bg-secondary"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <Label>Witnesses (Optional)</Label>
               <div className="relative mt-1">
@@ -788,6 +839,22 @@ export function DisciplinaryManagement() {
                   <div>
                     <p className="text-muted-foreground">Action Taken</p>
                     <p>{selectedRecord.actionTaken}</p>
+                  </div>
+                )}
+                {selectedRecord.type === "fine" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-muted-foreground">Fine Amount</p>
+                      <p>{(selectedRecord.fineAmount || 0).toLocaleString()} RWF</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Paid</p>
+                      <p>{(selectedRecord.finePaidAmount || 0).toLocaleString()} RWF</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Outstanding</p>
+                      <p className="text-red-400">{Math.max(0, (selectedRecord.fineAmount || 0) - (selectedRecord.finePaidAmount || 0)).toLocaleString()} RWF</p>
+                    </div>
                   </div>
                 )}
                 <div>

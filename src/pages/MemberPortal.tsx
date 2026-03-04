@@ -1662,7 +1662,7 @@ export default function MemberPortal() {
 
                 {/* Summary Stats */}
                 {contributionStatus && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="card-glass rounded-xl p-4 text-center">
                       <p className="text-2xl font-bold text-green-500">
                         {formatCurrency(contributionStatus.totalPaid)}
@@ -1671,14 +1671,9 @@ export default function MemberPortal() {
                     </div>
                     <div className="card-glass rounded-xl p-4 text-center border border-red-500/30 bg-red-500/5">
                       <p className="text-2xl font-bold text-red-500">
-                        {formatCurrency(
-                          (contributionStatus.unpaidMonths || []).reduce((sum, m) => sum + m.expectedAmount, 0) +
-                          (contributionStatus.specialStatus || [])
-                            .filter(s => !s.isPaid)
-                            .reduce((sum, s) => sum + (s.expectedAmount - s.paidAmount), 0)
-                        )}
+                        {formatCurrency(contributionStatus.totalOutstanding)}
                       </p>
-                      <p className="text-xs text-red-400">Outstanding Dues</p>
+                      <p className="text-xs text-red-400">Total Outstanding</p>
                     </div>
                     <div className="card-glass rounded-xl p-4 text-center">
                       <p className="text-2xl font-bold text-primary">
@@ -1691,6 +1686,12 @@ export default function MemberPortal() {
                         {formatCurrency(contributionStatus.specialContributions)}
                       </p>
                       <p className="text-xs text-muted-foreground">Special Contributions</p>
+                    </div>
+                    <div className="card-glass rounded-xl p-4 text-center border border-orange-500/30 bg-orange-500/5">
+                      <p className="text-2xl font-bold text-orange-500">
+                        {formatCurrency(contributionStatus.outstandingFines)}
+                      </p>
+                      <p className="text-xs text-orange-400">Outstanding Fines</p>
                     </div>
                   </div>
                 )}

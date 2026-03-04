@@ -4,6 +4,7 @@ import { getAllMembers } from "./dataService";
 import { createReceipt } from "./receiptService";
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
 import { isMonthTemporarilyUnlocked } from './unlockRequestService';
+import { getOutstandingFineBalanceByMember, getOutstandingFineBalanceTotal } from './disciplinaryService';
 
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
@@ -453,6 +454,8 @@ export interface MemberContributionStatus {
     paidAmount: number;
     isPaid: boolean;
   }[];
+  outstandingFines: number;
+  totalOutstanding: number;
 }
 
 export async function getMemberContributionStatus(
@@ -503,6 +506,11 @@ export async function getMemberContributionStatus(
     };
   });
 
+  const duesOutstanding = unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0)
+    + specialStatus.filter(s => !s.isPaid).reduce((sum, s) => sum + Math.max(0, s.expectedAmount - s.paidAmount), 0);
+  const outstandingFines = await getOutstandingFineBalanceByMember(memberId);
+  const totalOutstanding = duesOutstanding + outstandingFines;
+
   return {
     memberId,
     memberName,
@@ -513,6 +521,8 @@ export async function getMemberContributionStatus(
     paidMonths,
     unpaidMonths,
     specialStatus,
+    outstandingFines,
+    totalOutstanding,
   };
 }
 
@@ -527,6 +537,8 @@ export interface ContributionStats {
   contributionCount: number;
   uniqueContributors: number;
   outstandingDues: number;
+  outstandingFines: number;
+  totalOutstanding: number;
 }
 
 export async function getContributionStats(): Promise<ContributionStats> {
@@ -589,6 +601,9 @@ export async function getContributionStats(): Promise<ContributionStats> {
     }
   }
 
+  const outstandingFines = await getOutstandingFineBalanceTotal();
+  const totalOutstanding = outstandingDues + outstandingFines;
+
   return {
     totalCollected,
     monthlyDuesCollected,
@@ -598,6 +613,8 @@ export async function getContributionStats(): Promise<ContributionStats> {
     contributionCount: contributions.length,
     uniqueContributors,
     outstandingDues,
+    outstandingFines,
+    totalOutstanding,
   };
 }
 

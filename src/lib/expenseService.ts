@@ -11,6 +11,10 @@ export type ExpenseCategory =
   | "admin"
   | "marketing"
   | "charity"
+  | "utilities"
+  | "event-production"
+  | "member-welfare"
+  | "technology"
   | "other";
 
 export interface Expense {
@@ -140,6 +144,10 @@ export async function getExpenseStats() {
     admin: 0,
     marketing: 0,
     charity: 0,
+    utilities: 0,
+    "event-production": 0,
+    "member-welfare": 0,
+    technology: 0,
     other: 0,
   };
 
@@ -204,6 +212,10 @@ export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
   { value: "admin", label: "Administrative" },
   { value: "marketing", label: "Marketing & Promotion" },
   { value: "charity", label: "Charity & Donations" },
+  { value: "utilities", label: "Utilities & Bills" },
+  { value: "event-production", label: "Event Production" },
+  { value: "member-welfare", label: "Member Welfare" },
+  { value: "technology", label: "Technology & Software" },
   { value: "other", label: "Other" },
 ];
 

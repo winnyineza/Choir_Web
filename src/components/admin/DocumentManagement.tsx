@@ -73,6 +73,9 @@ export function DocumentManagement() {
     category: "other" as DocumentCategory,
     isPublic: false,
     tags: "",
+    storageProvider: "internal" as "internal" | "google-drive",
+    externalUrl: "",
+    externalFileId: "",
   });
   const [fileData, setFileData] = useState<{
     name: string;
@@ -158,10 +161,19 @@ export function DocumentManagement() {
       return;
     }
 
-    if (!selectedDocument && !fileData) {
+    if (!selectedDocument && formData.storageProvider === "internal" && !fileData) {
       toast({
         title: "Error",
         description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.storageProvider === "google-drive" && !formData.externalUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a Google Drive link",
         variant: "destructive",
       });
       return;
@@ -180,6 +192,9 @@ export function DocumentManagement() {
           category: formData.category,
           isPublic: formData.isPublic,
           tags,
+          storageProvider: formData.storageProvider,
+          externalUrl: formData.storageProvider === "google-drive" ? formData.externalUrl : undefined,
+          externalFileId: formData.storageProvider === "google-drive" ? formData.externalFileId || undefined : undefined,
           ...(fileData && {
             fileName: fileData.name,
             fileType: fileData.type,
@@ -196,10 +211,13 @@ export function DocumentManagement() {
           title: formData.title,
           description: formData.description,
           category: formData.category,
-          fileName: fileData!.name,
-          fileType: fileData!.type,
-          fileSize: fileData!.size,
-          fileData: fileData!.data,
+          fileName: fileData?.name || (formData.title ? `${formData.title}.url` : "google-drive-link.url"),
+          fileType: fileData?.type || "url",
+          fileSize: fileData?.size || 0,
+          fileData: fileData?.data || "",
+          storageProvider: formData.storageProvider,
+          externalUrl: formData.storageProvider === "google-drive" ? formData.externalUrl : undefined,
+          externalFileId: formData.storageProvider === "google-drive" ? formData.externalFileId || undefined : undefined,
           uploadedBy: user?.name || "Admin",
           isPublic: formData.isPublic,
           tags,
@@ -260,6 +278,9 @@ export function DocumentManagement() {
       category: "other",
       isPublic: false,
       tags: "",
+      storageProvider: "internal",
+      externalUrl: "",
+      externalFileId: "",
     });
     setFileData(null);
     if (fileInputRef.current) {
@@ -275,6 +296,9 @@ export function DocumentManagement() {
       category: doc.category,
       isPublic: doc.isPublic,
       tags: doc.tags?.join(", ") || "",
+      storageProvider: doc.storageProvider || "internal",
+      externalUrl: doc.externalUrl || "",
+      externalFileId: doc.externalFileId || "",
     });
     setShowUploadModal(true);
   };
@@ -496,6 +520,9 @@ export function DocumentManagement() {
             {/* File Upload */}
             <div>
               <Label>File {!selectedDocument && "*"}</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Required for Internal uploads. Optional when using Google Drive link mode.
+              </p>
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className={cn(
@@ -530,6 +557,45 @@ export function DocumentManagement() {
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.zip"
               />
             </div>
+
+            <div>
+              <Label>Storage</Label>
+              <Select
+                value={formData.storageProvider}
+                onValueChange={(v) => setFormData({ ...formData, storageProvider: v as "internal" | "google-drive" })}
+              >
+                <SelectTrigger className="mt-1 bg-secondary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="internal">Internal Upload</SelectItem>
+                  <SelectItem value="google-drive">Google Drive Link</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.storageProvider === "google-drive" && (
+              <>
+                <div>
+                  <Label>Google Drive URL *</Label>
+                  <Input
+                    value={formData.externalUrl}
+                    onChange={(e) => setFormData({ ...formData, externalUrl: e.target.value })}
+                    placeholder="https://drive.google.com/file/d/..."
+                    className="mt-1 bg-secondary"
+                  />
+                </div>
+                <div>
+                  <Label>Drive File ID (Optional)</Label>
+                  <Input
+                    value={formData.externalFileId}
+                    onChange={(e) => setFormData({ ...formData, externalFileId: e.target.value })}
+                    placeholder="1AbCdEf..."
+                    className="mt-1 bg-secondary"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <Label>Title *</Label>

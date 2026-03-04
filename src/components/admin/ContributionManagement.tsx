@@ -686,9 +686,9 @@ export function ContributionManagement() {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-primary" />
             </div>
-            <p className="text-xl font-bold text-red-400">{formatCurrency(stats?.outstandingDues ?? 0)}</p>
+            <p className="text-xl font-bold text-red-400">{formatCurrency(stats?.totalOutstanding ?? stats?.outstandingDues ?? 0)}</p>
           </div>
-          <p className="text-[11px] text-muted-foreground">Outstanding Dues</p>
+          <p className="text-[11px] text-muted-foreground">Outstanding (Dues + Fines)</p>
         </div>
         {/* This Month */}
         <div className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all">

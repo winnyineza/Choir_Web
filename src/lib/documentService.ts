@@ -13,6 +13,9 @@ export interface Document {
   fileType: string; // e.g., "pdf", "docx", "xlsx"
   fileSize: number; // in bytes
   fileData: string; // Base64 encoded
+  storageProvider?: "internal" | "google-drive";
+  externalUrl?: string;
+  externalFileId?: string;
   uploadedBy: string;
   uploadedAt: string;
   updatedAt?: string;
@@ -79,6 +82,7 @@ export async function createDocument(
 ): Promise<Document> {
   return dbInsert<Document>(DOCUMENTS_KEY, {
     ...data,
+    storageProvider: data.storageProvider || "internal",
     uploadedAt: new Date().toISOString(),
     downloadCount: 0,
   });
@@ -245,6 +249,12 @@ export function getFileIcon(fileType: string): string {
 
 export async function downloadDocument(doc: Document): Promise<void> {
   try {
+    if (doc.storageProvider === "google-drive" && doc.externalUrl) {
+      window.open(doc.externalUrl, "_blank", "noopener,noreferrer");
+      await incrementDownloadCount(doc.id);
+      return;
+    }
+
     // Convert base64 to blob
     const byteCharacters = atob(doc.fileData.split(",")[1] || doc.fileData);
     const byteNumbers = new Array(byteCharacters.length);

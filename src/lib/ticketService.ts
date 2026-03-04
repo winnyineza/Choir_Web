@@ -40,6 +40,8 @@ export interface TicketOrder {
     phone: string;
   };
   status: "pending" | "confirmed" | "cancelled" | "used";
+  archivedAt?: string;
+  archivedReason?: string;
   paymentMethod: "momo" | "card" | "bank";
   transactionId?: string;
   qrCodeData: string;
@@ -171,6 +173,7 @@ export async function getOrderStats(): Promise<{
   confirmed: number;
   cancelled: number;
   used: number;
+  archived: number;
   revenue: number;
 }> {
   const orders = await getAllOrders();
@@ -180,6 +183,7 @@ export async function getOrderStats(): Promise<{
     confirmed: orders.filter((o) => o.status === "confirmed").length,
     cancelled: orders.filter((o) => o.status === "cancelled").length,
     used: orders.filter((o) => o.status === "used").length,
+    archived: orders.filter((o) => !!o.archivedAt).length,
     revenue: orders
       .filter((o) => o.status === "confirmed" || o.status === "used")
       .reduce((sum, o) => sum + o.total, 0),
@@ -245,7 +249,11 @@ export async function cleanupOldPendingOrders(maxAgeHours: number = 24): Promise
     if (order.status === "pending") {
       const orderAge = now - new Date(order.createdAt).getTime();
       if (orderAge > maxAgeMs) {
-        await dbUpdate<TicketOrder>(ORDERS_KEY, order.id, { status: "cancelled" });
+        await dbUpdate<TicketOrder>(ORDERS_KEY, order.id, {
+          status: "cancelled",
+          archivedAt: new Date().toISOString(),
+          archivedReason: `Auto-cancelled pending order older than ${maxAgeHours}h`,
+        });
         cleanedCount++;
       }
     }
@@ -265,11 +273,22 @@ export async function deletePendingOrders(maxAgeHours: number = 24): Promise<num
     if (order.status === "pending") {
       const orderAge = now - new Date(order.createdAt).getTime();
       if (orderAge > maxAgeMs) {
-        await dbDelete(ORDERS_KEY, order.id);
+        await dbUpdate<TicketOrder>(ORDERS_KEY, order.id, {
+          status: "cancelled",
+          archivedAt: new Date().toISOString(),
+          archivedReason: `Archived old pending order (>${maxAgeHours}h)`,
+        });
         deletedCount++;
       }
     }
   }
 
   return deletedCount;
+}
+
+export async function getArchivedOrders(): Promise<TicketOrder[]> {
+  const orders = await getAllOrders();
+  return orders
+    .filter((order) => !!order.archivedAt)
+    .sort((a, b) => new Date(b.archivedAt || b.createdAt).getTime() - new Date(a.archivedAt || a.createdAt).getTime());
 }

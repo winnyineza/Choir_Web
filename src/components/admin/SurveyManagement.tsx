@@ -86,6 +86,9 @@ export function SurveyManagement() {
     description: "",
     eventId: "",
     status: "draft" as Survey["status"],
+    scheduleEnabled: false,
+    scheduleFrequency: "once" as "once" | "weekly" | "monthly",
+    scheduleNextSendAt: "",
     questions: [] as SurveyQuestion[],
   });
   
@@ -139,6 +142,11 @@ export function SurveyManagement() {
         description: form.description || undefined,
         eventId: form.eventId || undefined,
         status: form.status,
+        schedule: {
+          enabled: form.scheduleEnabled,
+          frequency: form.scheduleFrequency,
+          nextSendAt: form.scheduleEnabled && form.scheduleNextSendAt ? new Date(form.scheduleNextSendAt).toISOString() : undefined,
+        },
         questions: form.questions,
       }, currentUser || undefined);
       toast({ title: "Updated", description: "Survey updated successfully." });
@@ -148,6 +156,11 @@ export function SurveyManagement() {
         description: form.description || undefined,
         eventId: form.eventId || undefined,
         status: form.status,
+        schedule: {
+          enabled: form.scheduleEnabled,
+          frequency: form.scheduleFrequency,
+          nextSendAt: form.scheduleEnabled && form.scheduleNextSendAt ? new Date(form.scheduleNextSendAt).toISOString() : undefined,
+        },
         questions: form.questions,
       }, currentUser || undefined);
       toast({ title: "Created", description: "Survey created successfully." });
@@ -165,6 +178,9 @@ export function SurveyManagement() {
       description: "",
       eventId: "",
       status: "draft",
+      scheduleEnabled: false,
+      scheduleFrequency: "once",
+      scheduleNextSendAt: "",
       questions: [],
     });
     setNewQuestion({ prompt: "", type: "text", options: [""] });
@@ -203,6 +219,9 @@ export function SurveyManagement() {
       description: survey.description || "",
       eventId: survey.eventId || "",
       status: survey.status,
+      scheduleEnabled: !!survey.schedule?.enabled,
+      scheduleFrequency: survey.schedule?.frequency || "once",
+      scheduleNextSendAt: survey.schedule?.nextSendAt ? survey.schedule.nextSendAt.slice(0, 16) : "",
       questions: survey.questions,
     });
     setShowCreateModal(true);
@@ -581,6 +600,45 @@ export function SurveyManagement() {
                       <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/40 border border-primary/10">
+                  <input
+                    type="checkbox"
+                    id="scheduleEnabled"
+                    checked={form.scheduleEnabled}
+                    onChange={(e) => setForm({ ...form, scheduleEnabled: e.target.checked })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <label htmlFor="scheduleEnabled" className="text-sm">Enable Schedule</label>
+                </div>
+                <div>
+                  <Label>Frequency</Label>
+                  <Select
+                    value={form.scheduleFrequency}
+                    onValueChange={(v) => setForm({ ...form, scheduleFrequency: v as "once" | "weekly" | "monthly" })}
+                  >
+                    <SelectTrigger className="mt-1 bg-secondary border-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="once">Once</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Next Send</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.scheduleNextSendAt}
+                    onChange={(e) => setForm({ ...form, scheduleNextSendAt: e.target.value })}
+                    className="mt-1 bg-secondary border-primary/20"
+                    disabled={!form.scheduleEnabled}
+                  />
                 </div>
               </div>
             </div>

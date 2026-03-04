@@ -111,6 +111,7 @@ export async function downloadBackup(
       for (const [key, records] of Object.entries(backupData.data)) {
         if (records.length > 0) {
           tablesFolder.file(`${key}.json`, JSON.stringify(records, null, 2));
+          tablesFolder.file(`${key}.csv`, toCsv(records));
         }
       }
     }
@@ -144,6 +145,25 @@ export async function downloadBackup(
       recordCount: 0,
     };
   }
+}
+
+function toCsv(records: any[]): string {
+  if (!records || records.length === 0) return '';
+  const headers = Array.from(
+    records.reduce((keys, row) => {
+      Object.keys(row || {}).forEach((k) => keys.add(k));
+      return keys;
+    }, new Set<string>())
+  );
+
+  const escapeCell = (value: any) => {
+    if (value === null || value === undefined) return '';
+    const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    return `"${serialized.replace(/"/g, '""')}"`;
+  };
+
+  const rows = records.map((record) => headers.map((header) => escapeCell(record?.[header])).join(','));
+  return [headers.join(','), ...rows].join('\n');
 }
 
 // ============ IMPORT FUNCTIONS ============

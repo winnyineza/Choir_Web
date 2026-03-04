@@ -2,6 +2,13 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -229,6 +236,7 @@ export function AuditLogPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
   
   const { toast } = useToast();
 
@@ -756,8 +764,9 @@ export function AuditLogPage() {
             return (
               <div
                 key={log.id}
+                onClick={() => setSelectedLog(log)}
                 className={cn(
-                  "flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-primary/30",
+                  "flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-primary/30 cursor-pointer",
                   "bg-secondary/20 border-primary/10"
                 )}
               >
@@ -783,7 +792,7 @@ export function AuditLogPage() {
                     </span>
                   </div>
                   {log.details && (
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
                       {log.details}
                     </p>
                   )}
@@ -872,6 +881,40 @@ export function AuditLogPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null); }}>
+        <DialogContent className="sm:max-w-xl bg-charcoal border-primary/20">
+          <DialogHeader>
+            <DialogTitle className="font-display gold-text">Audit Entry Details</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Full details for the selected audit activity.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedLog && (
+            <div className="space-y-3 text-sm mt-2">
+              <div>
+                <p className="text-muted-foreground">Action</p>
+                <p className="font-medium text-foreground">{selectedLog.action}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">User</p>
+                <p className="text-foreground">{selectedLog.userName} ({selectedLog.userEmail})</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Timestamp</p>
+                <p className="text-foreground">{formatDate(selectedLog.timestamp)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Details</p>
+                <div className="rounded-md bg-secondary/40 border border-primary/10 p-3 text-foreground whitespace-pre-wrap break-words">
+                  {selectedLog.details || "No details provided"}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

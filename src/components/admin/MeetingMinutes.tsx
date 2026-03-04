@@ -117,7 +117,7 @@ export function MeetingMinutesComponent() {
   const [stats, setStats] = useState<MeetingStats>({
     totalMeetings: 0,
     thisMonth: 0,
-    byType: { general: 0, committee: 0 },
+    byType: { general: 0, committee: 0, executive: 0, rehearsal: 0, workshop: 0, emergency: 0 },
     drafts: 0,
     approved: 0,
   });
@@ -649,6 +649,13 @@ export function MeetingMinutesComponent() {
           </div>
           <p className="text-xs text-muted-foreground mt-1">Committee</p>
         </div>
+        <div className="card-glass rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <Users className="w-4 h-4 text-amber-400" />
+            <span className="text-xl font-bold">{stats.byType.executive}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Executive</p>
+        </div>
       </div>
 
       {/* Actions */}
@@ -672,6 +679,10 @@ export function MeetingMinutesComponent() {
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="general">General</SelectItem>
             <SelectItem value="committee">Committee</SelectItem>
+            <SelectItem value="executive">Executive</SelectItem>
+            <SelectItem value="rehearsal">Rehearsal</SelectItem>
+            <SelectItem value="workshop">Workshop</SelectItem>
+            <SelectItem value="emergency">Emergency</SelectItem>
           </SelectContent>
         </Select>
 
@@ -877,6 +888,10 @@ export function MeetingMinutesComponent() {
                   <SelectContent>
                     <SelectItem value="general">General Meeting</SelectItem>
                     <SelectItem value="committee">Committee Meeting</SelectItem>
+                    <SelectItem value="executive">Executive Meeting</SelectItem>
+                    <SelectItem value="rehearsal">Rehearsal Session</SelectItem>
+                    <SelectItem value="workshop">Workshop</SelectItem>
+                    <SelectItem value="emergency">Emergency Meeting</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">

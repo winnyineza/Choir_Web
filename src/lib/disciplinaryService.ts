@@ -1,6 +1,6 @@
 // Disciplinary Service - manages disciplinary records (Supabase-direct)
 
-import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, generateId } from './supabaseDB';
 
 export interface DisciplinaryRecord {
   id: string;
@@ -12,7 +12,10 @@ export interface DisciplinaryRecord {
   description: string;
   date: string;
   expiryDate?: string;
-  status: "active" | "resolved" | "appealed" | "expired";
+  status: "active" | "resolved" | "appealed" | "expired" | "archived";
+  fineAmount?: number;
+  finePaidAmount?: number;
+  fineDueDate?: string;
   actionTaken?: string;
   issuedBy: string;
   issuedByName: string;
@@ -24,6 +27,8 @@ export interface DisciplinaryRecord {
   appealReason?: string;
   appealDecision?: "approved" | "denied" | "pending";
   attachments?: string[];
+  archivedAt?: string;
+  archivedBy?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -141,11 +146,40 @@ export async function decideAppeal(
 
 export async function deleteDisciplinaryRecord(id: string): Promise<boolean> {
   try {
-    await dbDelete(DISCIPLINARY_KEY, id);
+    const record = await dbGetById<DisciplinaryRecord>(DISCIPLINARY_KEY, id);
+    if (!record) return false;
+    await dbUpdate<DisciplinaryRecord>(DISCIPLINARY_KEY, id, {
+      ...record,
+      status: "archived",
+      archivedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     return true;
   } catch {
     return false;
   }
+}
+
+export async function getOutstandingFineBalanceByMember(memberId: string): Promise<number> {
+  const records = await getAllDisciplinaryRecords();
+  return records
+    .filter(r => r.memberId === memberId && r.type === "fine" && r.status !== "archived")
+    .reduce((sum, record) => {
+      const assessed = Math.max(0, record.fineAmount || 0);
+      const paid = Math.max(0, record.finePaidAmount || 0);
+      return sum + Math.max(0, assessed - paid);
+    }, 0);
+}
+
+export async function getOutstandingFineBalanceTotal(): Promise<number> {
+  const records = await getAllDisciplinaryRecords();
+  return records
+    .filter(r => r.type === "fine" && r.status !== "archived")
+    .reduce((sum, record) => {
+      const assessed = Math.max(0, record.fineAmount || 0);
+      const paid = Math.max(0, record.finePaidAmount || 0);
+      return sum + Math.max(0, assessed - paid);
+    }, 0);
 }
 
 export async function getDisciplinaryStats(): Promise<DisciplinaryStats> {

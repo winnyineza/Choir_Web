@@ -116,6 +116,7 @@ export async function getAllPageViews(): Promise<PageView[]> {
 
 export async function getPageViewStats(): Promise<{
   totalViews: number;
+  uniqueVisitors: number;
   todayViews: number;
   weekViews: number;
   monthViews: number;
@@ -134,6 +135,7 @@ export async function getPageViewStats(): Promise<{
   const todayViews = pageViews.filter((pv) => pv.timestamp >= todayStart).length;
   const weekViews = pageViews.filter((pv) => pv.timestamp >= weekStart).length;
   const monthViews = pageViews.filter((pv) => pv.timestamp >= monthStart).length;
+  const uniqueVisitors = new Set(pageViews.map((pv) => pv.sessionId).filter(Boolean)).size;
 
   // Count views by page
   const pageCountMap: Record<string, { title: string; count: number }> = {};
@@ -181,6 +183,7 @@ export async function getPageViewStats(): Promise<{
 
   return {
     totalViews: pageViews.length,
+    uniqueVisitors,
     todayViews,
     weekViews,
     monthViews,
