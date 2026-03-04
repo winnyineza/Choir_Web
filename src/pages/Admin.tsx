@@ -631,6 +631,25 @@ export default function Admin() {
   };
 
   const confirmedOrders = orders.filter(o => o.status === "confirmed" || o.status === "used");
+  const ticketedEvents = events.filter((event) => !event.isFree && event.tickets.length > 0);
+  const ticketedEventCount = ticketedEvents.length;
+  const totalTicketCapacity = ticketedEvents.reduce(
+    (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.available || 0), 0),
+    0
+  );
+  const totalTicketsConfiguredSold = ticketedEvents.reduce(
+    (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.sold || 0), 0),
+    0
+  );
+  const totalTicketsRemaining = ticketedEvents.reduce(
+    (sum, event) =>
+      sum + event.tickets.reduce((tierSum, tier) => tierSum + Math.max(0, (tier.available || 0) - (tier.sold || 0)), 0),
+    0
+  );
+  const ticketRevenuePotential = ticketedEvents.reduce(
+    (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.price || 0) * (tier.available || 0), 0),
+    0
+  );
   
   // Get unique events from orders for filter dropdown
   const orderEvents = [...new Map(confirmedOrders.map(o => [o.eventId, { id: o.eventId, title: o.eventTitle }])).values()];
@@ -1529,7 +1548,7 @@ export default function Admin() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-8 gap-3">
                   <div className="card-glass rounded-xl p-4">
                     <p className="text-xs text-muted-foreground">Weekly Web Visits</p>
                     <p className="text-2xl font-bold text-foreground">{dashboardPageStats.weekViews.toLocaleString()}</p>
@@ -1537,6 +1556,18 @@ export default function Admin() {
                   <div className="card-glass rounded-xl p-4">
                     <p className="text-xs text-muted-foreground">Unique Visitors</p>
                     <p className="text-2xl font-bold text-foreground">{dashboardPageStats.uniqueVisitors.toLocaleString()}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Ticketed Events</p>
+                    <p className="text-2xl font-bold text-foreground">{ticketedEventCount}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Tickets Remaining</p>
+                    <p className="text-2xl font-bold text-foreground">{totalTicketsRemaining.toLocaleString()}</p>
+                  </div>
+                  <div className="card-glass rounded-xl p-4">
+                    <p className="text-xs text-muted-foreground">Ticket Potential</p>
+                    <p className="text-2xl font-bold text-foreground">{formatCurrency(ticketRevenuePotential)}</p>
                   </div>
                   <div className="card-glass rounded-xl p-4">
                     <p className="text-xs text-muted-foreground">Ticket Conversion</p>
@@ -2002,8 +2033,27 @@ export default function Admin() {
           {/* Ticket Orders */}
           {activeTab === "tickets" && (
             <div className="space-y-6">
+              {ticketedEventCount > 0 && (
+                <div className="card-glass rounded-xl p-4 border border-primary/20">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-foreground flex items-center gap-2">
+                        <Ticket className="w-4 h-4 text-primary" />
+                        Ticketing Coverage
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {ticketedEventCount} ticketed event(s) configured • {totalTicketsConfiguredSold.toLocaleString()}/{totalTicketCapacity.toLocaleString()} sold • {totalTicketsRemaining.toLocaleString()} remaining
+                      </p>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Potential Revenue: <span className="text-foreground font-semibold">{formatCurrency(ticketRevenuePotential)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="card-glass rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-foreground">{orderStats.total}</p>
                   <p className="text-xs text-muted-foreground">Total Orders</p>
@@ -2023,6 +2073,10 @@ export default function Admin() {
                 <div className="card-glass rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold gold-text">{formatCurrency(orderStats.revenue)}</p>
                   <p className="text-xs text-muted-foreground">Revenue</p>
+                </div>
+                <div className="card-glass rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-primary">{ticketedEventCount}</p>
+                  <p className="text-xs text-muted-foreground">Ticketed Events</p>
                 </div>
               </div>
 
@@ -2402,7 +2456,9 @@ export default function Admin() {
                     <p className="text-sm text-muted-foreground">
                       {orderSearch
                         ? "No orders match your search criteria."
-                        : "Ticket orders will appear here when customers make purchases."}
+                        : ticketedEventCount > 0
+                          ? `You have ${ticketedEventCount} ticketed event(s) live. Orders will appear here as soon as purchases start.`
+                          : "Ticket orders will appear here when customers make purchases."}
                     </p>
                   </div>
                 )}

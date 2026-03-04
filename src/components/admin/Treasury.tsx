@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAllOrders } from "@/lib/ticketService";
+import { getAllEvents } from "@/lib/dataService";
 import { getAllContributions } from "@/lib/contributionService";
 import { getAllExpenses, Expense, getCategoryLabel } from "@/lib/expenseService";
 import { getAllDisciplinaryRecords, getOutstandingFineBalanceTotal } from "@/lib/disciplinaryService";
@@ -126,6 +127,13 @@ export function Treasury({ onRefresh }: TreasuryProps) {
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [allContributions, setAllContributions] = useState<any[]>([]);
   const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [ticketingOverview, setTicketingOverview] = useState({
+    ticketedEvents: 0,
+    ticketCapacity: 0,
+    ticketsSold: 0,
+    ticketsRemaining: 0,
+    potentialRevenue: 0,
+  });
   
   // Donation form
   const [donationForm, setDonationForm] = useState({
@@ -143,6 +151,33 @@ export function Treasury({ onRefresh }: TreasuryProps) {
   }, []);
 
   const loadFinancialData = async () => {
+    const events = await getAllEvents();
+    const ticketedEvents = events.filter((event) => !event.isFree && event.tickets.length > 0);
+    const ticketCapacity = ticketedEvents.reduce(
+      (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.available || 0), 0),
+      0
+    );
+    const ticketsSold = ticketedEvents.reduce(
+      (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.sold || 0), 0),
+      0
+    );
+    const ticketsRemaining = ticketedEvents.reduce(
+      (sum, event) =>
+        sum + event.tickets.reduce((tierSum, tier) => tierSum + Math.max(0, (tier.available || 0) - (tier.sold || 0)), 0),
+      0
+    );
+    const potentialRevenue = ticketedEvents.reduce(
+      (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.price || 0) * (tier.available || 0), 0),
+      0
+    );
+    setTicketingOverview({
+      ticketedEvents: ticketedEvents.length,
+      ticketCapacity,
+      ticketsSold,
+      ticketsRemaining,
+      potentialRevenue,
+    });
+
     // Ticket Revenue
     const orders = await getAllOrders();
     setAllOrders(orders);
@@ -242,7 +277,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
       // Filter by month
       const monthTickets = allOrders
         .filter(o => o.status === "confirmed" && new Date(o.createdAt) >= monthStart && new Date(o.createdAt) <= monthEnd)
-        .reduce((sum, o) => sum + o.totalAmount, 0);
+        .reduce((sum, o) => sum + (o.total || o.totalAmount || 0), 0);
       
       const monthContributions = allContributions
         .filter(c => new Date(c.paidAt) >= monthStart && new Date(c.paidAt) <= monthEnd)
@@ -274,7 +309,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     { name: "Tickets", value: ticketRevenue, color: INCOME_COLORS.tickets },
     { name: "Contributions", value: contributionTotal, color: INCOME_COLORS.contributions },
     { name: "Donations", value: donationTotal, color: INCOME_COLORS.donations },
-  ].filter(d => d.value > 0);
+  ].filter(d => d.value > 0 || (d.name === "Tickets" && ticketingOverview.ticketedEvents > 0));
 
   // Expense by category
   const expenseByCategory = useMemo(() => {
@@ -390,6 +425,11 @@ export function Treasury({ onRefresh }: TreasuryProps) {
       summary: {
         totalIncome,
         ticketRevenue,
+        ticketedEvents: ticketingOverview.ticketedEvents,
+        ticketCapacity: ticketingOverview.ticketCapacity,
+        ticketsSold: ticketingOverview.ticketsSold,
+        ticketsRemaining: ticketingOverview.ticketsRemaining,
+        ticketRevenuePotential: ticketingOverview.potentialRevenue,
         contributionTotal,
         donationTotal,
         expenseTotal,
@@ -488,11 +528,21 @@ export function Treasury({ onRefresh }: TreasuryProps) {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
               <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
                 <Ticket className="w-5 h-5 text-blue-400 mb-2" />
-                <p className="text-xs text-muted-foreground">Tickets</p>
+                <p className="text-xs text-muted-foreground">Ticket Revenue</p>
                 <p className="text-lg font-bold text-foreground">{formatCompactCurrency(ticketRevenue)}</p>
+              </div>
+              <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                <BarChart3 className="w-5 h-5 text-blue-400 mb-2" />
+                <p className="text-xs text-muted-foreground">Ticketed Events</p>
+                <p className="text-lg font-bold text-foreground">{ticketingOverview.ticketedEvents}</p>
+              </div>
+              <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                <Target className="w-5 h-5 text-blue-400 mb-2" />
+                <p className="text-xs text-muted-foreground">Open Capacity</p>
+                <p className="text-lg font-bold text-foreground">{ticketingOverview.ticketsRemaining.toLocaleString()}</p>
               </div>
               <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
                 <Users className="w-5 h-5 text-purple-400 mb-2" />
@@ -518,6 +568,21 @@ export function Treasury({ onRefresh }: TreasuryProps) {
           </div>
         </div>
       </div>
+
+      {ticketingOverview.ticketedEvents > 0 && (
+        <div className="card-glass rounded-xl p-4 border border-primary/20">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Ticket setup: <span className="text-foreground font-medium">{ticketingOverview.ticketedEvents}</span> event(s) •
+              <span className="text-foreground font-medium"> {ticketingOverview.ticketsSold.toLocaleString()}</span> sold /
+              <span className="text-foreground font-medium"> {ticketingOverview.ticketCapacity.toLocaleString()}</span> capacity
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Potential Ticket Revenue: <span className="text-foreground font-semibold">{formatCurrency(ticketingOverview.potentialRevenue)}</span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-primary/10 pb-2">
