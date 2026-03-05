@@ -632,8 +632,9 @@ export default function Admin() {
   };
 
   const confirmedOrders = orders.filter(o => o.status === "confirmed" || o.status === "used");
-  const ticketedEvents = events.filter((event) => !event.isFree && event.tickets.length > 0);
+  const ticketedEvents = events.filter((event) => event.tickets.length > 0);
   const ticketedEventCount = ticketedEvents.length;
+  const hasTicketedEvents = ticketedEventCount > 0;
   const totalTicketCapacity = ticketedEvents.reduce(
     (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.available || 0), 0),
     0
@@ -1383,15 +1384,17 @@ export default function Admin() {
                       </div>
                       <p className="text-xs text-muted-foreground">Pending Leave</p>
                     </div>
-                    <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                          <Mail className="w-4 h-4 text-blue-400" />
+                    {hasTicketedEvents && (
+                      <div className="card-glass rounded-xl p-4 hover:bg-secondary/50 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                            <Ticket className="w-4 h-4 text-primary" />
+                          </div>
+                          <p className="text-2xl font-bold text-foreground">{formatCurrency(financialTotals.ticketRevenue)}</p>
                         </div>
-                        <p className={cn("text-2xl font-bold", unreadMessages > 0 ? "text-blue-400" : "text-foreground")}>{unreadMessages}</p>
+                        <p className="text-xs text-muted-foreground">Tickets</p>
                       </div>
-                      <p className="text-xs text-muted-foreground">Unread Messages</p>
-                    </div>
+                    )}
                   </div>
 
                   <div>
@@ -1549,14 +1552,16 @@ export default function Admin() {
                   </Button>
                 </div>
 
-                <TicketHealthWidget
-                  title="Ticket Health (Global)"
-                  ticketedEvents={ticketedEventCount}
-                  ticketCapacity={totalTicketCapacity}
-                  ticketsSold={totalTicketsConfiguredSold}
-                  ticketsRemaining={totalTicketsRemaining}
-                  potentialRevenue={ticketRevenuePotential}
-                />
+                {hasTicketedEvents && (
+                  <TicketHealthWidget
+                    title="Ticket Health (Global)"
+                    ticketedEvents={ticketedEventCount}
+                    ticketCapacity={totalTicketCapacity}
+                    ticketsSold={totalTicketsConfiguredSold}
+                    ticketsRemaining={totalTicketsRemaining}
+                    potentialRevenue={ticketRevenuePotential}
+                  />
+                )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-8 gap-3">
                   <div className="card-glass rounded-xl p-4">
@@ -1567,22 +1572,26 @@ export default function Admin() {
                     <p className="text-xs text-muted-foreground">Unique Visitors</p>
                     <p className="text-2xl font-bold text-foreground">{dashboardPageStats.uniqueVisitors.toLocaleString()}</p>
                   </div>
-                  <div className="card-glass rounded-xl p-4">
-                    <p className="text-xs text-muted-foreground">Ticketed Events</p>
-                    <p className="text-2xl font-bold text-foreground">{ticketedEventCount}</p>
-                  </div>
-                  <div className="card-glass rounded-xl p-4">
-                    <p className="text-xs text-muted-foreground">Tickets Remaining</p>
-                    <p className="text-2xl font-bold text-foreground">{totalTicketsRemaining.toLocaleString()}</p>
-                  </div>
-                  <div className="card-glass rounded-xl p-4">
-                    <p className="text-xs text-muted-foreground">Ticket Potential</p>
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(ticketRevenuePotential)}</p>
-                  </div>
-                  <div className="card-glass rounded-xl p-4">
-                    <p className="text-xs text-muted-foreground">Ticket Conversion</p>
-                    <p className="text-2xl font-bold text-foreground">{orderStats.total > 0 ? `${Math.round((orderStats.confirmed / orderStats.total) * 100)}%` : "0%"}</p>
-                  </div>
+                  {hasTicketedEvents && (
+                    <>
+                      <div className="card-glass rounded-xl p-4">
+                        <p className="text-xs text-muted-foreground">Ticketed Events</p>
+                        <p className="text-2xl font-bold text-foreground">{ticketedEventCount}</p>
+                      </div>
+                      <div className="card-glass rounded-xl p-4">
+                        <p className="text-xs text-muted-foreground">Tickets Remaining</p>
+                        <p className="text-2xl font-bold text-foreground">{totalTicketsRemaining.toLocaleString()}</p>
+                      </div>
+                      <div className="card-glass rounded-xl p-4">
+                        <p className="text-xs text-muted-foreground">Ticket Potential</p>
+                        <p className="text-2xl font-bold text-foreground">{formatCurrency(ticketRevenuePotential)}</p>
+                      </div>
+                      <div className="card-glass rounded-xl p-4">
+                        <p className="text-xs text-muted-foreground">Ticket Conversion</p>
+                        <p className="text-2xl font-bold text-foreground">{orderStats.total > 0 ? `${Math.round((orderStats.confirmed / orderStats.total) * 100)}%` : "0%"}</p>
+                      </div>
+                    </>
+                  )}
                   <div className="card-glass rounded-xl p-4">
                     <p className="text-xs text-muted-foreground">Attendance Health</p>
                     <p className="text-2xl font-bold text-foreground">{Math.round(overallAttendanceStats.avgAttendance)}%</p>
@@ -1598,39 +1607,43 @@ export default function Admin() {
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                  <div className="card-glass rounded-2xl p-5">
-                    <h3 className="font-display text-base font-semibold mb-3">Revenue Momentum</h3>
-                    {revenueTrend.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={240}>
-                        <AreaChart data={revenueTrend}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
-                          <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
-                          <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
-                          <Tooltip formatter={(value: number) => [formatCurrency(value), "Revenue"]} />
-                          <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No confirmed ticket revenue in selected time range yet.</p>
-                    )}
-                  </div>
+                  {hasTicketedEvents && (
+                    <div className="card-glass rounded-2xl p-5">
+                      <h3 className="font-display text-base font-semibold mb-3">Revenue Momentum</h3>
+                      {revenueTrend.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={240}>
+                          <AreaChart data={revenueTrend}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
+                            <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                            <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                            <Tooltip formatter={(value: number) => [formatCurrency(value), "Revenue"]} />
+                            <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No confirmed ticket revenue in selected time range yet.</p>
+                      )}
+                    </div>
+                  )}
 
-                  <div className="card-glass rounded-2xl p-5">
-                    <h3 className="font-display text-base font-semibold mb-3">Ticket Pipeline Status</h3>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={ticketPipelineData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
-                        <XAxis dataKey="name" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
-                        <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
-                        <Tooltip formatter={(value: number) => [value, "Orders"]} />
-                        <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                          {ticketPipelineData.map((entry, index) => (
-                            <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {hasTicketedEvents && (
+                    <div className="card-glass rounded-2xl p-5">
+                      <h3 className="font-display text-base font-semibold mb-3">Ticket Pipeline Status</h3>
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={ticketPipelineData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(212,165,55,0.08)" />
+                          <XAxis dataKey="name" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+                          <Tooltip formatter={(value: number) => [value, "Orders"]} />
+                          <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                            {ticketPipelineData.map((entry, index) => (
+                              <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
 
                   <div className="card-glass rounded-2xl p-5">
                     <h3 className="font-display text-base font-semibold mb-3">Attendance Trend</h3>
@@ -1948,13 +1961,15 @@ export default function Admin() {
                 </Button>
               </div>
 
-              <TicketHealthWidget
-                ticketedEvents={ticketedEventCount}
-                ticketCapacity={totalTicketCapacity}
-                ticketsSold={totalTicketsConfiguredSold}
-                ticketsRemaining={totalTicketsRemaining}
-                potentialRevenue={ticketRevenuePotential}
-              />
+              {hasTicketedEvents && (
+                <TicketHealthWidget
+                  ticketedEvents={ticketedEventCount}
+                  ticketCapacity={totalTicketCapacity}
+                  ticketsSold={totalTicketsConfiguredSold}
+                  ticketsRemaining={totalTicketsRemaining}
+                  potentialRevenue={ticketRevenuePotential}
+                />
+              )}
               
               <div className="card-glass rounded-2xl overflow-hidden">
                 {events.length > 0 ? (
@@ -2051,13 +2066,15 @@ export default function Admin() {
           {/* Ticket Orders */}
           {activeTab === "tickets" && (
             <div className="space-y-6">
-              <TicketHealthWidget
-                ticketedEvents={ticketedEventCount}
-                ticketCapacity={totalTicketCapacity}
-                ticketsSold={totalTicketsConfiguredSold}
-                ticketsRemaining={totalTicketsRemaining}
-                potentialRevenue={ticketRevenuePotential}
-              />
+              {hasTicketedEvents && (
+                <TicketHealthWidget
+                  ticketedEvents={ticketedEventCount}
+                  ticketCapacity={totalTicketCapacity}
+                  ticketsSold={totalTicketsConfiguredSold}
+                  ticketsRemaining={totalTicketsRemaining}
+                  potentialRevenue={ticketRevenuePotential}
+                />
+              )}
 
               {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -2081,10 +2098,12 @@ export default function Admin() {
                   <p className="text-2xl font-bold gold-text">{formatCurrency(orderStats.revenue)}</p>
                   <p className="text-xs text-muted-foreground">Revenue</p>
                 </div>
-                <div className="card-glass rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-primary">{ticketedEventCount}</p>
-                  <p className="text-xs text-muted-foreground">Ticketed Events</p>
-                </div>
+                {hasTicketedEvents && (
+                  <div className="card-glass rounded-xl p-4 text-center">
+                    <p className="text-2xl font-bold text-primary">{ticketedEventCount}</p>
+                    <p className="text-xs text-muted-foreground">Ticketed Events</p>
+                  </div>
+                )}
               </div>
 
               {/* Pending Order Cleanup */}

@@ -71,6 +71,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
     memberGrowth: 0,
     // Events
     upcomingEvents: 0,
+    ticketedEvents: 0,
     totalTicketsSold: 0,
     avgCheckInRate: 0,
     // Engagement
@@ -151,6 +152,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
     const collectionRate = expectedTotal > 0 ? (contributionStats.totalCollected / expectedTotal * 100) : 100;
 
     // Ticket stats
+    const ticketedEvents = events.filter(event => event.tickets.length > 0).length;
     const totalTicketsSold = confirmedOrders.reduce((sum, o) => sum + (o.ticketQuantity || 0), 0);
     const usedTickets = orders.filter(o => o.status === "used").length;
     const avgCheckInRate = confirmedOrders.length > 0 ? (usedTickets / confirmedOrders.length * 100) : 0;
@@ -168,6 +170,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
       newThisMonth,
       memberGrowth,
       upcomingEvents: events.length,
+      ticketedEvents,
       totalTicketsSold,
       avgCheckInRate,
       pendingLeave: leaveRequests.filter(l => l.status === "pending").length,
@@ -191,11 +194,14 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
     ]);
 
     // Revenue by source
-    setRevenueBySource([
+    const sourceData = [
       { name: "Contributions", value: contributionTotal, color: "#F59E0B" },
-      { name: "Tickets", value: ticketRevenue, color: "#3B82F6" },
       { name: "Donations", value: donationTotal, color: "#10B981" },
-    ]);
+    ];
+    if (ticketedEvents > 0) {
+      sourceData.splice(1, 0, { name: "Tickets", value: ticketRevenue, color: "#3B82F6" });
+    }
+    setRevenueBySource(sourceData);
 
     // Monthly trend (last 6 months)
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -355,13 +361,15 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
           <p className="text-[10px] text-muted-foreground">Upcoming Events</p>
         </button>
         
-        <button onClick={() => onNavigate("tickets")} className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all text-left">
-          <div className="flex items-center gap-2 mb-1">
-            <Ticket className="w-4 h-4 text-primary" />
-            <span className="text-lg font-bold">{stats.totalTicketsSold}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground">Tickets Sold</p>
-        </button>
+        {stats.ticketedEvents > 0 && (
+          <button onClick={() => onNavigate("tickets")} className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all text-left">
+            <div className="flex items-center gap-2 mb-1">
+              <Ticket className="w-4 h-4 text-primary" />
+              <span className="text-lg font-bold">{stats.totalTicketsSold}</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Tickets Sold</p>
+          </button>
+        )}
         
         <button onClick={() => onNavigate("contributions")} className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all text-left">
           <div className="flex items-center gap-2 mb-1">

@@ -153,7 +153,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
 
   const loadFinancialData = async () => {
     const events = await getAllEvents();
-    const ticketedEvents = events.filter((event) => !event.isFree && event.tickets.length > 0);
+    const ticketedEvents = events.filter((event) => event.tickets.length > 0);
     const ticketCapacity = ticketedEvents.reduce(
       (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.available || 0), 0),
       0
@@ -530,21 +530,27 @@ export function Treasury({ onRefresh }: TreasuryProps) {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-              <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
-                <Ticket className="w-5 h-5 text-blue-400 mb-2" />
-                <p className="text-xs text-muted-foreground">Ticket Revenue</p>
-                <p className="text-lg font-bold text-foreground">{formatCompactCurrency(ticketRevenue)}</p>
-              </div>
-              <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
-                <BarChart3 className="w-5 h-5 text-blue-400 mb-2" />
-                <p className="text-xs text-muted-foreground">Ticketed Events</p>
-                <p className="text-lg font-bold text-foreground">{ticketingOverview.ticketedEvents}</p>
-              </div>
-              <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
-                <Target className="w-5 h-5 text-blue-400 mb-2" />
-                <p className="text-xs text-muted-foreground">Open Capacity</p>
-                <p className="text-lg font-bold text-foreground">{ticketingOverview.ticketsRemaining.toLocaleString()}</p>
-              </div>
+              {ticketingOverview.ticketedEvents > 0 && (
+                <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                  <Ticket className="w-5 h-5 text-blue-400 mb-2" />
+                  <p className="text-xs text-muted-foreground">Ticket Revenue</p>
+                  <p className="text-lg font-bold text-foreground">{formatCompactCurrency(ticketRevenue)}</p>
+                </div>
+              )}
+              {ticketingOverview.ticketedEvents > 0 && (
+                <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                  <BarChart3 className="w-5 h-5 text-blue-400 mb-2" />
+                  <p className="text-xs text-muted-foreground">Ticketed Events</p>
+                  <p className="text-lg font-bold text-foreground">{ticketingOverview.ticketedEvents}</p>
+                </div>
+              )}
+              {ticketingOverview.ticketedEvents > 0 && (
+                <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                  <Target className="w-5 h-5 text-blue-400 mb-2" />
+                  <p className="text-xs text-muted-foreground">Open Capacity</p>
+                  <p className="text-lg font-bold text-foreground">{ticketingOverview.ticketsRemaining.toLocaleString()}</p>
+                </div>
+              )}
               <div className="bg-background/50 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
                 <Users className="w-5 h-5 text-purple-400 mb-2" />
                 <p className="text-xs text-muted-foreground">Contributions</p>
@@ -570,13 +576,15 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         </div>
       </div>
 
-      <TicketHealthWidget
-        ticketedEvents={ticketingOverview.ticketedEvents}
-        ticketCapacity={ticketingOverview.ticketCapacity}
-        ticketsSold={ticketingOverview.ticketsSold}
-        ticketsRemaining={ticketingOverview.ticketsRemaining}
-        potentialRevenue={ticketingOverview.potentialRevenue}
-      />
+      {ticketingOverview.ticketedEvents > 0 && (
+        <TicketHealthWidget
+          ticketedEvents={ticketingOverview.ticketedEvents}
+          ticketCapacity={ticketingOverview.ticketCapacity}
+          ticketsSold={ticketingOverview.ticketsSold}
+          ticketsRemaining={ticketingOverview.ticketsRemaining}
+          potentialRevenue={ticketingOverview.potentialRevenue}
+        />
+      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-primary/10 pb-2">
@@ -760,7 +768,9 @@ export function Treasury({ onRefresh }: TreasuryProps) {
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCompactCurrency} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar dataKey="tickets" name="Tickets" fill={INCOME_COLORS.tickets} radius={[4, 4, 0, 0]} />
+                  {ticketingOverview.ticketedEvents > 0 && (
+                    <Bar dataKey="tickets" name="Tickets" fill={INCOME_COLORS.tickets} radius={[4, 4, 0, 0]} />
+                  )}
                   <Bar dataKey="contributions" name="Contributions" fill={INCOME_COLORS.contributions} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="donations" name="Donations" fill={INCOME_COLORS.donations} radius={[4, 4, 0, 0]} />
                 </BarChart>
