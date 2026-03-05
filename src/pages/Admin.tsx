@@ -200,47 +200,6 @@ import { getTicketedEvents } from "@/lib/ticketVisibility";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "event-staff" | "team" | "audit" | "settings";
 
-const BIRTHDAY_EVENT_PREFIX = "birthday-member-";
-
-const getMemberBirthdayCalendarEvents = (members: Member[]): Event[] => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return members
-    .filter((member) => member.status === "Active" && !!member.dateOfBirth)
-    .map((member) => {
-      const [, month, day] = member.dateOfBirth!.split("-").map(Number);
-      let nextBirthday = new Date(today.getFullYear(), month - 1, day);
-      nextBirthday.setHours(0, 0, 0, 0);
-
-      if (nextBirthday < today) {
-        nextBirthday = new Date(today.getFullYear() + 1, month - 1, day);
-        nextBirthday.setHours(0, 0, 0, 0);
-      }
-
-      const birthdayDate = nextBirthday.toISOString().split("T")[0];
-      const firstName = member.name.split(" ")[0];
-      const possessiveName = firstName.endsWith("s") ? `${firstName}'` : `${firstName}'s`;
-
-      return {
-        id: `${BIRTHDAY_EVENT_PREFIX}${member.id}-${nextBirthday.getFullYear()}`,
-        title: `${possessiveName} Birthday`,
-        description: `Auto-generated birthday reminder for ${member.name}.`,
-        date: birthdayDate,
-        time: "00:00",
-        location: "Serenades Calendar",
-        category: "Other",
-        isFree: true,
-        tickets: [],
-        createdAt: new Date().toISOString(),
-        status: "published",
-      } as Event;
-    })
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-};
-
-const isGeneratedBirthdayEvent = (event: Event) => event.id.startsWith(BIRTHDAY_EVENT_PREFIX);
-
 const sidebarItems = [
   { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
   { id: "members" as Tab, label: "Members", icon: Users },
@@ -401,6 +360,7 @@ export default function Admin() {
     connectedAt: null,
   });
   const [googleConnectionLoading, setGoogleConnectionLoading] = useState(false);
+  const [birthdaySyncLoading, setBirthdaySyncLoading] = useState(false);
 
   // My Account state
   const [accountName, setAccountName] = useState(currentUser?.name || "");
@@ -427,12 +387,8 @@ export default function Admin() {
         getDashboardStats(),
         getUnreadContactCount(),
       ]);
-      const birthdayEvents = getMemberBirthdayCalendarEvents(membersData);
-      const calendarEvents = [...eventsData, ...birthdayEvents].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
       setMembers(membersData);
-      setEvents(calendarEvents);
+      setEvents(eventsData);
       setDashboardStats(dashboardData);
       setUnreadMessages(unreadCount);
 
@@ -615,6 +571,31 @@ export default function Admin() {
         variant: "destructive",
       });
       setGoogleConnectionLoading(false);
+    }
+  };
+
+  const handleSyncBirthdaysToGoogle = async () => {
+    if (!currentUser?.id) {
+      toast({ title: "Error", description: "Admin authentication required", variant: "destructive" });
+      return;
+    }
+
+    setBirthdaySyncLoading(true);
+    try {
+      const result = await syncGoogleBirthdayCalendar(currentUser.id);
+      toast({
+        title: "Google Birthday Calendar Synced",
+        description: `Created: ${result.created}, Updated: ${result.updated}, Removed: ${result.deleted}`,
+      });
+      await refreshGoogleIntegrationStatus();
+    } catch (error: any) {
+      toast({
+        title: "Birthday Sync Failed",
+        description: error.message || "Could not sync birthdays to Google Calendar",
+        variant: "destructive",
+      });
+    } finally {
+      setBirthdaySyncLoading(false);
     }
   };
 
@@ -2038,7 +2019,6 @@ export default function Admin() {
                     </thead>
                     <tbody>
                       {events.map((event) => {
-                        const isBirthdayEvent = isGeneratedBirthdayEvent(event);
                         const totalTickets = event.tickets.reduce((sum, t) => sum + t.available, 0);
                         const soldTickets = event.tickets.reduce((sum, t) => sum + (t.sold || 0), 0);
                         const remainingTickets = totalTickets - soldTickets;
@@ -2066,48 +2046,36 @@ export default function Admin() {
                             <td className="p-4">
                               <span className={cn(
                                 "px-2 py-1 rounded-full text-xs font-semibold",
-                                isBirthdayEvent
-                                  ? "bg-pink-500/20 text-pink-300"
-                                  : event.isFree
-                                    ? "bg-green-500/20 text-green-400"
-                                    : "bg-primary/20 text-primary"
+                                event.isFree ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
                               )}>
-                                {isBirthdayEvent ? "Birthday" : event.isFree ? "Free" : `${event.tickets.length} tiers`}
+                                {event.isFree ? "Free" : `${event.tickets.length} tiers`}
                               </span>
                             </td>
                             <td className="p-4 text-right space-x-1">
-                              {isBirthdayEvent ? (
-                                <span className="inline-flex px-2 py-1 rounded-md bg-secondary text-xs text-muted-foreground">
-                                  Auto-generated
-                                </span>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => { setSummaryEvent(event); setShowEventSummary(true); }}
-                                    title="View Summary"
-                                  >
-                                    <BarChart3 className="w-4 h-4 text-primary" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => { setEditingEvent(event); setShowAddEvent(true); }}
-                                    title="Edit"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteEvent(event.id, event.title)}
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-destructive" />
-                                  </Button>
-                                </>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setSummaryEvent(event); setShowEventSummary(true); }}
+                                title="View Summary"
+                              >
+                                <BarChart3 className="w-4 h-4 text-primary" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setEditingEvent(event); setShowAddEvent(true); }}
+                                title="Edit"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteEvent(event.id, event.title)}
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -3391,7 +3359,18 @@ export default function Admin() {
                     <RefreshCw className={cn("w-4 h-4 mr-2", googleConnectionLoading && "animate-spin")} />
                     Refresh Status
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSyncBirthdaysToGoogle}
+                    disabled={birthdaySyncLoading || !currentUser?.id || !googleConnectionStatus.connected}
+                  >
+                    {birthdaySyncLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Calendar className="w-4 h-4 mr-2" />}
+                    Sync Birthdays to Google
+                  </Button>
                 </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Birthday reminders sync to Google Calendar only and are not listed as regular Serenades events.
+                </p>
               </div>
 
               {/* My Account Section */}
