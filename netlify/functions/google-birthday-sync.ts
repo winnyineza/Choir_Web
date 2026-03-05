@@ -60,7 +60,6 @@ function buildBirthdayEventPayload(member: MemberRow) {
     end: { date: getAllDayEndDate(startDate) },
     recurrence: ["RRULE:FREQ=YEARLY"],
     transparency: "transparent",
-    reminders: { useDefault: true },
     extendedProperties: {
       private: {
         serenadesType: BIRTHDAY_TYPE,
