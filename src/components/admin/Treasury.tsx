@@ -53,6 +53,7 @@ import { getAllDonations, createDonation, updateDonation, deleteDonation, Donati
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { TicketHealthWidget } from "@/components/admin/TicketHealthWidget";
+import { getTicketedEvents } from "@/lib/ticketVisibility";
 import {
   PieChart,
   Pie,
@@ -153,7 +154,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
 
   const loadFinancialData = async () => {
     const events = await getAllEvents();
-    const ticketedEvents = events.filter((event) => event.tickets.length > 0);
+    const ticketedEvents = getTicketedEvents(events);
     const ticketCapacity = ticketedEvents.reduce(
       (sum, event) => sum + event.tickets.reduce((tierSum, tier) => tierSum + (tier.available || 0), 0),
       0

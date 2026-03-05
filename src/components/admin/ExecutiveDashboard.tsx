@@ -49,6 +49,7 @@ import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 import { getRecentSessions, getOverallAttendanceStats } from "@/lib/attendanceService";
 import { getPageViewStats } from "@/lib/analyticsService";
 import { formatCurrency } from "@/lib/flutterwave";
+import { getTicketedEvents } from "@/lib/ticketVisibility";
 
 interface ExecutiveDashboardProps {
   onNavigate: (tab: string) => void;
@@ -152,7 +153,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
     const collectionRate = expectedTotal > 0 ? (contributionStats.totalCollected / expectedTotal * 100) : 100;
 
     // Ticket stats
-    const ticketedEvents = events.filter(event => event.tickets.length > 0).length;
+    const ticketedEvents = getTicketedEvents(events).length;
     const totalTicketsSold = confirmedOrders.reduce((sum, o) => sum + (o.ticketQuantity || 0), 0);
     const usedTickets = orders.filter(o => o.status === "used").length;
     const avgCheckInRate = confirmedOrders.length > 0 ? (usedTickets / confirmedOrders.length * 100) : 0;

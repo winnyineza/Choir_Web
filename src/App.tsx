@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,22 +8,23 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { trackPageView, trackSession } from "@/lib/analyticsService";
 import Index from "./pages/Index";
-import About from "./pages/About";
-import Events from "./pages/Events";
-import Ministry from "./pages/Ministry";
-import Releases from "./pages/Releases";
-import Gallery from "./pages/Gallery";
-import Join from "./pages/Join";
-import Support from "./pages/Support";
-import Donate from "./pages/Donate";
-import Admin from "./pages/Admin";
-import AdminLogin from "./pages/AdminLogin";
-import Contact from "./pages/Contact";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import NotFound from "./pages/NotFound";
-import Scanner from "./pages/Scanner";
-import MemberPortal from "./pages/MemberPortal";
+
+const About = lazy(() => import("./pages/About"));
+const Events = lazy(() => import("./pages/Events"));
+const Ministry = lazy(() => import("./pages/Ministry"));
+const Releases = lazy(() => import("./pages/Releases"));
+const Gallery = lazy(() => import("./pages/Gallery"));
+const Join = lazy(() => import("./pages/Join"));
+const Support = lazy(() => import("./pages/Support"));
+const Donate = lazy(() => import("./pages/Donate"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Scanner = lazy(() => import("./pages/Scanner"));
+const MemberPortal = lazy(() => import("./pages/MemberPortal"));
 
 const queryClient = new QueryClient();
 
@@ -54,7 +55,8 @@ const App = () => (
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AnalyticsTracker />
-            <Routes>
+            <Suspense fallback={null}>
+              <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/events" element={<Events />} />
@@ -72,7 +74,8 @@ const App = () => (
                 <Route path="/scanner" element={<Scanner />} />
                 <Route path="/member-portal" element={<MemberPortal />} />
                 <Route path="*" element={<NotFound />} />
-            </Routes>
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

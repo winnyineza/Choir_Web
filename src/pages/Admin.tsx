@@ -196,6 +196,7 @@ const VoiceBalanceTracker = lazy(() => import("@/components/admin/VoiceBalanceTr
 const SurveyManagement = lazy(() => import("@/components/admin/SurveyManagement").then(m => ({ default: m.SurveyManagement })));
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2, ClipboardList } from "lucide-react";
 import { BackupRestore } from "@/components/admin/BackupRestore";
+import { getTicketedEvents } from "@/lib/ticketVisibility";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "event-staff" | "team" | "audit" | "settings";
 
@@ -632,7 +633,7 @@ export default function Admin() {
   };
 
   const confirmedOrders = orders.filter(o => o.status === "confirmed" || o.status === "used");
-  const ticketedEvents = events.filter((event) => event.tickets.length > 0);
+  const ticketedEvents = getTicketedEvents(events);
   const ticketedEventCount = ticketedEvents.length;
   const hasTicketedEvents = ticketedEventCount > 0;
   const totalTicketCapacity = ticketedEvents.reduce(
