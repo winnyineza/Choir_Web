@@ -16,7 +16,7 @@ export interface Donation {
   createdAt: string;
 }
 
-const STORAGE_KEY = "choir_donations";
+const STORAGE_KEY = "serenades_donations";
 
 export async function getAllDonations(): Promise<Donation[]> {
   return dbGetAll<Donation>(STORAGE_KEY);

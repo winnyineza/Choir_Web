@@ -360,7 +360,6 @@ export default function Admin() {
     connectedAt: null,
   });
   const [googleConnectionLoading, setGoogleConnectionLoading] = useState(false);
-  const [birthdaySyncLoading, setBirthdaySyncLoading] = useState(false);
 
   // My Account state
   const [accountName, setAccountName] = useState(currentUser?.name || "");
@@ -542,6 +541,11 @@ export default function Admin() {
     try {
       const status = await getGoogleConnectionStatus(currentUser.id);
       setGoogleConnectionStatus(status);
+      if (status.connected) {
+        void syncGoogleBirthdayCalendar(currentUser.id).catch((syncError) => {
+          console.warn("[Admin] Google birthday sync skipped:", syncError?.message || syncError);
+        });
+      }
     } catch (error: any) {
       setGoogleConnectionStatus({ connected: false, googleEmail: null, connectedAt: null });
       toast({
@@ -574,31 +578,6 @@ export default function Admin() {
     }
   };
 
-  const handleSyncBirthdaysToGoogle = async () => {
-    if (!currentUser?.id) {
-      toast({ title: "Error", description: "Admin authentication required", variant: "destructive" });
-      return;
-    }
-
-    setBirthdaySyncLoading(true);
-    try {
-      const result = await syncGoogleBirthdayCalendar(currentUser.id);
-      toast({
-        title: "Google Birthday Calendar Synced",
-        description: `Created: ${result.created}, Updated: ${result.updated}, Removed: ${result.deleted}`,
-      });
-      await refreshGoogleIntegrationStatus();
-    } catch (error: any) {
-      toast({
-        title: "Birthday Sync Failed",
-        description: error.message || "Could not sync birthdays to Google Calendar",
-        variant: "destructive",
-      });
-    } finally {
-      setBirthdaySyncLoading(false);
-    }
-  };
-
   // Load core data on mount, then tab-specific data
   useEffect(() => {
     loadCoreData();
@@ -617,6 +596,12 @@ export default function Admin() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    refreshGoogleIntegrationStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   // Filtered data
   const filteredOrders = orders
@@ -3359,17 +3344,9 @@ export default function Admin() {
                     <RefreshCw className={cn("w-4 h-4 mr-2", googleConnectionLoading && "animate-spin")} />
                     Refresh Status
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleSyncBirthdaysToGoogle}
-                    disabled={birthdaySyncLoading || !currentUser?.id || !googleConnectionStatus.connected}
-                  >
-                    {birthdaySyncLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Calendar className="w-4 h-4 mr-2" />}
-                    Sync Birthdays to Google
-                  </Button>
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Birthday reminders sync to Google Calendar only and are not listed as regular Serenades events.
+                  Birthday reminders sync automatically to Google Calendar when the account is connected and are not listed as regular Serenades events.
                 </p>
               </div>
 

@@ -32,6 +32,7 @@ export interface GoogleBirthdaySyncResult {
   updated: number;
   deleted: number;
   totalActiveBirthdays: number;
+  calendarId?: string;
 }
 
 async function readJson<T>(response: Response): Promise<T> {
