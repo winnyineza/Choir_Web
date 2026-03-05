@@ -92,18 +92,6 @@ function getGoogleErrorCodeFromMessage(message: string): number | null {
   return codeMatch ? Number(codeMatch[1]) : null;
 }
 
-function uniqueCalendarCandidates(...ids: Array<string | null | undefined>) {
-  const seen = new Set<string>();
-  return ids
-    .map((id) => id?.trim())
-    .filter((id): id is string => Boolean(id))
-    .filter((id) => {
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-}
-
 const handler: Handler = async (event) => {
   const headers = buildHeaders();
 
@@ -131,13 +119,8 @@ const handler: Handler = async (event) => {
       };
     }
 
-    const calendarCandidates = uniqueCalendarCandidates(
-      process.env.GOOGLE_TARGET_CALENDAR_ID,
-      integration.calendar_id,
-      "primary",
-    );
-
-    if (calendarCandidates.length === 0) {
+    const calendarId = (process.env.GOOGLE_TARGET_CALENDAR_ID || integration.calendar_id || "").trim();
+    if (!calendarId) {
       return {
         statusCode: 500,
         headers,
@@ -162,35 +145,23 @@ const handler: Handler = async (event) => {
     const activeMembers = (members || []).filter((member: MemberRow) => Boolean(member.date_of_birth));
     const activeById = new Map(activeMembers.map((member: MemberRow) => [member.id, member]));
 
-    let calendarIdInUse: string | null = null;
-    let listData: any = null;
-    let lastCalendarError: Error | null = null;
+    let listData: any;
+    try {
+      const listUrl = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`);
+      listUrl.searchParams.set("singleEvents", "false");
+      listUrl.searchParams.set("showDeleted", "false");
+      listUrl.searchParams.set("maxResults", "2500");
+      listUrl.searchParams.set("privateExtendedProperty", `serenadesType=${BIRTHDAY_TYPE}`);
 
-    for (const calendarId of calendarCandidates) {
-      try {
-        const listUrl = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`);
-        listUrl.searchParams.set("singleEvents", "false");
-        listUrl.searchParams.set("showDeleted", "false");
-        listUrl.searchParams.set("maxResults", "2500");
-        listUrl.searchParams.set("privateExtendedProperty", `serenadesType=${BIRTHDAY_TYPE}`);
-
-        const listRes = await googleRequest(accessToken, listUrl.toString());
-        listData = await listRes.json();
-        calendarIdInUse = calendarId;
-        break;
-      } catch (error: any) {
-        const message = String(error?.message || "");
-        const googleCode = getGoogleErrorCodeFromMessage(message);
-        if (googleCode === 404) {
-          lastCalendarError = error;
-          continue;
-        }
-        throw error;
+      const listRes = await googleRequest(accessToken, listUrl.toString());
+      listData = await listRes.json();
+    } catch (error: any) {
+      const message = String(error?.message || "");
+      const googleCode = getGoogleErrorCodeFromMessage(message);
+      if (googleCode === 404) {
+        throw new Error(`Google calendar not found: ${calendarId}`);
       }
-    }
-
-    if (!calendarIdInUse || !listData) {
-      throw lastCalendarError || new Error("Could not access any configured Google calendar");
+      throw error;
     }
 
     const existingEvents = (listData.items || []) as GoogleCalendarEvent[];
@@ -221,14 +192,14 @@ const handler: Handler = async (event) => {
       const existing = existingByMemberId.get(member.id);
 
       if (existing) {
-        const patchUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarIdInUse)}/events/${encodeURIComponent(existing.id)}?sendUpdates=none`;
+        const patchUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(existing.id)}?sendUpdates=none`;
         await googleRequest(accessToken, patchUrl, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
         updated += 1;
       } else {
-        const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarIdInUse)}/events?sendUpdates=none`;
+        const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=none`;
         await googleRequest(accessToken, createUrl, {
           method: "POST",
           body: JSON.stringify(payload),
@@ -243,7 +214,7 @@ const handler: Handler = async (event) => {
     }
 
     for (const orphan of orphanedEvents) {
-      const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarIdInUse)}/events/${encodeURIComponent(orphan.id)}?sendUpdates=none`;
+      const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(orphan.id)}?sendUpdates=none`;
       await googleRequest(accessToken, deleteUrl, { method: "DELETE" });
       deleted += 1;
     }
@@ -264,7 +235,7 @@ const handler: Handler = async (event) => {
         updated,
         deleted,
         totalActiveBirthdays: activeMembers.length,
-        calendarId: calendarIdInUse,
+        calendarId,
       }),
     };
   } catch (error: any) {
