@@ -115,7 +115,7 @@ import {
 } from "@/lib/attendanceService";
 import { getPageViewStats } from "@/lib/analyticsService";
 import { useToast } from "@/hooks/use-toast";
-import { getGoogleConnectionStatus, getGoogleOAuthStartUrl, type GoogleConnectionStatus } from "@/lib/googleMeetService";
+import { getGoogleConnectionStatus, getGoogleOAuthStartUrl, syncGoogleBirthdayCalendar, type GoogleConnectionStatus } from "@/lib/googleMeetService";
 import { Switch } from "@/components/ui/switch";
 import { AddMemberModal } from "@/components/admin/AddMemberModal";
 import { BulkAddMembersModal } from "@/components/admin/BulkAddMembersModal";
@@ -435,6 +435,12 @@ export default function Admin() {
       setEvents(calendarEvents);
       setDashboardStats(dashboardData);
       setUnreadMessages(unreadCount);
+
+      if (currentUser?.id) {
+        void syncGoogleBirthdayCalendar(currentUser.id).catch((syncError) => {
+          console.warn("[Admin] Google birthday sync skipped:", syncError?.message || syncError);
+        });
+      }
     } catch (err) {
       console.error("[Admin] Error loading core data:", err);
     }

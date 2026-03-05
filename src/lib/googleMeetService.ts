@@ -26,6 +26,14 @@ export interface GoogleMeetingResult {
   googleConferenceId: string | null;
 }
 
+export interface GoogleBirthdaySyncResult {
+  success: boolean;
+  created: number;
+  updated: number;
+  deleted: number;
+  totalActiveBirthdays: number;
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
   if (!text) return {} as T;
@@ -102,4 +110,18 @@ export async function deleteGoogleMeeting(adminId: string, meetingId: string, go
   if (!response.ok) {
     throw new Error(data.error || "Failed to delete Google meeting");
   }
+}
+
+export async function syncGoogleBirthdayCalendar(adminId: string): Promise<GoogleBirthdaySyncResult> {
+  const response = await fetch("/.netlify/functions/google-birthday-sync", {
+    method: "POST",
+    headers: createHeaders(adminId),
+  });
+
+  const data = await readJson<any>(response);
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to sync Google birthday calendar");
+  }
+
+  return data as GoogleBirthdaySyncResult;
 }
