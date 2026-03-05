@@ -94,35 +94,50 @@ interface MemberWithContributions extends Member {
   upcomingAmount?: number;
 }
 
+const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
+function parseDateOnly(dateValue: string): Date {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getDateOnly(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function getBirthdayDaysUntil(dateOfBirth: string, referenceDate: Date = new Date()): number {
+  const dob = parseDateOnly(dateOfBirth);
+  const today = getDateOnly(referenceDate);
+
+  const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+  if (nextBirthday < today) {
+    nextBirthday.setFullYear(today.getFullYear() + 1);
+  }
+
+  return Math.round((nextBirthday.getTime() - today.getTime()) / ONE_DAY_MS);
+}
+
 // Helper to get TODAY's birthdays (for sending wishes)
 function getTodayBirthdays(members: Member[]): Member[] {
-  const today = new Date();
+  const today = getDateOnly(new Date());
   const todayMonth = today.getMonth();
   const todayDate = today.getDate();
 
   return members.filter(member => {
     if (!member.date_of_birth) return false;
-    const dob = new Date(member.date_of_birth);
+    const dob = parseDateOnly(member.date_of_birth);
     return dob.getMonth() === todayMonth && dob.getDate() === todayDate;
   });
 }
 
 // Helper to get upcoming birthdays (for admin reminders)
 function getUpcomingBirthdays(members: Member[], daysAhead: number = 7): Member[] {
-  const today = new Date();
+  const today = getDateOnly(new Date());
   const upcoming: Member[] = [];
 
   members.forEach(member => {
     if (!member.date_of_birth) return;
-    
-    const dob = new Date(member.date_of_birth);
-    const thisYearBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-    
-    if (thisYearBirthday < today) {
-      thisYearBirthday.setFullYear(today.getFullYear() + 1);
-    }
-    
-    const daysUntil = Math.ceil((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntil = getBirthdayDaysUntil(member.date_of_birth, today);
     
     // Exclude today (those get birthday wishes instead)
     if (daysUntil > 0 && daysUntil <= daysAhead) {
@@ -399,10 +414,22 @@ function generateFinanceOverdueEmail(
 
 // Generate birthday reminder email HTML (for admins - upcoming birthdays)
 function generateBirthdayReminderEmail(birthdays: Member[]): string {
-  const birthdayList = birthdays.map(m => {
-    const dob = new Date(m.date_of_birth!);
-    return `<li><strong>${m.name}</strong> - ${dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</li>`;
-  }).join('');
+  const birthdayList = birthdays
+    .map(member => {
+      const dob = parseDateOnly(member.date_of_birth!);
+      const daysUntil = getBirthdayDaysUntil(member.date_of_birth!);
+      return {
+        name: member.name,
+        dayLabel: dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+        daysUntil,
+      };
+    })
+    .sort((a, b) => a.daysUntil - b.daysUntil)
+    .map(item => {
+      const suffix = item.daysUntil === 1 ? 'day' : 'days';
+      return `<li><strong>${item.name}</strong> - ${item.dayLabel} <span style="color: #d4a537;">(in ${item.daysUntil} ${suffix})</span></li>`;
+    })
+    .join('');
 
   return `
     <!DOCTYPE html>
@@ -423,7 +450,7 @@ function generateBirthdayReminderEmail(birthdays: Member[]): string {
           <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>🎂 Upcoming Birthdays!</h1>
-        <p>The following choir members have birthdays coming up in the next 7 days:</p>
+        <p>The following choir members have birthdays within the next 7 days:</p>
         <ul>${birthdayList}</ul>
         <p>Don't forget to wish them a happy birthday!</p>
         <div class="footer">
