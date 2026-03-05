@@ -202,3 +202,37 @@ export function getBaseUrl() {
   const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
   return withProtocol.replace(/\/+$/, "");
 }
+
+export function normalizeGoogleCalendarId(rawValue?: string | null): string {
+  const raw = (rawValue || "").trim();
+  if (!raw) return "";
+
+  const decodeSafe = (value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+
+  const parseFromUrl = (value: string) => {
+    try {
+      const url = new URL(value);
+      const src = url.searchParams.get("src");
+      return src ? decodeSafe(src).trim() : "";
+    } catch {
+      return "";
+    }
+  };
+
+  const fromUrl = parseFromUrl(raw);
+  if (fromUrl) return fromUrl;
+
+  const srcMatch = raw.match(/[?&]src=([^&]+)/i);
+  if (srcMatch?.[1]) {
+    return decodeSafe(srcMatch[1]).trim();
+  }
+
+  const cleaned = decodeSafe(raw).replace(/^mailto:/i, "").trim();
+  return cleaned;
+}

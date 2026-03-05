@@ -6,6 +6,7 @@ import {
   exchangeRefreshTokenForAccessToken,
   getClientIp,
   getGoogleIntegration,
+  normalizeGoogleCalendarId,
   getSupabaseAdminClient,
   requireActiveAdmin,
 } from "./_shared/googleMeetUtils";
@@ -85,9 +86,10 @@ const handler: Handler = async (event) => {
   try {
     const admin = await requireActiveAdmin(event.headers);
     const integration = await getGoogleIntegration();
+    const rawCalendarId = process.env.GOOGLE_TARGET_CALENDAR_ID || integration?.calendar_id || null;
+    const calendarId = normalizeGoogleCalendarId(rawCalendarId);
 
     if (event.httpMethod === "GET") {
-      const calendarId = process.env.GOOGLE_TARGET_CALENDAR_ID || integration?.calendar_id || null;
       return {
         statusCode: 200,
         headers,
@@ -95,7 +97,7 @@ const handler: Handler = async (event) => {
           connected: Boolean(integration),
           googleEmail: integration?.google_email || null,
           connectedAt: integration?.connected_at || null,
-          calendarId,
+          calendarId: calendarId || null,
         }),
       };
     }
@@ -110,7 +112,6 @@ const handler: Handler = async (event) => {
 
     const refreshToken = decryptRefreshToken(integration);
     const accessToken = await exchangeRefreshTokenForAccessToken(refreshToken);
-    const calendarId = process.env.GOOGLE_TARGET_CALENDAR_ID || integration.calendar_id;
     if (!calendarId) {
       return {
         statusCode: 500,
