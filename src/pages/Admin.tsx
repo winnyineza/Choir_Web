@@ -358,6 +358,7 @@ export default function Admin() {
     connected: false,
     googleEmail: null,
     connectedAt: null,
+    calendarId: null,
   });
   const [googleConnectionLoading, setGoogleConnectionLoading] = useState(false);
 
@@ -535,19 +536,34 @@ export default function Admin() {
     });
   }, []);
 
-  const refreshGoogleIntegrationStatus = async () => {
+  const refreshGoogleIntegrationStatus = async (showSyncFeedback = false) => {
     if (!currentUser?.id) return;
     setGoogleConnectionLoading(true);
     try {
       const status = await getGoogleConnectionStatus(currentUser.id);
       setGoogleConnectionStatus(status);
       if (status.connected) {
-        void syncGoogleBirthdayCalendar(currentUser.id).catch((syncError) => {
+        try {
+          const result = await syncGoogleBirthdayCalendar(currentUser.id);
+          if (showSyncFeedback) {
+            toast({
+              title: "Google Birthday Sync Complete",
+              description: `Created ${result.created}, updated ${result.updated}, removed ${result.deleted} (calendar: ${result.calendarId || status.calendarId || "unknown"})`,
+            });
+          }
+        } catch (syncError: any) {
           console.warn("[Admin] Google birthday sync skipped:", syncError?.message || syncError);
-        });
+          if (showSyncFeedback) {
+            toast({
+              title: "Birthday Sync Failed",
+              description: syncError?.message || "Could not sync birthdays to Google Calendar",
+              variant: "destructive",
+            });
+          }
+        }
       }
     } catch (error: any) {
-      setGoogleConnectionStatus({ connected: false, googleEmail: null, connectedAt: null });
+      setGoogleConnectionStatus({ connected: false, googleEmail: null, connectedAt: null, calendarId: null });
       toast({
         title: "Google Status Check Failed",
         description: error.message || "Could not load Google integration status",
@@ -3333,6 +3349,11 @@ export default function Admin() {
                         : "N/A"}
                     </span>
                   </div>
+
+                  <div>
+                    <span className="text-muted-foreground">Target calendar:</span>{" "}
+                    <span className="text-foreground">{googleConnectionStatus.calendarId || "N/A"}</span>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-4">
@@ -3340,7 +3361,7 @@ export default function Admin() {
                     {googleConnectionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Calendar className="w-4 h-4 mr-2" />}
                     {googleConnectionStatus.connected ? "Reconnect Google" : "Connect Google"}
                   </Button>
-                  <Button variant="outline" onClick={refreshGoogleIntegrationStatus} disabled={googleConnectionLoading || !currentUser?.id}>
+                  <Button variant="outline" onClick={() => refreshGoogleIntegrationStatus(true)} disabled={googleConnectionLoading || !currentUser?.id}>
                     <RefreshCw className={cn("w-4 h-4 mr-2", googleConnectionLoading && "animate-spin")} />
                     Refresh Status
                   </Button>

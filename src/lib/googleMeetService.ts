@@ -2,6 +2,7 @@ export interface GoogleConnectionStatus {
   connected: boolean;
   googleEmail: string | null;
   connectedAt: string | null;
+  calendarId: string | null;
 }
 
 export interface GoogleMeetingPayload {
@@ -63,6 +64,7 @@ export async function getGoogleConnectionStatus(adminId: string): Promise<Google
     connected: Boolean(data.connected),
     googleEmail: data.googleEmail || null,
     connectedAt: data.connectedAt || null,
+    calendarId: data.calendarId || null,
   };
 }
 

@@ -87,6 +87,7 @@ const handler: Handler = async (event) => {
     const integration = await getGoogleIntegration();
 
     if (event.httpMethod === "GET") {
+      const calendarId = process.env.GOOGLE_TARGET_CALENDAR_ID || integration?.calendar_id || null;
       return {
         statusCode: 200,
         headers,
@@ -94,6 +95,7 @@ const handler: Handler = async (event) => {
           connected: Boolean(integration),
           googleEmail: integration?.google_email || null,
           connectedAt: integration?.connected_at || null,
+          calendarId,
         }),
       };
     }
