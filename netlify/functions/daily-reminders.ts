@@ -413,8 +413,8 @@ function generateFinanceOverdueEmail(
 }
 
 // Generate birthday reminder email HTML (for admins - upcoming birthdays)
-function generateBirthdayReminderEmail(birthdays: Member[]): string {
-  const birthdayList = birthdays
+function generateBirthdayReminderEmail(birthdays: Member[], daysAhead: number = 7): string {
+  const birthdayItems = birthdays
     .map(member => {
       const dob = parseDateOnly(member.date_of_birth!);
       const daysUntil = getBirthdayDaysUntil(member.date_of_birth!);
@@ -424,7 +424,12 @@ function generateBirthdayReminderEmail(birthdays: Member[]): string {
         daysUntil,
       };
     })
-    .sort((a, b) => a.daysUntil - b.daysUntil)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+
+  const nearestDays = birthdayItems[0]?.daysUntil ?? daysAhead;
+  const nearestLabel = nearestDays === 1 ? "1 day" : `${nearestDays} days`;
+
+  const birthdayList = birthdayItems
     .map(item => {
       const suffix = item.daysUntil === 1 ? 'day' : 'days';
       return `<li><strong>${item.name}</strong> - ${item.dayLabel} <span style="color: #d4a537;">(in ${item.daysUntil} ${suffix})</span></li>`;
@@ -450,7 +455,7 @@ function generateBirthdayReminderEmail(birthdays: Member[]): string {
           <img src="${LOGO_URL}" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
         </div>
         <h1>🎂 Upcoming Birthdays!</h1>
-        <p>The following choir members have birthdays within the next 7 days:</p>
+        <p>Next birthday is in <strong>${nearestLabel}</strong>. Here are all upcoming birthdays within the next ${daysAhead} days:</p>
         <ul>${birthdayList}</ul>
         <p>Don't forget to wish them a happy birthday!</p>
         <div class="footer">
@@ -1077,15 +1082,20 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     }
 
     // ===== UPCOMING BIRTHDAYS - Send reminder to admins =====
-    const upcomingBirthdays = getUpcomingBirthdays(members, 7);
+    const upcomingWindowDays = 7;
+    const upcomingBirthdays = getUpcomingBirthdays(members, upcomingWindowDays);
     
     if (upcomingBirthdays.length > 0) {
       console.log(`Found ${upcomingBirthdays.length} upcoming birthdays (next 7 days)`);
+      const nearestBirthdayDays = upcomingBirthdays.reduce((minDays, member) => {
+        const daysUntil = getBirthdayDaysUntil(member.date_of_birth!);
+        return Math.min(minDays, daysUntil);
+      }, Number.MAX_SAFE_INTEGER);
       
       const sent = await sendEmail(
         adminEmails,
-        `🎂 ${upcomingBirthdays.length} Upcoming Birthday${upcomingBirthdays.length > 1 ? 's' : ''} This Week`,
-        generateBirthdayReminderEmail(upcomingBirthdays)
+        `🎂 ${upcomingBirthdays.length} Upcoming Birthday${upcomingBirthdays.length > 1 ? 's' : ''} (next in ${nearestBirthdayDays} day${nearestBirthdayDays === 1 ? '' : 's'})`,
+        generateBirthdayReminderEmail(upcomingBirthdays, upcomingWindowDays)
       );
 
       if (sent) {
