@@ -486,25 +486,33 @@ export default function MemberPortal() {
     setCanResend(false);
     setResendTimer(60);
 
-    const result = await sendVerificationCode(email, memberInfo?.name || "Member");
+    try {
+      const result = await sendVerificationCode(email, memberInfo?.name || "Member");
 
-    setIsLoading(false);
-
-    if (result.success) {
-      if (result.code) {
-        setDevCode(result.code);
+      if (result.success) {
+        if (result.code) {
+          setDevCode(result.code);
+        }
+        toast({
+          title: "Code sent! 📧",
+          description: result.message,
+        });
+        setView("submit");
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        });
       }
-      toast({
-        title: "Code sent! 📧",
-        description: result.message,
-      });
-      setView("submit");
-    } else {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: result.message,
+        description: error?.message || "Failed to send verification code. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

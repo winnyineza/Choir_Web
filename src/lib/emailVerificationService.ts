@@ -38,15 +38,21 @@ export async function sendVerificationCode(email: string, memberName: string): P
 
   // Production: Send via Netlify send-email function (Gmail SMTP)
   try {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
     const response = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         to: [{ email, name: memberName }],
         subject: `Your Verification Code - Serenades of Praise`,
         html: generateEmailTemplate(memberName, code),
       }),
     });
+
+    window.clearTimeout(timeoutId);
 
     if (response.ok) {
       return {
@@ -61,7 +67,13 @@ export async function sendVerificationCode(email: string, memberName: string): P
         message: 'Failed to send verification code. Please try again.',
       };
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      return {
+        success: false,
+        message: 'Email request timed out. Please try again.',
+      };
+    }
     console.error('Failed to send verification email:', error);
     return {
       success: false,
