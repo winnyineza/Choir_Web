@@ -117,6 +117,11 @@ function getBirthdayDaysUntil(dateOfBirth: string, referenceDate: Date = new Dat
   return Math.round((nextBirthday.getTime() - today.getTime()) / ONE_DAY_MS);
 }
 
+type BirthdayReminderEntry = {
+  member: Member;
+  daysUntil: number;
+};
+
 // Helper to get TODAY's birthdays (for sending wishes)
 function getTodayBirthdays(members: Member[]): Member[] {
   const today = getDateOnly(new Date());
@@ -413,11 +418,10 @@ function generateFinanceOverdueEmail(
 }
 
 // Generate birthday reminder email HTML (for admins - upcoming birthdays)
-function generateBirthdayReminderEmail(birthdays: Member[], daysAhead: number = 7): string {
-  const birthdayItems = birthdays
-    .map(member => {
+function generateBirthdayReminderEmail(reminders: BirthdayReminderEntry[], daysAhead: number = 7): string {
+  const birthdayItems = reminders
+    .map(({ member, daysUntil }) => {
       const dob = parseDateOnly(member.date_of_birth!);
-      const daysUntil = getBirthdayDaysUntil(member.date_of_birth!);
       return {
         name: member.name,
         dayLabel: dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
@@ -431,8 +435,10 @@ function generateBirthdayReminderEmail(birthdays: Member[], daysAhead: number = 
 
   const birthdayList = birthdayItems
     .map(item => {
-      const suffix = item.daysUntil === 1 ? 'day' : 'days';
-      return `<li><strong>${item.name}</strong> - ${item.dayLabel} <span style="color: #d4a537;">(in ${item.daysUntil} ${suffix})</span></li>`;
+      const countdownLabel = item.daysUntil === 0
+        ? "(D-day: today)"
+        : `(in ${item.daysUntil} ${item.daysUntil === 1 ? "day" : "days"})`;
+      return `<li><strong>${item.name}</strong> - ${item.dayLabel} <span class="countdown">${countdownLabel}</span></li>`;
     })
     .join('');
 
@@ -440,13 +446,38 @@ function generateBirthdayReminderEmail(birthdays: Member[], daysAhead: number = 
     <!DOCTYPE html>
     <html>
     <head>
+      <meta name="color-scheme" content="light dark" />
+      <meta name="supported-color-schemes" content="light dark" />
       <style>
-        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; }
-        h1 { color: #d4a537; margin-bottom: 20px; }
+        :root {
+          color-scheme: light dark;
+          --bg: #f5f5f5;
+          --card: #ffffff;
+          --text: #161616;
+          --muted: #5f6368;
+          --accent: #d4a537;
+          --item-bg: #f0f1f3;
+          --item-border: #d4a537;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --bg: #0a0a0a;
+            --card: #1a1a1a;
+            --text: #ffffff;
+            --muted: #9aa0a6;
+            --accent: #d4a537;
+            --item-bg: #2a2a2a;
+            --item-border: #d4a537;
+          }
+        }
+        body { font-family: Arial, sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: var(--card); border-radius: 12px; padding: 30px; }
+        h1 { color: var(--accent); margin-bottom: 20px; }
         ul { list-style: none; padding: 0; }
-        li { padding: 10px 15px; background: #2a2a2a; margin-bottom: 8px; border-radius: 8px; border-left: 4px solid #d4a537; }
-        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+        li { padding: 10px 15px; background: var(--item-bg); margin-bottom: 8px; border-radius: 8px; border-left: 4px solid var(--item-border); }
+        .countdown { color: var(--accent); }
+        .footer { margin-top: 30px; text-align: center; color: var(--muted); font-size: 12px; }
+        .muted-text { color: var(--muted); }
       </style>
     </head>
     <body>
@@ -456,6 +487,7 @@ function generateBirthdayReminderEmail(birthdays: Member[], daysAhead: number = 
         </div>
         <h1>🎂 Upcoming Birthdays!</h1>
         <p>Next birthday is in <strong>${nearestLabel}</strong>. Here are all upcoming birthdays within the next ${daysAhead} days:</p>
+        <p class="muted-text">Reminder checkpoints: 7 days, 3 days, 1 day, and D-day.</p>
         <ul>${birthdayList}</ul>
         <p>Don't forget to wish them a happy birthday!</p>
         <div class="footer">
@@ -1083,24 +1115,36 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
     // ===== UPCOMING BIRTHDAYS - Send reminder to admins =====
     const upcomingWindowDays = 7;
-    const upcomingBirthdays = getUpcomingBirthdays(members, upcomingWindowDays);
-    
-    if (upcomingBirthdays.length > 0) {
-      console.log(`Found ${upcomingBirthdays.length} upcoming birthdays (next 7 days)`);
-      const nearestBirthdayDays = upcomingBirthdays.reduce((minDays, member) => {
-        const daysUntil = getBirthdayDaysUntil(member.date_of_birth!);
-        return Math.min(minDays, daysUntil);
-      }, Number.MAX_SAFE_INTEGER);
+    const reminderCheckpoints = new Set([7, 3, 1]);
+    const checkpointBirthdays: BirthdayReminderEntry[] = members
+      .filter(member => !!member.date_of_birth)
+      .map(member => ({ member, daysUntil: getBirthdayDaysUntil(member.date_of_birth!) }))
+      .filter(entry => reminderCheckpoints.has(entry.daysUntil));
+    const dDayBirthdays: BirthdayReminderEntry[] = todayBirthdays
+      .filter(member => !!member.date_of_birth)
+      .map(member => ({ member, daysUntil: 0 }));
+
+    const combinedMap = new Map<string, BirthdayReminderEntry>();
+    [...dDayBirthdays, ...checkpointBirthdays].forEach(entry => {
+      combinedMap.set(entry.member.id, entry);
+    });
+    const birthdayReminders = Array.from(combinedMap.values()).sort((a, b) => a.daysUntil - b.daysUntil);
+
+    if (birthdayReminders.length > 0) {
+      console.log(`Found ${birthdayReminders.length} birthday reminder(s) at checkpoints (7/3/1/D-day)`);
+      const nearestBirthdayDays = birthdayReminders.reduce((minDays, entry) => Math.min(minDays, entry.daysUntil), Number.MAX_SAFE_INTEGER);
       
       const sent = await sendEmail(
         adminEmails,
-        `🎂 ${upcomingBirthdays.length} Upcoming Birthday${upcomingBirthdays.length > 1 ? 's' : ''} (next in ${nearestBirthdayDays} day${nearestBirthdayDays === 1 ? '' : 's'})`,
-        generateBirthdayReminderEmail(upcomingBirthdays, upcomingWindowDays)
+        nearestBirthdayDays === 0
+          ? `🎂 Birthday Alert: D-day (${birthdayReminders.length} reminder${birthdayReminders.length > 1 ? 's' : ''})`
+          : `🎂 ${birthdayReminders.length} Upcoming Birthday${birthdayReminders.length > 1 ? 's' : ''} (next in ${nearestBirthdayDays} day${nearestBirthdayDays === 1 ? '' : 's'})`,
+        generateBirthdayReminderEmail(birthdayReminders, upcomingWindowDays)
       );
 
       if (sent) {
         results.birthdayRemindersSent = true;
-        results.upcomingBirthdayCount = upcomingBirthdays.length;
+        results.upcomingBirthdayCount = birthdayReminders.length;
       }
     }
 
