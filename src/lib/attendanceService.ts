@@ -210,9 +210,7 @@ export async function saveAttendance(
     createdAt: new Date().toISOString(),
   }));
 
-  for (const record of newRecords) {
-    await dbInsert<AttendanceRecord>(ATTENDANCE_KEY, record);
-  }
+  await Promise.all(newRecords.map((record) => dbInsert<AttendanceRecord>(ATTENDANCE_KEY, record)));
 
   await saveSession(date, sessionTitle, newRecords, markedBy);
 

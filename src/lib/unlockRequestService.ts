@@ -25,6 +25,10 @@ export interface UnlockRequest {
   createdAt: string;
 }
 
+function canReviewUnlockRequests(role?: string) {
+  return role === "super_admin" || role === "main_admin";
+}
+
 // ============ CRUD ============
 
 export async function getAllUnlockRequests(): Promise<UnlockRequest[]> {
@@ -81,9 +85,14 @@ export async function createUnlockRequest(data: {
 export async function approveUnlockRequest(
   id: string,
   reviewedBy: string,
+  reviewedByRole?: string,
   reviewNotes?: string,
   daysToUnlock: number = 3
 ): Promise<UnlockRequest | null> {
+  if (!canReviewUnlockRequests(reviewedByRole)) {
+    throw new Error("Only Super Admin and Main Admin can approve unlock requests.");
+  }
+
   const request = await getUnlockRequestById(id);
   if (!request || request.status !== "pending") return null;
 
@@ -104,8 +113,13 @@ export async function approveUnlockRequest(
 export async function denyUnlockRequest(
   id: string,
   reviewedBy: string,
+  reviewedByRole?: string,
   reviewNotes?: string
 ): Promise<UnlockRequest | null> {
+  if (!canReviewUnlockRequests(reviewedByRole)) {
+    throw new Error("Only Super Admin and Main Admin can deny unlock requests.");
+  }
+
   const request = await getUnlockRequestById(id);
   if (!request || request.status !== "pending") return null;
 

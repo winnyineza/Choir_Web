@@ -35,6 +35,7 @@ import {
   type MeetingStats,
 } from "@/lib/meetingService";
 import { canEditAttendanceDate, getAttendanceByDate, hasAttendanceForDate, saveAttendance, getSessionByDate, deleteAttendanceForDate } from "@/lib/attendanceService";
+import { getAllUnlockRequests } from "@/lib/unlockRequestService";
 import {
   createOrUpdateGoogleMeeting,
   deleteGoogleMeeting,
@@ -408,7 +409,17 @@ export function MeetingMinutesComponent() {
           );
 
           if (isLinkedAttendance) {
-            attendanceDeleted = canEditAttendanceDate(meeting.date, currentUser?.role === "super_admin")
+            const unlockRequests = await getAllUnlockRequests();
+            const baseDate = new Date(`${meeting.date}T00:00:00`);
+            const tempUnlocked = unlockRequests.some((request) => {
+              if (request.status !== "approved") return false;
+              if (!request.unlockedUntil) return false;
+              if (new Date(request.unlockedUntil).getTime() < Date.now()) return false;
+              if (request.type !== "attendance" && request.type !== "both") return false;
+              return request.month === baseDate.getMonth() + 1 && request.year === baseDate.getFullYear();
+            });
+
+            attendanceDeleted = (canEditAttendanceDate(meeting.date, currentUser?.role === "super_admin" || currentUser?.role === "main_admin") || tempUnlocked)
               ? await deleteAttendanceForDate(meeting.date)
               : false;
           }
@@ -421,7 +432,7 @@ export function MeetingMinutesComponent() {
           title: "Meeting Deleted",
           description: attendanceDeleted
             ? "Meeting and its linked attendance were deleted."
-            : meeting?.date && !canEditAttendanceDate(meeting.date, currentUser?.role === "super_admin")
+            : meeting?.date && !canEditAttendanceDate(meeting.date, currentUser?.role === "super_admin" || currentUser?.role === "main_admin")
               ? "Meeting was deleted. Linked attendance was kept because the 3-day edit window has closed."
               : "Meeting has been deleted.",
         });

@@ -264,7 +264,11 @@ export default function Admin() {
     role: previewRole as any,
   } : currentUser;
   const canManageMembers = canEditMembers(effectiveUser) && hasWriteAccess(effectiveUser, "members");
-  const canManageAttendance = hasWriteAccess(effectiveUser, "attendance");
+  const canManageAttendance = Boolean(
+    effectiveUser
+    && (effectiveUser.role === "super_admin" || effectiveUser.role === "main_admin")
+    && hasWriteAccess(effectiveUser, "attendance")
+  );
 
   // Filter sidebar items based on role permissions (use effectiveUser for preview)
   const accessibleTabs = getAccessibleTabs(effectiveUser);
@@ -403,6 +407,18 @@ export default function Admin() {
     } catch (err) {
       console.error("[Admin] Error loading core data:", err);
     }
+  };
+
+  const loadAttendanceData = async () => {
+    const [recentSessionsData, attendanceStatsData, pendingLeaveData] = await Promise.all([
+      getRecentSessions(20),
+      getOverallAttendanceStats(),
+      getPendingLeaveRequests(),
+    ]);
+
+    setAttendanceSessions(recentSessionsData);
+    setOverallAttendanceStats(attendanceStatsData);
+    setLeaveRequests(pendingLeaveData);
   };
 
   const runGoogleBirthdaySync = async (source: string, showSyncFeedback = false) => {
@@ -557,7 +573,7 @@ export default function Admin() {
         setPromoCodes(await getAllPromoCodes());
         break;
       case "attendance":
-        setAttendanceSessions(await getRecentSessions(20));
+        await loadAttendanceData();
         break;
       case "settings": {
         const stats = await getBackupStats();
@@ -578,8 +594,7 @@ export default function Admin() {
 
   // Combined load for full refresh (used after mutations)
   const loadData = async () => {
-    await loadCoreData();
-    await loadTabData(activeTab);
+    await Promise.all([loadCoreData(), loadTabData(activeTab)]);
   };
 
   // Load settings on mount
@@ -678,6 +693,69 @@ export default function Admin() {
     refreshGoogleIntegrationStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    getAllUnlockRequests()
+      .then(setUnlockRequests)
+      .catch(() => {
+        // Best-effort fetch for attendance unlock state.
+      });
+  }, [currentUser?.id]);
+
+  const requestAttendanceUnlock = async (date: string) => {
+    if (!currentUser?.id || !currentUser?.name) {
+      toast({ title: "Error", description: "Admin authentication required.", variant: "destructive" });
+      return;
+    }
+
+    const reason = window.prompt(
+      `Why do you need to unlock attendance for ${new Date(`${date}T00:00:00`).toLocaleDateString()}?`,
+      "Need to correct attendance records.",
+    )?.trim();
+
+    if (!reason) return;
+
+    const baseDate = new Date(`${date}T00:00:00`);
+    const month = baseDate.getMonth() + 1;
+    const year = baseDate.getFullYear();
+    const fullReason = `Attendance edit request for ${date}: ${reason}`;
+
+    try {
+      await createUnlockRequest({
+        requestedBy: currentUser.name,
+        requestedByRole: currentUser.role,
+        requestedById: currentUser.id,
+        type: "attendance",
+        month,
+        year,
+        reason: fullReason,
+      });
+
+      await notifyUnlockRequestCreated(
+        currentUser.name,
+        currentUser.role,
+        month,
+        year,
+        "attendance",
+        fullReason,
+      );
+
+      const updatedRequests = await getAllUnlockRequests();
+      setUnlockRequests(updatedRequests);
+      toast({
+        title: "Unlock Request Sent",
+        description: "Only Super Admin or Main Admin can approve this attendance unlock request.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Request Failed",
+        description: error?.message || "Could not submit attendance unlock request.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Filtered data
   const filteredOrders = orders
@@ -853,9 +931,26 @@ export default function Admin() {
   };
 
   const attendanceTrend = getAttendanceRate();
-  const isAttendanceSuperAdmin = currentUser?.role === "super_admin";
+  const isAttendancePrivilegedEditor = currentUser?.role === "super_admin" || currentUser?.role === "main_admin";
+  const isAttendanceUnlockApprover = currentUser?.role === "super_admin" || currentUser?.role === "main_admin";
+  const isAttendanceDateTemporarilyUnlocked = (date: string) => {
+    const baseDate = new Date(`${date}T00:00:00`);
+    const month = baseDate.getMonth() + 1;
+    const year = baseDate.getFullYear();
+    const now = Date.now();
+
+    return unlockRequests.some((request) => {
+      if (request.status !== "approved") return false;
+      if (!request.unlockedUntil) return false;
+      if (new Date(request.unlockedUntil).getTime() < now) return false;
+      if (request.type !== "attendance" && request.type !== "both") return false;
+      return request.month === month && request.year === year;
+    });
+  };
   const attendanceEditDeadline = attendanceDate ? getAttendanceEditDeadline(attendanceDate) : null;
-  const canEditSelectedAttendance = attendanceDate ? canEditAttendanceDate(attendanceDate, isAttendanceSuperAdmin) : false;
+  const canEditSelectedAttendance = attendanceDate
+    ? canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(attendanceDate)
+    : false;
   const filteredAttendanceMembers = members.filter((member) => {
     const query = attendanceMemberSearch.trim().toLowerCase();
     if (!query) return true;
@@ -2708,6 +2803,9 @@ export default function Admin() {
                           Editing locked after {attendanceEditDeadline.toLocaleDateString()}
                         </span>
                       )}
+                      {canEditSelectedAttendance && isAttendanceDateTemporarilyUnlocked(attendanceDate) && (
+                        <span className="text-[10px] text-green-400 mt-0.5 block">Temporarily unlocked</span>
+                      )}
                     </div>
                     {canManageAttendance && (
                       <Input
@@ -2732,7 +2830,7 @@ export default function Admin() {
                             return;
                           }
 
-                          if (!canEditAttendanceDate(attendanceDate, isAttendanceSuperAdmin)) {
+                          if (!canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) && !isAttendanceDateTemporarilyUnlocked(attendanceDate)) {
                             toast({
                               title: "Attendance Locked",
                               description: `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`,
@@ -2773,7 +2871,7 @@ export default function Admin() {
                         <Button
                           variant="gold"
                         onClick={async () => {
-                          if (!canEditAttendanceDate(attendanceDate, isAttendanceSuperAdmin)) {
+                          if (!canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) && !isAttendanceDateTemporarilyUnlocked(attendanceDate)) {
                             toast({
                               title: "Attendance Locked",
                               description: `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`,
@@ -2790,7 +2888,7 @@ export default function Admin() {
                           }));
                             
                             await saveAttendance(attendanceDate, records, sessionTitle, 'Admin');
-                            loadData();
+                            await loadAttendanceData();
                             setIsTakingAttendance(false);
                             toast({
                               title: "Attendance Saved!",
@@ -2947,6 +3045,16 @@ export default function Admin() {
                         ? 'Click "Edit Attendance" to modify the records.'
                         : `Editing closed on ${attendanceEditDeadline?.toLocaleDateString()}.`}
                     </p>
+                    {!canEditSelectedAttendance && canManageAttendance && !isAttendanceUnlockApprover && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => requestAttendanceUnlock(attendanceDate)}
+                      >
+                        Request Unlock
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -2973,7 +3081,7 @@ export default function Admin() {
                       {attendanceSessions
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                         .map((session) => {
-                        const canEditSession = canEditAttendanceDate(session.date, isAttendanceSuperAdmin);
+                        const canEditSession = canEditAttendanceDate(session.date, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(session.date);
                         const sessionDeadline = getAttendanceEditDeadline(session.date);
 
                         return (
@@ -3026,6 +3134,16 @@ export default function Admin() {
                                 }}
                               >
                                 <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canManageAttendance && !canEditSession && !isAttendanceUnlockApprover && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => requestAttendanceUnlock(session.date)}
+                                title="Request attendance unlock"
+                              >
+                                <Lock className="w-4 h-4 text-yellow-500" />
                               </Button>
                             )}
                             {canManageAttendance && (
@@ -3864,7 +3982,7 @@ export default function Admin() {
                               variant="gold"
                               size="sm"
                               onClick={async () => {
-                                await approveUnlockRequest(req.id, currentUser?.name || "Admin", undefined, 3);
+                                await approveUnlockRequest(req.id, currentUser?.name || "Admin", currentUser?.role, undefined, 3);
                                 toast({ title: "Approved", description: `${CONTRIB_MONTH_NAMES[req.month - 1]} ${req.year} unlocked for 3 days.` });
                                 const requester = req.requestedById ? await getAdminById(req.requestedById) : null;
                                 if (requester) {
@@ -3879,7 +3997,7 @@ export default function Admin() {
                               variant="outline"
                               size="sm"
                               onClick={async () => {
-                                await denyUnlockRequest(req.id, currentUser?.name || "Admin", "Denied by admin");
+                                await denyUnlockRequest(req.id, currentUser?.name || "Admin", currentUser?.role, "Denied by admin");
                                 toast({ title: "Denied", description: "Unlock request denied." });
                                 const requester = req.requestedById ? await getAdminById(req.requestedById) : null;
                                 if (requester) {
