@@ -795,30 +795,150 @@ export default function Admin() {
   const handleDownloadAttendanceSession = async (session: AttendanceSession) => {
     try {
       const records = await getAttendanceByDate(session.date);
-      const headers = ["Member Name", "Email", "Voice", "Status", "Marked By"];
-      const rows = records
-        .sort((left, right) => left.memberName.localeCompare(right.memberName))
-        .map((record) => [
-          record.memberName,
-          record.memberEmail,
-          record.memberVoice,
-          record.status,
-          record.markedBy || "",
-        ]);
+      const sortedRecords = [...records].sort((left, right) => left.memberName.localeCompare(right.memberName));
+      const sessionDateLabel = new Date(`${session.date}T00:00:00`).toLocaleDateString();
+      const totalMembers = sortedRecords.length;
+      const totalPresent = sortedRecords.filter((record) => record.status === "present" || record.status === "late").length;
+      const totalAbsent = sortedRecords.filter((record) => record.status === "absent").length;
+      const totalExcused = sortedRecords.filter((record) => record.status === "excused").length;
 
-      const csv = [
-        ["Date", new Date(`${session.date}T00:00:00`).toLocaleDateString()].join(","),
-        ["Session", `"${session.title.replace(/"/g, '""')}"`].join(","),
-        "",
-        headers.join(","),
-        ...rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")),
-      ].join("\n");
+      const reportHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Attendance Report - ${session.title}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 32px;
+        color: #111827;
+        background: #ffffff;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 2px solid #d4af37;
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+      }
+      .header img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 50%;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .header p {
+        margin: 4px 0 0;
+        color: #4b5563;
+      }
+      .meta, .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: #fafafa;
+      }
+      .card strong {
+        display: block;
+        font-size: 12px;
+        text-transform: uppercase;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        text-align: left;
+        font-size: 14px;
+      }
+      th {
+        background: #111827;
+        color: #ffffff;
+      }
+      .status {
+        text-transform: capitalize;
+        font-weight: 600;
+      }
+      .status.present, .status.late {
+        color: #166534;
+      }
+      .status.absent {
+        color: #b91c1c;
+      }
+      .status.excused {
+        color: #a16207;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <img src="${logo}" alt="Serenades of Praise Choir Logo" />
+      <div>
+        <h1>Serenades of Praise Choir</h1>
+        <p>Attendance Report</p>
+      </div>
+    </div>
 
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    <div class="meta">
+      <div class="card"><strong>Session</strong>${session.title}</div>
+      <div class="card"><strong>Date</strong>${sessionDateLabel}</div>
+      <div class="card"><strong>Generated</strong>${new Date().toLocaleString()}</div>
+    </div>
+
+    <div class="summary">
+      <div class="card"><strong>Total Members</strong>${totalMembers}</div>
+      <div class="card"><strong>Attended</strong>${totalPresent}</div>
+      <div class="card"><strong>Absent</strong>${totalAbsent}</div>
+      <div class="card"><strong>Excused</strong>${totalExcused}</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Member Name</th>
+          <th>Email</th>
+          <th>Voice</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Marked By</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sortedRecords.map((record) => `
+          <tr>
+            <td>${record.memberName}</td>
+            <td>${record.memberEmail || ""}</td>
+            <td>${record.memberVoice || ""}</td>
+            <td>${sessionDateLabel}</td>
+            <td class="status ${record.status}">${record.status}</td>
+            <td>${record.markedBy || ""}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+      const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `attendance-${session.date}.csv`;
+      anchor.download = `attendance-${session.date}.html`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
@@ -4250,16 +4370,22 @@ export default function Admin() {
                   <thead className="sticky top-0 bg-secondary/80 backdrop-blur">
                     <tr>
                       <th className="p-3 text-left text-xs font-medium text-muted-foreground">Member</th>
+                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">Email</th>
                       <th className="p-3 text-left text-xs font-medium text-muted-foreground">Voice</th>
+                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">Date</th>
                       <th className="p-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">Marked By</th>
                     </tr>
                   </thead>
                   <tbody>
                     {viewingAttendanceRecords.map((record) => (
                       <tr key={record.id} className="border-t border-primary/10">
                         <td className="p-3 text-sm text-foreground">{record.memberName}</td>
+                        <td className="p-3 text-sm text-muted-foreground">{record.memberEmail || "N/A"}</td>
                         <td className="p-3 text-sm text-muted-foreground">{record.memberVoice}</td>
+                        <td className="p-3 text-sm text-muted-foreground">{new Date(`${record.date}T00:00:00`).toLocaleDateString()}</td>
                         <td className="p-3 text-sm capitalize text-foreground">{record.status}</td>
+                        <td className="p-3 text-sm text-muted-foreground">{record.markedBy || "N/A"}</td>
                       </tr>
                     ))}
                   </tbody>
