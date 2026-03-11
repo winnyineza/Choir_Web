@@ -47,6 +47,10 @@ interface DownloadReportOptions {
   emptyMessage?: string;
 }
 
+interface SpreadsheetReportOptions extends DownloadReportOptions {
+  sheetName?: string;
+}
+
 function escapeHtml(value: ReportCell): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -75,18 +79,16 @@ function triggerDownload(content: string, mimeType: string, filename: string): v
   URL.revokeObjectURL(link.href);
 }
 
-export function downloadBrandedTableReport({
+function buildReportHtml({
   title,
-  filename,
   headers,
   rows,
   subtitle,
   meta = [],
   summary = [],
   emptyMessage = "No records available for this report.",
-}: BrandedTableReportOptions): void {
+}: Omit<BrandedTableReportOptions, "filename">): string {
   const generatedAt = new Date().toLocaleString();
-  const fileDate = createTimestamp();
   const finalMeta = meta.length > 0 ? meta : [{ label: "Generated", value: generatedAt }];
   const finalSummary = summary.length > 0
     ? summary
@@ -106,7 +108,7 @@ export function downloadBrandedTableReport({
         <td colspan="${headers.length}" class="empty-row">${escapeHtml(emptyMessage)}</td>
       </tr>`;
 
-  const reportHtml = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -316,8 +318,87 @@ export function downloadBrandedTableReport({
     </div>
   </body>
 </html>`;
+}
 
-  triggerDownload(reportHtml, "text/html;charset=utf-8;", `${filename}-${fileDate}.html`);
+export function downloadBrandedTableReport({
+  title,
+  filename,
+  headers,
+  rows,
+  subtitle,
+  meta = [],
+  summary = [],
+  emptyMessage = "No records available for this report.",
+}: BrandedTableReportOptions): void {
+  const fileDate = createTimestamp();
+  const reportHtml = buildReportHtml({
+    title,
+    headers,
+    rows,
+    subtitle,
+    meta,
+    summary,
+    emptyMessage,
+  });
+
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.innerHTML = reportHtml;
+  document.body.appendChild(container);
+
+  const target = container.firstElementChild as HTMLElement | null;
+  if (!target) {
+    document.body.removeChild(container);
+    throw new Error("Failed to generate report preview");
+  }
+
+  void import("html2pdf.js")
+    .then(({ default: html2pdf }) => html2pdf()
+      .set({
+        margin: 8,
+        filename: `${filename}-${fileDate}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(target)
+      .save())
+    .finally(() => {
+      document.body.removeChild(container);
+    });
+}
+
+export function downloadSpreadsheetReport({
+  title,
+  filename,
+  headers,
+  rows,
+  subtitle,
+  meta = [],
+  summary = [],
+  sheetName,
+}: BrandedTableReportOptions & { sheetName?: string }): void {
+  const worksheetRows = [
+    [title],
+    ...(subtitle ? [[subtitle]] : []),
+    [],
+    ...meta.map((item) => [item.label, item.value ?? ""]),
+    ...(meta.length > 0 ? [[]] : []),
+    ...summary.map((item) => [item.label, item.value ?? ""]),
+    ...(summary.length > 0 ? [[]] : []),
+    headers,
+    ...rows.map((row) => row.map((cell) => cell ?? "")),
+  ];
+
+  void import("xlsx").then((XLSX) => {
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, (sheetName || title).slice(0, 31));
+    XLSX.writeFile(workbook, `${filename}-${createTimestamp()}.xlsx`);
+  });
 }
 
 // Export orders to CSV
@@ -1119,7 +1200,7 @@ function downloadCSV(
   filename: string,
   options: DownloadReportOptions = {}
 ): void {
-  downloadBrandedTableReport({
+  downloadSpreadsheetReport({
     title: options.title ?? formatReportTitle(filename),
     subtitle: options.subtitle,
     filename,

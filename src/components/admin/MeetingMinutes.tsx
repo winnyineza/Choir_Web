@@ -474,46 +474,63 @@ export function MeetingMinutesComponent() {
   };
 
   const handleExportMeeting = (meeting: MeetingMinutesType) => {
-    const rows = [
-      ["Date", meeting.date],
-      ["Time", `${meeting.startTime}${meeting.endTime ? ` - ${meeting.endTime}` : ""}`],
-      ["Location", meeting.location],
-      ["Type", getMeetingTypeLabel(meeting.type)],
-      ["Chairperson", meeting.chairperson],
-      ["Secretary", meeting.secretary],
-      ["Attendees", meeting.attendees.join(", ") || "None"],
-      ["Absentees", meeting.absentees?.join(", ") || "None"],
-      ["Opening Prayer", meeting.openingPrayer || ""],
-      ["Closing Prayer", meeting.closingPrayer || ""],
-      ["Next Meeting", meeting.nextMeetingDate || ""],
-      ["Notes", meeting.notes || ""],
-      ...meeting.agenda.flatMap((item, index) => [
-        [`Agenda ${index + 1}`, item.title],
-        ["Discussion", item.discussion],
-        ["Decision", item.decision || ""],
-        ["Action Item", item.actionItem || ""],
-        ["Responsible", item.responsible || ""],
-      ]),
-    ];
+    void import("docx").then(({ Document, Packer, Paragraph, TextRun, HeadingLevel }) => {
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              new Paragraph({
+                text: "Serenades of Praise Choir",
+                heading: HeadingLevel.TITLE,
+              }),
+              new Paragraph({
+                text: meeting.title,
+                heading: HeadingLevel.HEADING_1,
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `Date: ${meeting.date}`, bold: true }),
+                  new TextRun({ text: `   Time: ${meeting.startTime}${meeting.endTime ? ` - ${meeting.endTime}` : ""}` }),
+                ],
+              }),
+              new Paragraph(`Location: ${meeting.location}`),
+              new Paragraph(`Type: ${getMeetingTypeLabel(meeting.type)}`),
+              new Paragraph(`Chairperson: ${meeting.chairperson}`),
+              new Paragraph(`Secretary: ${meeting.secretary}`),
+              new Paragraph(`Status: ${meeting.status}`),
+              new Paragraph({ text: "Attendance", heading: HeadingLevel.HEADING_2 }),
+              new Paragraph(`Attendees: ${meeting.attendees.join(", ") || "None"}`),
+              new Paragraph(`Absentees: ${meeting.absentees?.join(", ") || "None"}`),
+              ...(meeting.openingPrayer ? [new Paragraph(`Opening Prayer: ${meeting.openingPrayer}`)] : []),
+              ...(meeting.closingPrayer ? [new Paragraph(`Closing Prayer: ${meeting.closingPrayer}`)] : []),
+              ...(meeting.nextMeetingDate ? [new Paragraph(`Next Meeting: ${meeting.nextMeetingDate}`)] : []),
+              ...(meeting.notes ? [new Paragraph(`Notes: ${meeting.notes}`)] : []),
+              new Paragraph({ text: "Agenda", heading: HeadingLevel.HEADING_2 }),
+              ...meeting.agenda.flatMap((item, index) => [
+                new Paragraph({ text: `${index + 1}. ${item.title}`, heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(`Discussion: ${item.discussion}`),
+                ...(item.decision ? [new Paragraph(`Decision: ${item.decision}`)] : []),
+                ...(item.actionItem ? [new Paragraph(`Action Item: ${item.actionItem}`)] : []),
+                ...(item.responsible ? [new Paragraph(`Responsible: ${item.responsible}`)] : []),
+              ]),
+            ],
+          },
+        ],
+      });
 
-    downloadBrandedTableReport({
-      title: "Meeting Minutes Report",
-      subtitle: meeting.title,
-      filename: `meeting-${meeting.date}-${meeting.title.replace(/\s+/g, "-").toLowerCase()}`,
-      headers: ["Section", "Details"],
-      rows,
-      meta: [
-        { label: "Meeting", value: meeting.title },
-        { label: "Status", value: meeting.status },
-        { label: "Generated", value: new Date().toLocaleString() },
-      ],
-      summary: [
-        { label: "Agenda Items", value: meeting.agenda.length },
-        { label: "Attendees", value: meeting.attendees.length },
-        { label: "Absentees", value: meeting.absentees?.length || 0 },
-      ],
+      return Packer.toBlob(doc);
+    }).then((blob) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `meeting-${meeting.date}-${meeting.title.replace(/\s+/g, "-").toLowerCase()}.docx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Exported", description: "Meeting minutes DOCX downloaded." });
+    }).catch(() => {
+      toast({ title: "Error", description: "Failed to export meeting minutes", variant: "destructive" });
     });
-    toast({ title: "Exported", description: "Meeting minutes report downloaded." });
   };
 
   const handleExportAll = async () => {
