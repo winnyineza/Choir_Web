@@ -1,5 +1,6 @@
 import { addAuditLog, type AdminUser } from "./adminService";
 import { dbGetAll, dbInsert, dbDelete, generateId } from './supabaseDB';
+import { downloadBrandedTableReport } from "./exportUtils";
 
 export interface Receipt {
   id: string;
@@ -56,12 +57,17 @@ export async function exportReceiptsToCSV(): Promise<void> {
     r.recordedBy || "",
   ]);
 
-  const csv = [headers.join(","), ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `receipts-${new Date().toISOString().split("T")[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBrandedTableReport({
+    title: "Receipts Report",
+    filename: "receipts",
+    headers,
+    rows,
+    meta: [
+      { label: "Generated", value: new Date().toLocaleString() },
+    ],
+    summary: [
+      { label: "Receipts", value: receipts.length },
+      { label: "Total Amount", value: receipts.reduce((sum, receipt) => sum + receipt.amount, 0) },
+    ],
+  });
 }

@@ -152,6 +152,7 @@ import {
   exportAttendanceToCSV,
   exportFinancialReportToCSV,
   getBackupStats,
+  downloadBrandedTableReport,
 } from "@/lib/exportUtils";
 const AnnouncementManagement = lazy(() => import("@/components/admin/AnnouncementManagement").then(m => ({ default: m.AnnouncementManagement })));
 const EventStaffManagement = lazy(() => import("@/components/admin/EventStaffManagement").then(m => ({ default: m.EventStaffManagement })));
@@ -286,7 +287,7 @@ export default function Admin() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveFilter, setLeaveFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [unreadMessages, setUnreadMessages] = useState(0);
-  
+
   // Financial totals for Finance dashboard
   const [financialTotals, setFinancialTotals] = useState({
     contributions: 0,
@@ -296,7 +297,7 @@ export default function Admin() {
     totalIncome: 0,
     balance: 0,
   });
-  
+
   // Order & attendance stats (loaded async)
   const [orderStats, setOrderStats] = useState({ total: 0, pending: 0, confirmed: 0, cancelled: 0, used: 0, archived: 0, revenue: 0 });
   const [overallAttendanceStats, setOverallAttendanceStats] = useState({ totalSessions: 0, avgAttendance: 0, recentTrend: 'stable' as 'up' | 'down' | 'stable' });
@@ -310,7 +311,7 @@ export default function Admin() {
     viewsByDay: [] as { date: string; views: number }[],
     viewsByHour: [] as { hour: number; views: number }[],
   });
-  
+
   // Attendance state
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
@@ -802,147 +803,31 @@ export default function Admin() {
       const totalAbsent = sortedRecords.filter((record) => record.status === "absent").length;
       const totalExcused = sortedRecords.filter((record) => record.status === "excused").length;
 
-      const reportHtml = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Attendance Report - ${session.title}</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 32px;
-        color: #111827;
-        background: #ffffff;
-      }
-      .header {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        border-bottom: 2px solid #d4af37;
-        padding-bottom: 16px;
-        margin-bottom: 24px;
-      }
-      .header img {
-        width: 64px;
-        height: 64px;
-        object-fit: cover;
-        border-radius: 50%;
-      }
-      .header h1 {
-        margin: 0;
-        font-size: 24px;
-      }
-      .header p {
-        margin: 4px 0 0;
-        color: #4b5563;
-      }
-      .meta, .summary {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-bottom: 20px;
-      }
-      .card {
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 12px 14px;
-        background: #fafafa;
-      }
-      .card strong {
-        display: block;
-        font-size: 12px;
-        text-transform: uppercase;
-        color: #6b7280;
-        margin-bottom: 6px;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th, td {
-        border: 1px solid #e5e7eb;
-        padding: 10px 12px;
-        text-align: left;
-        font-size: 14px;
-      }
-      th {
-        background: #111827;
-        color: #ffffff;
-      }
-      .status {
-        text-transform: capitalize;
-        font-weight: 600;
-      }
-      .status.present, .status.late {
-        color: #166534;
-      }
-      .status.absent {
-        color: #b91c1c;
-      }
-      .status.excused {
-        color: #a16207;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <img src="${logo}" alt="Serenades of Praise Choir Logo" />
-      <div>
-        <h1>Serenades of Praise Choir</h1>
-        <p>Attendance Report</p>
-      </div>
-    </div>
-
-    <div class="meta">
-      <div class="card"><strong>Session</strong>${session.title}</div>
-      <div class="card"><strong>Date</strong>${sessionDateLabel}</div>
-      <div class="card"><strong>Generated</strong>${new Date().toLocaleString()}</div>
-    </div>
-
-    <div class="summary">
-      <div class="card"><strong>Total Members</strong>${totalMembers}</div>
-      <div class="card"><strong>Attended</strong>${totalPresent}</div>
-      <div class="card"><strong>Absent</strong>${totalAbsent}</div>
-      <div class="card"><strong>Excused</strong>${totalExcused}</div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Member Name</th>
-          <th>Email</th>
-          <th>Voice</th>
-          <th>Date</th>
-          <th>Status</th>
-          <th>Marked By</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${sortedRecords.map((record) => `
-          <tr>
-            <td>${record.memberName}</td>
-            <td>${record.memberEmail || ""}</td>
-            <td>${record.memberVoice || ""}</td>
-            <td>${sessionDateLabel}</td>
-            <td class="status ${record.status}">${record.status}</td>
-            <td>${record.markedBy || ""}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-
-      const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `attendance-${session.date}.html`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      downloadBrandedTableReport({
+        title: "Attendance Report",
+        subtitle: session.title,
+        filename: `attendance-${session.date}`,
+        headers: ["Member Name", "Email", "Voice", "Date", "Status", "Marked By"],
+        rows: sortedRecords.map((record) => [
+          record.memberName,
+          record.memberEmail || "",
+          record.memberVoice || "",
+          sessionDateLabel,
+          record.status,
+          record.markedBy || "",
+        ]),
+        meta: [
+          { label: "Session", value: session.title },
+          { label: "Date", value: sessionDateLabel },
+          { label: "Generated", value: new Date().toLocaleString() },
+        ],
+        summary: [
+          { label: "Total Members", value: totalMembers },
+          { label: "Attended", value: totalPresent },
+          { label: "Absent", value: totalAbsent },
+          { label: "Excused", value: totalExcused },
+        ],
+      });
     } catch (error: any) {
       toast({
         title: "Download Failed",

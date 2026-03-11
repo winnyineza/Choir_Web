@@ -65,6 +65,7 @@ import {
   type AdminUser,
 } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 
 const ITEMS_PER_PAGE = 25;
 
@@ -386,7 +387,6 @@ export function AuditLogPage() {
   };
 
   const handleExport = () => {
-    // Create CSV content
     const headers = ["Timestamp", "User", "Email", "Action", "Details"];
     const rows = filteredLogs.map(log => [
       new Date(log.timestamp).toISOString(),
@@ -396,19 +396,21 @@ export function AuditLogPage() {
       log.details,
     ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    // Download
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `audit-log-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBrandedTableReport({
+      title: "Audit Log Report",
+      filename: "audit-log",
+      headers,
+      rows,
+      meta: [
+        { label: "User Filter", value: selectedUser === "all" ? "All Users" : selectedUser },
+        { label: "Action Filter", value: selectedAction === "all" ? "All Actions" : selectedAction },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+      summary: [
+        { label: "Entries", value: filteredLogs.length },
+        { label: "Page", value: currentPage },
+      ],
+    });
 
     toast({
       title: "Export Complete",

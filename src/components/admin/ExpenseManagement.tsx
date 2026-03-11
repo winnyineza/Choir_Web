@@ -44,6 +44,7 @@ import {
 } from "@/lib/expenseService";
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 
 export function ExpenseManagement() {
   const { toast } = useToast();
@@ -211,19 +212,24 @@ export function ExpenseManagement() {
     const total = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
     rows.push([]);
     rows.push(["TOTAL", "", "", "", total, "", "", "", ""]);
+        downloadBrandedTableReport({
+          title: "Expenses Report",
+          subtitle: `${filterYear}`,
+          filename: `expenses-${filterYear}`,
+          headers,
+          rows,
+          meta: [
+            { label: "Year", value: filterYear },
+            { label: "Category Filter", value: filterCategory === "all" ? "All Categories" : getCategoryLabel(filterCategory as ExpenseCategory) },
+            { label: "Generated", value: new Date().toLocaleString() },
+          ],
+          summary: [
+            { label: "Records", value: filteredExpenses.length },
+            { label: "Total Expenses", value: formatCurrency(total) },
+          ],
+        });
     
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `expenses-${filterYear}.csv`;
-    link.click();
-    
-    toast({ title: "Exported", description: "Expenses exported to CSV." });
+        toast({ title: "Exported", description: "Expenses report downloaded." });
   };
   
   // Calculate year total

@@ -19,6 +19,306 @@ import {
 } from "./contributionService";
 import { getAllExpenses, getCategoryLabel } from "./expenseService";
 import { getAllDonations, Donation } from "./donationService";
+import logo from "@/assets/LogoTSC.jpg";
+
+type ReportCell = string | number | boolean | null | undefined;
+
+interface ReportMetric {
+  label: string;
+  value: ReportCell;
+}
+
+interface BrandedTableReportOptions {
+  title: string;
+  filename: string;
+  headers: string[];
+  rows: ReportCell[][];
+  subtitle?: string;
+  meta?: ReportMetric[];
+  summary?: ReportMetric[];
+  emptyMessage?: string;
+}
+
+interface DownloadReportOptions {
+  title?: string;
+  subtitle?: string;
+  meta?: ReportMetric[];
+  summary?: ReportMetric[];
+  emptyMessage?: string;
+}
+
+function escapeHtml(value: ReportCell): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatReportTitle(filename: string): string {
+  return filename
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function createTimestamp(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function triggerDownload(content: string, mimeType: string, filename: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+export function downloadBrandedTableReport({
+  title,
+  filename,
+  headers,
+  rows,
+  subtitle,
+  meta = [],
+  summary = [],
+  emptyMessage = "No records available for this report.",
+}: BrandedTableReportOptions): void {
+  const generatedAt = new Date().toLocaleString();
+  const fileDate = createTimestamp();
+  const finalMeta = meta.length > 0 ? meta : [{ label: "Generated", value: generatedAt }];
+  const finalSummary = summary.length > 0
+    ? summary
+    : [{ label: "Records", value: rows.length }, { label: "Generated", value: generatedAt }];
+
+  const tableRows = rows.length > 0
+    ? rows
+        .map(
+          (row) => `
+            <tr>
+              ${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}
+            </tr>`
+        )
+        .join("")
+    : `
+      <tr>
+        <td colspan="${headers.length}" class="empty-row">${escapeHtml(emptyMessage)}</td>
+      </tr>`;
+
+  const reportHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap");
+
+      :root {
+        color-scheme: light;
+        --brand-gold: #d4af37;
+        --brand-charcoal: #0b0b0b;
+        --brand-ink: #111827;
+        --brand-muted: #6b7280;
+        --brand-border: #e5e7eb;
+        --brand-surface: #ffffff;
+        --brand-surface-alt: #f8fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: "Montserrat", Arial, sans-serif;
+        color: var(--brand-ink);
+        background:
+          radial-gradient(circle at top right, rgba(212, 175, 55, 0.18), transparent 28%),
+          linear-gradient(180deg, #f9f6ea 0%, #ffffff 42%);
+      }
+
+      .report-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: var(--brand-surface);
+        border: 1px solid rgba(212, 175, 55, 0.24);
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 24px 60px rgba(11, 11, 11, 0.08);
+      }
+
+      .report-header {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 28px 32px;
+        color: #ffffff;
+        background: linear-gradient(135deg, #0b0b0b 0%, #1b1b1b 55%, #3e3210 100%);
+        border-bottom: 3px solid var(--brand-gold);
+      }
+
+      .report-header img {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid rgba(245, 231, 167, 0.45);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      }
+
+      .report-header h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+      }
+
+      .report-header p {
+        margin: 6px 0 0;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.98rem;
+      }
+
+      .report-body {
+        padding: 28px 32px 32px;
+      }
+
+      .meta-grid,
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+      }
+
+      .metric-card {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--brand-border);
+        background: linear-gradient(180deg, var(--brand-surface-alt) 0%, #ffffff 100%);
+      }
+
+      .metric-card strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--brand-muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .metric-card span {
+        display: block;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--brand-ink);
+        word-break: break-word;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--brand-border);
+        border-radius: 18px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+      }
+
+      th,
+      td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--brand-border);
+        text-align: left;
+        vertical-align: top;
+        font-size: 0.92rem;
+      }
+
+      th {
+        background: var(--brand-charcoal);
+        color: #ffffff;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(248, 250, 252, 0.75);
+      }
+
+      .empty-row {
+        text-align: center;
+        color: var(--brand-muted);
+        padding: 24px;
+      }
+
+      .report-footer {
+        margin-top: 18px;
+        color: var(--brand-muted);
+        font-size: 0.8rem;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="report-shell">
+      <div class="report-header">
+        <img src="${logo}" alt="Serenades of Praise Choir Logo" />
+        <div>
+          <h1>Serenades of Praise Choir</h1>
+          <p>${escapeHtml(title)}${subtitle ? ` • ${escapeHtml(subtitle)}` : ""}</p>
+        </div>
+      </div>
+      <div class="report-body">
+        <div class="meta-grid">
+          ${finalMeta
+            .map(
+              (item) => `
+                <div class="metric-card">
+                  <strong>${escapeHtml(item.label)}</strong>
+                  <span>${escapeHtml(item.value)}</span>
+                </div>`
+            )
+            .join("")}
+        </div>
+        <div class="summary-grid">
+          ${finalSummary
+            .map(
+              (item) => `
+                <div class="metric-card">
+                  <strong>${escapeHtml(item.label)}</strong>
+                  <span>${escapeHtml(item.value)}</span>
+                </div>`
+            )
+            .join("")}
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                ${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>
+        <div class="report-footer">Generated on ${escapeHtml(generatedAt)}</div>
+      </div>
+    </div>
+  </body>
+</html>`;
+
+  triggerDownload(reportHtml, "text/html;charset=utf-8;", `${filename}-${fileDate}.html`);
+}
 
 // Export orders to CSV
 export function exportOrdersToCSV(orders: TicketOrder[], filename: string = "ticket-orders") {
@@ -56,19 +356,13 @@ export function exportOrdersToCSV(orders: TicketOrder[], filename: string = "tic
     order.transactionId || "",
   ]);
 
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-    ),
-  ].join("\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `${filename}-${new Date().toISOString().split("T")[0]}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
+  downloadCSV(headers, rows, filename, {
+    title: "Ticket Orders Report",
+    summary: [
+      { label: "Orders", value: orders.length },
+      { label: "Revenue", value: formatCurrency(orders.reduce((sum, order) => sum + order.total, 0)) },
+    ],
+  });
 }
 
 // Add event to calendar (generates .ics file or opens Google Calendar)
@@ -819,20 +1113,22 @@ export async function exportDonationsToCSV(): Promise<void> {
 }
 
 // Helper function to download CSV
-function downloadCSV(headers: string[], rows: any[][], filename: string): void {
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) =>
-      row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
-    ),
-  ].join("\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `${filename}-${new Date().toISOString().split("T")[0]}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
+function downloadCSV(
+  headers: string[],
+  rows: ReportCell[][],
+  filename: string,
+  options: DownloadReportOptions = {}
+): void {
+  downloadBrandedTableReport({
+    title: options.title ?? formatReportTitle(filename),
+    subtitle: options.subtitle,
+    filename,
+    headers,
+    rows,
+    meta: options.meta,
+    summary: options.summary,
+    emptyMessage: options.emptyMessage,
+  });
 }
 
 // Get backup statistics

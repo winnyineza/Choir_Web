@@ -30,7 +30,6 @@ import {
   getCategoryLabel,
   getConditionLabel,
   getConditionColor,
-  exportInventoryToCSV,
   type InventoryItem,
   type ItemCategory,
   type ItemCondition,
@@ -41,6 +40,7 @@ import { getAllMembers, type Member } from "@/lib/dataService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 import {
   Package,
   Plus,
@@ -268,15 +268,48 @@ export function InventoryManagement() {
 
   const handleExport = async () => {
     try {
-      const csv = await exportInventoryToCSV();
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `inventory_${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "Exported", description: "Inventory exported to CSV." });
+      const headers = [
+        "Name",
+        "Category",
+        "Quantity",
+        "Available",
+        "Condition",
+        "Location",
+        "Purchase Date",
+        "Purchase Price",
+        "Serial Number",
+        "Notes",
+      ];
+      const rows = filteredItems.map((item) => [
+        item.name,
+        getCategoryLabel(item.category),
+        item.quantity,
+        item.available,
+        getConditionLabel(item.condition),
+        item.location,
+        item.purchaseDate || "",
+        item.purchasePrice || "",
+        item.serialNumber || "",
+        item.notes || "",
+      ]);
+
+      downloadBrandedTableReport({
+        title: "Inventory Report",
+        filename: "inventory",
+        headers,
+        rows,
+        meta: [
+          { label: "Category Filter", value: filterCategory === "all" ? "All Categories" : getCategoryLabel(filterCategory as ItemCategory) },
+          { label: "Condition Filter", value: filterCondition === "all" ? "All Conditions" : getConditionLabel(filterCondition as ItemCondition) },
+          { label: "Generated", value: new Date().toLocaleString() },
+        ],
+        summary: [
+          { label: "Items", value: filteredItems.length },
+          { label: "Total Quantity", value: filteredItems.reduce((sum, item) => sum + item.quantity, 0) },
+          { label: "Available Units", value: filteredItems.reduce((sum, item) => sum + item.available, 0) },
+        ],
+      });
+      toast({ title: "Exported", description: "Inventory report downloaded." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to export", variant: "destructive" });
     }

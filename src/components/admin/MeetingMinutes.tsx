@@ -27,8 +27,6 @@ import {
   getMeetingStats,
   getMeetingTypeLabel,
   getMeetingTypeColor,
-  exportMeetingToText,
-  exportMeetingsToCSV,
   type MeetingMinutes as MeetingMinutesType,
   type MeetingType,
   type MeetingAgendaItem,
@@ -50,6 +48,7 @@ import { addAuditLog, canApproveMeetingMinutes } from "@/lib/adminService";
 import { notifyMeetingMinutesApproved } from "@/lib/notificationEmailService";
 import { getMembersOnLeaveForDate } from "@/lib/leaveService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 import {
   FileText,
   Plus,
@@ -475,28 +474,87 @@ export function MeetingMinutesComponent() {
   };
 
   const handleExportMeeting = (meeting: MeetingMinutesType) => {
-    const text = exportMeetingToText(meeting);
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `meeting_${meeting.date}_${meeting.title.replace(/\s+/g, "_")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported", description: "Meeting minutes exported." });
+    const rows = [
+      ["Date", meeting.date],
+      ["Time", `${meeting.startTime}${meeting.endTime ? ` - ${meeting.endTime}` : ""}`],
+      ["Location", meeting.location],
+      ["Type", getMeetingTypeLabel(meeting.type)],
+      ["Chairperson", meeting.chairperson],
+      ["Secretary", meeting.secretary],
+      ["Attendees", meeting.attendees.join(", ") || "None"],
+      ["Absentees", meeting.absentees?.join(", ") || "None"],
+      ["Opening Prayer", meeting.openingPrayer || ""],
+      ["Closing Prayer", meeting.closingPrayer || ""],
+      ["Next Meeting", meeting.nextMeetingDate || ""],
+      ["Notes", meeting.notes || ""],
+      ...meeting.agenda.flatMap((item, index) => [
+        [`Agenda ${index + 1}`, item.title],
+        ["Discussion", item.discussion],
+        ["Decision", item.decision || ""],
+        ["Action Item", item.actionItem || ""],
+        ["Responsible", item.responsible || ""],
+      ]),
+    ];
+
+    downloadBrandedTableReport({
+      title: "Meeting Minutes Report",
+      subtitle: meeting.title,
+      filename: `meeting-${meeting.date}-${meeting.title.replace(/\s+/g, "-").toLowerCase()}`,
+      headers: ["Section", "Details"],
+      rows,
+      meta: [
+        { label: "Meeting", value: meeting.title },
+        { label: "Status", value: meeting.status },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+      summary: [
+        { label: "Agenda Items", value: meeting.agenda.length },
+        { label: "Attendees", value: meeting.attendees.length },
+        { label: "Absentees", value: meeting.absentees?.length || 0 },
+      ],
+    });
+    toast({ title: "Exported", description: "Meeting minutes report downloaded." });
   };
 
   const handleExportAll = async () => {
     try {
-      const csv = await exportMeetingsToCSV();
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `meetings_${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "Exported", description: "All meetings exported to CSV." });
+      downloadBrandedTableReport({
+        title: "Meetings Report",
+        filename: "meetings",
+        headers: [
+          "Date",
+          "Title",
+          "Type",
+          "Location",
+          "Chairperson",
+          "Secretary",
+          "Attendees Count",
+          "Agenda Items",
+          "Status",
+        ],
+        rows: filteredMeetings.map((meeting) => [
+          meeting.date,
+          meeting.title,
+          getMeetingTypeLabel(meeting.type),
+          meeting.location,
+          meeting.chairperson,
+          meeting.secretary,
+          meeting.attendees.length,
+          meeting.agenda.length,
+          meeting.status,
+        ]),
+        meta: [
+          { label: "Type Filter", value: filterType === "all" ? "All Types" : getMeetingTypeLabel(filterType as MeetingType) },
+          { label: "Status Filter", value: filterStatus === "all" ? "All Statuses" : filterStatus },
+          { label: "Generated", value: new Date().toLocaleString() },
+        ],
+        summary: [
+          { label: "Meetings", value: filteredMeetings.length },
+          { label: "Approved", value: filteredMeetings.filter((meeting) => meeting.status === "approved").length },
+          { label: "Drafts", value: filteredMeetings.filter((meeting) => meeting.status === "draft").length },
+        ],
+      });
+      toast({ title: "Exported", description: "Meetings report downloaded." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to export", variant: "destructive" });
     }

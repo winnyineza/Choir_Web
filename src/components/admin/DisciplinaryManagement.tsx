@@ -25,7 +25,6 @@ import {
   resolveDisciplinaryRecord,
   deleteDisciplinaryRecord,
   getDisciplinaryStats,
-  exportDisciplinaryToCSV,
   type DisciplinaryRecord,
   type DisciplinaryStats,
 } from "@/lib/disciplinaryService";
@@ -34,6 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { notifyDisciplinaryAction, notifyDisciplinaryResolved } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 import {
   AlertTriangle,
   Ban,
@@ -270,15 +270,50 @@ export function DisciplinaryManagement() {
 
   const handleExport = async () => {
     try {
-      const csv = await exportDisciplinaryToCSV();
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `disciplinary_records_${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "Exported", description: "Disciplinary records exported to CSV." });
+      const headers = [
+        "Date",
+        "Member",
+        "Type",
+        "Severity",
+        "Reason",
+        "Description",
+        "Status",
+        "Action Taken",
+        "Issued By",
+        "Expiry Date",
+        "Resolution",
+      ];
+      const rows = filteredRecords.map((record) => [
+        new Date(record.date).toLocaleDateString(),
+        record.memberName,
+        record.type,
+        record.severity,
+        record.reason,
+        record.description,
+        record.status,
+        record.actionTaken || "",
+        record.issuedByName,
+        record.expiryDate ? new Date(record.expiryDate).toLocaleDateString() : "",
+        record.resolution || "",
+      ]);
+
+      downloadBrandedTableReport({
+        title: "Disciplinary Report",
+        filename: "disciplinary-records",
+        headers,
+        rows,
+        meta: [
+          { label: "Type Filter", value: filterType === "all" ? "All Types" : filterType },
+          { label: "Status Filter", value: filterStatus === "all" ? "All Statuses" : filterStatus },
+          { label: "Generated", value: new Date().toLocaleString() },
+        ],
+        summary: [
+          { label: "Records", value: filteredRecords.length },
+          { label: "Active", value: filteredRecords.filter((record) => record.status === "active").length },
+          { label: "Resolved", value: filteredRecords.filter((record) => record.status === "resolved").length },
+        ],
+      });
+      toast({ title: "Exported", description: "Disciplinary report downloaded." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to export", variant: "destructive" });
     }

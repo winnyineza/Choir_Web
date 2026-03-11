@@ -29,13 +29,13 @@ import {
   formatFileSize,
   getFileIcon,
   downloadDocument,
-  exportDocumentListToCSV,
   type Document,
   type DocumentCategory,
 } from "@/lib/documentService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 import {
   FileText,
   Plus,
@@ -259,15 +259,43 @@ export function DocumentManagement() {
   };
 
   const handleExportList = async () => {
-    const csv = await exportDocumentListToCSV();
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `documents_list_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported", description: "Document list exported to CSV." });
+    downloadBrandedTableReport({
+      title: "Document Library Report",
+      filename: "documents-list",
+      headers: [
+        "Title",
+        "Category",
+        "File Name",
+        "File Type",
+        "Size",
+        "Uploaded By",
+        "Uploaded At",
+        "Public",
+        "Downloads",
+      ],
+      rows: filteredDocuments.map((doc) => [
+        doc.title,
+        getCategoryLabel(doc.category),
+        doc.fileName,
+        doc.fileType,
+        formatFileSize(doc.fileSize),
+        doc.uploadedBy,
+        doc.uploadedAt.split("T")[0],
+        doc.isPublic ? "Yes" : "No",
+        doc.downloadCount,
+      ]),
+      meta: [
+        { label: "Category Filter", value: filterCategory === "all" ? "All Categories" : getCategoryLabel(filterCategory as DocumentCategory) },
+        { label: "Visibility Filter", value: filterVisibility === "all" ? "All Documents" : filterVisibility },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+      summary: [
+        { label: "Documents", value: filteredDocuments.length },
+        { label: "Public", value: filteredDocuments.filter((doc) => doc.isPublic).length },
+        { label: "Downloads", value: filteredDocuments.reduce((sum, doc) => sum + doc.downloadCount, 0) },
+      ],
+    });
+    toast({ title: "Exported", description: "Document library report downloaded." });
   };
 
   const resetForm = () => {

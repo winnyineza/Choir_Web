@@ -24,6 +24,7 @@ import { formatCurrency } from "@/lib/flutterwave";
 import type { Event } from "@/lib/dataService";
 import type { TicketOrder } from "@/lib/ticketService";
 import { cn } from "@/lib/utils";
+import { downloadBrandedTableReport } from "@/lib/exportUtils";
 
 interface EventSummaryModalProps {
   isOpen: boolean;
@@ -86,53 +87,42 @@ export function EventSummaryModal({ isOpen, onClose, event, orders }: EventSumma
   });
 
   const downloadSummary = () => {
-    const summary = `
-EVENT SUMMARY REPORT
-=====================
-
-Event: ${event.title}
-Date: ${new Date(event.date).toLocaleDateString()}
-Time: ${event.time}
-Location: ${event.location}
-Status: ${isPast ? "Completed" : isToday ? "Today" : "Upcoming"}
-
-TICKET SALES
-------------
-Total Available: ${totalTickets}
-Total Sold: ${soldTickets}
-Remaining: ${remainingTickets}
-Sell-through Rate: ${((soldTickets / totalTickets) * 100).toFixed(1)}%
-
-REVENUE
--------
-Total Revenue: ${formatCurrency(totalRevenue)}
-Average Order Value: ${formatCurrency(avgOrderValue)}
-
-ORDERS
-------
-Confirmed Orders: ${confirmedOrders.length}
-Pending Orders: ${pendingOrders.length}
-Cancelled Orders: ${cancelledOrders.length}
-
-CHECK-IN
---------
-Tickets Scanned: ${scannedTickets}
-Check-in Rate: ${checkInRate.toFixed(1)}%
-
-BREAKDOWN BY TIER
------------------
-${revenueByTier.map(t => `${t.name}: ${t.sold}/${t.available} sold (${formatCurrency(t.revenue)})`).join("\n")}
-
-Generated: ${new Date().toLocaleString()}
-    `.trim();
-
-    const blob = new Blob([summary], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${event.title.replace(/\s+/g, "_")}_summary.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBrandedTableReport({
+      title: "Event Summary Report",
+      subtitle: event.title,
+      filename: `${event.title.replace(/\s+/g, "-").toLowerCase()}-summary`,
+      headers: ["Metric", "Details"],
+      rows: [
+        ["Event Date", new Date(event.date).toLocaleDateString()],
+        ["Time", event.time],
+        ["Location", event.location],
+        ["Status", isPast ? "Completed" : isToday ? "Today" : "Upcoming"],
+        ["Total Available", totalTickets],
+        ["Total Sold", soldTickets],
+        ["Remaining", remainingTickets],
+        ["Sell-through Rate", `${totalTickets > 0 ? ((soldTickets / totalTickets) * 100).toFixed(1) : "0.0"}%`],
+        ["Total Revenue", formatCurrency(totalRevenue)],
+        ["Average Order Value", formatCurrency(avgOrderValue)],
+        ["Confirmed Orders", confirmedOrders.length],
+        ["Pending Orders", pendingOrders.length],
+        ["Cancelled Orders", cancelledOrders.length],
+        ["Tickets Scanned", scannedTickets],
+        ["Check-in Rate", `${checkInRate.toFixed(1)}%`],
+        ...revenueByTier.map((tier) => [
+          `Tier: ${tier.name}`,
+          `${tier.sold}/${tier.available} sold (${formatCurrency(tier.revenue)})`,
+        ]),
+      ],
+      meta: [
+        { label: "Event", value: event.title },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+      summary: [
+        { label: "Revenue", value: formatCurrency(totalRevenue) },
+        { label: "Confirmed Orders", value: confirmedOrders.length },
+        { label: "Check-in Rate", value: `${checkInRate.toFixed(1)}%` },
+      ],
+    });
   };
 
   return (
