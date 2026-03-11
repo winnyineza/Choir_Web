@@ -108,7 +108,6 @@ import {
   getAttendanceByDate,
   getRecentSessions,
   saveAttendance,
-  deleteAttendanceForDate,
   getMembersToExcuse,
   getOverallAttendanceStats,
   type AttendanceRecord,
@@ -264,11 +263,7 @@ export default function Admin() {
     role: previewRole as any,
   } : currentUser;
   const canManageMembers = canEditMembers(effectiveUser) && hasWriteAccess(effectiveUser, "members");
-  const canManageAttendance = Boolean(
-    effectiveUser
-    && (effectiveUser.role === "super_admin" || effectiveUser.role === "main_admin")
-    && hasWriteAccess(effectiveUser, "attendance")
-  );
+  const canManageAttendance = hasWriteAccess(effectiveUser, "attendance");
 
   // Filter sidebar items based on role permissions (use effectiveUser for preview)
   const accessibleTabs = getAccessibleTabs(effectiveUser);
@@ -324,6 +319,8 @@ export default function Admin() {
   const [isTakingAttendance, setIsTakingAttendance] = useState(false);
   const [membersOnLeave, setMembersOnLeave] = useState<{ memberId: string; memberName: string; reason: string }[]>([]);
   const [attendanceMemberSearch, setAttendanceMemberSearch] = useState("");
+  const [viewingAttendanceSession, setViewingAttendanceSession] = useState<AttendanceSession | null>(null);
+  const [viewingAttendanceRecords, setViewingAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [dashboardStats, setDashboardStats] = useState({
     totalMembers: 0,
     newMembersThisMonth: 0,
@@ -757,6 +754,84 @@ export default function Admin() {
     }
   };
 
+  const handleViewAttendanceSession = async (session: AttendanceSession) => {
+    try {
+      const records = await getAttendanceByDate(session.date);
+      const sortedRecords = [...records].sort((left, right) => left.memberName.localeCompare(right.memberName));
+      setViewingAttendanceSession(session);
+      setViewingAttendanceRecords(sortedRecords);
+    } catch (error: any) {
+      toast({
+        title: "View Failed",
+        description: error?.message || "Could not load attendance records.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openAttendanceSessionForEdit = async (session: AttendanceSession) => {
+    const existing = await getAttendanceByDate(session.date);
+    const existingMap: { [key: string]: AttendanceStatus } = {};
+    existing.forEach((record) => {
+      existingMap[record.memberId] = record.status;
+    });
+
+    const onLeave = await getMembersToExcuse(session.date);
+    setMembersOnLeave(onLeave);
+    onLeave.forEach((leaveMember) => {
+      if (!existingMap[leaveMember.memberId]) {
+        existingMap[leaveMember.memberId] = "excused";
+      }
+    });
+
+    setViewingAttendanceSession(null);
+    setViewingAttendanceRecords([]);
+    setAttendanceDate(session.date);
+    setSessionTitle(session.title);
+    setAttendanceRecords(existingMap);
+    setIsTakingAttendance(true);
+  };
+
+  const handleDownloadAttendanceSession = async (session: AttendanceSession) => {
+    try {
+      const records = await getAttendanceByDate(session.date);
+      const headers = ["Member Name", "Email", "Voice", "Status", "Marked By"];
+      const rows = records
+        .sort((left, right) => left.memberName.localeCompare(right.memberName))
+        .map((record) => [
+          record.memberName,
+          record.memberEmail,
+          record.memberVoice,
+          record.status,
+          record.markedBy || "",
+        ]);
+
+      const csv = [
+        ["Date", new Date(`${session.date}T00:00:00`).toLocaleDateString()].join(","),
+        ["Session", `"${session.title.replace(/"/g, '""')}"`].join(","),
+        "",
+        headers.join(","),
+        ...rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")),
+      ].join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `attendance-${session.date}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({
+        title: "Download Failed",
+        description: error?.message || "Could not download attendance records.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Filtered data
   const filteredOrders = orders
     .filter((order) => orderFilter === "all" || order.status === orderFilter)
@@ -948,8 +1023,15 @@ export default function Admin() {
     });
   };
   const attendanceEditDeadline = attendanceDate ? getAttendanceEditDeadline(attendanceDate) : null;
+  const selectedAttendanceSession = attendanceSessions.find((session) => session.date === attendanceDate) || null;
+  const selectedAttendanceExists = Boolean(selectedAttendanceSession);
   const canEditSelectedAttendance = attendanceDate
-    ? canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(attendanceDate)
+    ? selectedAttendanceExists
+      && isAttendancePrivilegedEditor
+      && (canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(attendanceDate))
+    : false;
+  const canTakeSelectedAttendance = attendanceDate
+    ? !selectedAttendanceExists || canEditSelectedAttendance
     : false;
   const filteredAttendanceMembers = members.filter((member) => {
     const query = attendanceMemberSearch.trim().toLowerCase();
@@ -2798,12 +2880,12 @@ export default function Admin() {
                         }}
                         className="w-40 bg-secondary border-primary/20"
                       />
-                      {!canEditSelectedAttendance && attendanceEditDeadline && (
+                      {selectedAttendanceExists && !canEditSelectedAttendance && attendanceEditDeadline && (
                         <span className="text-[10px] text-red-400 mt-0.5 block">
                           Editing locked after {attendanceEditDeadline.toLocaleDateString()}
                         </span>
                       )}
-                      {canEditSelectedAttendance && isAttendanceDateTemporarilyUnlocked(attendanceDate) && (
+                      {selectedAttendanceExists && canEditSelectedAttendance && isAttendanceDateTemporarilyUnlocked(attendanceDate) && (
                         <span className="text-[10px] text-green-400 mt-0.5 block">Temporarily unlocked</span>
                       )}
                     </div>
@@ -2819,7 +2901,7 @@ export default function Admin() {
                     {canManageAttendance && !isTakingAttendance ? (
                       <Button
                         variant="gold"
-                        disabled={!canEditSelectedAttendance}
+                        disabled={!canTakeSelectedAttendance}
                         onClick={async () => {
                           if (members.length === 0) {
                             toast({
@@ -2830,10 +2912,12 @@ export default function Admin() {
                             return;
                           }
 
-                          if (!canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) && !isAttendanceDateTemporarilyUnlocked(attendanceDate)) {
+                          if (selectedAttendanceExists && !canEditSelectedAttendance) {
                             toast({
-                              title: "Attendance Locked",
-                              description: `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`,
+                              title: "Attendance Editing Restricted",
+                              description: isAttendancePrivilegedEditor
+                                ? `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`
+                                : "Only Main Admin and Super Admin can edit already taken attendance.",
                               variant: "destructive",
                             });
                             return;
@@ -2860,9 +2944,9 @@ export default function Admin() {
                         }}
                       >
                         <UserCheck className="w-4 h-4 mr-2" />
-                        {!canEditSelectedAttendance
-                          ? 'Attendance Locked'
-                          : attendanceSessions.some(s => s.date === attendanceDate)
+                        {!canTakeSelectedAttendance
+                          ? 'Editing Restricted'
+                          : selectedAttendanceExists
                             ? 'Edit Attendance'
                             : 'Start Attendance'}
                       </Button>
@@ -2871,10 +2955,12 @@ export default function Admin() {
                         <Button
                           variant="gold"
                         onClick={async () => {
-                          if (!canEditAttendanceDate(attendanceDate, isAttendancePrivilegedEditor) && !isAttendanceDateTemporarilyUnlocked(attendanceDate)) {
+                          if (selectedAttendanceExists && !canEditSelectedAttendance) {
                             toast({
-                              title: "Attendance Locked",
-                              description: `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`,
+                              title: "Attendance Editing Restricted",
+                              description: isAttendancePrivilegedEditor
+                                ? `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`
+                                : "Only Main Admin and Super Admin can edit already taken attendance.",
                               variant: "destructive",
                             });
                             return;
@@ -3043,18 +3129,10 @@ export default function Admin() {
                     <p className="text-xs text-muted-foreground mt-1">
                       {canEditSelectedAttendance
                         ? 'Click "Edit Attendance" to modify the records.'
-                        : `Editing closed on ${attendanceEditDeadline?.toLocaleDateString()}.`}
+                        : isAttendancePrivilegedEditor
+                          ? `Editing closed on ${attendanceEditDeadline?.toLocaleDateString()}. Use the lock action in history to request access.`
+                          : 'Only Main Admin and Super Admin can edit already taken attendance.'}
                     </p>
-                    {!canEditSelectedAttendance && canManageAttendance && !isAttendanceUnlockApprover && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => requestAttendanceUnlock(attendanceDate)}
-                      >
-                        Request Unlock
-                      </Button>
-                    )}
                   </div>
                 )}
               </div>
@@ -3066,6 +3144,7 @@ export default function Admin() {
                 </div>
                 
                 {attendanceSessions.length > 0 ? (
+                  <div className="max-h-[28rem] overflow-y-auto">
                   <table className="w-full">
                     <thead className="bg-secondary/50">
                       <tr>
@@ -3081,7 +3160,8 @@ export default function Admin() {
                       {attendanceSessions
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                         .map((session) => {
-                        const canEditSession = canEditAttendanceDate(session.date, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(session.date);
+                        const canEditSession = isAttendancePrivilegedEditor
+                          && (canEditAttendanceDate(session.date, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(session.date));
                         const sessionDeadline = getAttendanceEditDeadline(session.date);
 
                         return (
@@ -3104,95 +3184,50 @@ export default function Admin() {
                             <span className="text-yellow-400">{session.totalExcused}</span>
                           </td>
                           <td className="p-4 text-right">
+                            <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewAttendanceSession(session)}
+                              title="View attendance"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             {canManageAttendance && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                disabled={!canEditSession}
-                                title={!canEditSession ? `Attendance locked after ${sessionDeadline.toLocaleDateString()}` : undefined}
-                                onClick={async () => {
-                                  if (!canEditSession) {
+                                onClick={() => {
+                                  if (canEditSession) {
                                     toast({
-                                      title: "Attendance Locked",
-                                      description: `Attendance can only be edited within 3 days of the session date. This one locked on ${sessionDeadline.toLocaleDateString()}.`,
-                                      variant: "destructive",
+                                      title: "Attendance Editable",
+                                      description: `This attendance can be edited until ${sessionDeadline.toLocaleDateString()}. Open it with View to inspect or edit.`,
                                     });
                                     return;
                                   }
-                                  setAttendanceDate(session.date);
-                                  setSessionTitle(session.title);
-                                  const existing = await getAttendanceByDate(session.date);
-                                  const existingMap: { [key: string]: AttendanceStatus } = {};
-                                  existing.forEach(r => { existingMap[r.memberId] = r.status; });
-                                  const onLeave = await getMembersToExcuse(session.date);
-                                  setMembersOnLeave(onLeave);
-                                  onLeave.forEach(l => {
-                                    if (!existingMap[l.memberId]) existingMap[l.memberId] = 'excused';
-                                  });
-                                  setAttendanceRecords(existingMap);
-                                  setIsTakingAttendance(true);
-                                }}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {canManageAttendance && !canEditSession && !isAttendanceUnlockApprover && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => requestAttendanceUnlock(session.date)}
-                                title="Request attendance unlock"
-                              >
-                                <Lock className="w-4 h-4 text-yellow-500" />
-                              </Button>
-                            )}
-                            {canManageAttendance && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={!canEditSession}
-                                title={!canEditSession ? `Attendance locked after ${sessionDeadline.toLocaleDateString()}` : undefined}
-                                onClick={async () => {
-                                  if (!canEditSession) {
-                                    toast({
-                                      title: "Attendance Locked",
-                                      description: `Attendance can only be edited within 3 days of the session date. This one locked on ${sessionDeadline.toLocaleDateString()}.`,
-                                      variant: "destructive",
-                                    });
-                                    return;
-                                  }
-                                  if (confirm(`Delete attendance for ${new Date(session.date).toLocaleDateString()}?`)) {
-                                    try {
-                                      const deleted = await deleteAttendanceForDate(session.date);
-                                      await loadData();
 
-                                      if (deleted) {
-                                        toast({ title: "Attendance Deleted" });
-                                      } else {
-                                        toast({
-                                          title: "Nothing to Delete",
-                                          description: "No attendance records were found for that date.",
-                                          variant: "destructive",
-                                        });
-                                      }
-                                    } catch (error: any) {
-                                      toast({
-                                        title: "Delete Failed",
-                                        description: error?.message || "Could not delete attendance.",
-                                        variant: "destructive",
-                                      });
-                                    }
-                                  }
+                                  requestAttendanceUnlock(session.date);
                                 }}
+                                title={canEditSession ? `Editable until ${sessionDeadline.toLocaleDateString()}` : "Request attendance unlock"}
                               >
-                                <Trash2 className="w-4 h-4 text-destructive" />
+                                <Lock className={cn("w-4 h-4", canEditSession ? "text-muted-foreground" : "text-yellow-500")} />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadAttendanceSession(session)}
+                              title="Download attendance"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            </div>
                           </td>
                         </tr>
                       )})}
                     </tbody>
                   </table>
+                  </div>
                 ) : (
                   <div className="p-12 text-center">
                     <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -4179,6 +4214,77 @@ export default function Admin() {
         onSuccess={loadData}
         editVideo={editingMusicVideo}
       />
+
+      <Dialog open={!!viewingAttendanceSession} onOpenChange={(open) => {
+        if (!open) {
+          setViewingAttendanceSession(null);
+          setViewingAttendanceRecords([]);
+        }
+      }}>
+        <DialogContent className="max-w-2xl bg-background border-primary/20 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              Attendance Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewingAttendanceSession && (
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/10 bg-secondary/20 p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium text-foreground">{new Date(`${viewingAttendanceSession.date}T00:00:00`).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Session</p>
+                  <p className="font-medium text-foreground">{viewingAttendanceSession.title}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Recorded Members</p>
+                  <p className="font-medium text-foreground">{viewingAttendanceRecords.length}</p>
+                </div>
+              </div>
+
+              <div className="max-h-[22rem] overflow-y-auto rounded-xl border border-primary/10">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-secondary/80 backdrop-blur">
+                    <tr>
+                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">Member</th>
+                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">Voice</th>
+                      <th className="p-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewingAttendanceRecords.map((record) => (
+                      <tr key={record.id} className="border-t border-primary/10">
+                        <td className="p-3 text-sm text-foreground">{record.memberName}</td>
+                        <td className="p-3 text-sm text-muted-foreground">{record.memberVoice}</td>
+                        <td className="p-3 text-sm capitalize text-foreground">{record.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => handleDownloadAttendanceSession(viewingAttendanceSession)}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+                {isAttendancePrivilegedEditor && (
+                  canEditAttendanceDate(viewingAttendanceSession.date, currentUser?.role === "super_admin")
+                  || isAttendanceDateTemporarilyUnlocked(viewingAttendanceSession.date)
+                ) && (
+                  <Button variant="gold" onClick={() => openAttendanceSessionForEdit(viewingAttendanceSession)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit Attendance
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Member Profile Viewer */}
       <Dialog open={!!viewingMember} onOpenChange={(open) => { if (!open) setViewingMember(null); }}>
