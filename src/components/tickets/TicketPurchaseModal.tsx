@@ -258,6 +258,18 @@ export function TicketPurchaseModal({
       
       // Load Flutterwave script if not already loaded
       if (!(window as any).FlutterwaveCheckout) {
+        if (typeof document === "undefined" || !document.body) {
+          console.warn("[TicketPurchaseModal] Flutterwave script injection skipped: document.body is unavailable");
+          toast({
+            title: "Payment Error",
+            description: "Checkout could not be initialized. Please refresh and try again.",
+            variant: "destructive",
+          });
+          setStep("payment");
+          setIsProcessing(false);
+          return;
+        }
+
         const script = document.createElement("script");
         script.src = "https://checkout.flutterwave.com/v3.js";
         script.async = true;

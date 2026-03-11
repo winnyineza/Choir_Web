@@ -42,6 +42,46 @@ export interface AttendanceSession {
 
 const ATTENDANCE_KEY = 'choir_attendance';
 const SESSIONS_KEY = 'choir_attendance_sessions';
+export const ATTENDANCE_EDIT_WINDOW_DAYS = 3;
+
+function parseAttendanceDate(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, 0, 0, 0, 0);
+}
+
+export function getAttendanceEditDeadline(date: string): Date {
+  const baseDate = parseAttendanceDate(date);
+  const deadline = new Date(baseDate);
+  deadline.setDate(deadline.getDate() + ATTENDANCE_EDIT_WINDOW_DAYS);
+  deadline.setHours(23, 59, 59, 999);
+  return deadline;
+}
+
+export function canEditAttendanceDate(date: string, isSuperAdmin = false, now = new Date()): boolean {
+  if (isSuperAdmin) return true;
+  if (!date) return false;
+  return now.getTime() <= getAttendanceEditDeadline(date).getTime();
+}
+
+function dedupeSessionsByDate(sessions: AttendanceSession[]): AttendanceSession[] {
+  const latestByDate = new Map<string, AttendanceSession>();
+
+  for (const session of sessions) {
+    const existing = latestByDate.get(session.date);
+    if (!existing) {
+      latestByDate.set(session.date, session);
+      continue;
+    }
+
+    const existingCreatedAt = new Date(existing.createdAt).getTime();
+    const currentCreatedAt = new Date(session.createdAt).getTime();
+    if (currentCreatedAt >= existingCreatedAt) {
+      latestByDate.set(session.date, session);
+    }
+  }
+
+  return [...latestByDate.values()];
+}
 
 // Attendance Records CRUD
 export async function getAllAttendanceRecords(): Promise<AttendanceRecord[]> {
@@ -181,7 +221,8 @@ export async function saveAttendance(
 
 // Sessions Management
 export async function getAllSessions(): Promise<AttendanceSession[]> {
-  return dbGetAll<AttendanceSession>(SESSIONS_KEY);
+  const sessions = await dbGetAll<AttendanceSession>(SESSIONS_KEY);
+  return dedupeSessionsByDate(sessions);
 }
 
 export async function saveSession(
@@ -190,11 +231,7 @@ export async function saveSession(
   records: AttendanceRecord[],
   createdBy?: string
 ): Promise<AttendanceSession> {
-  const sessions = await getAllSessions();
-  const existing = sessions.find((s) => s.date === date);
-  if (existing) {
-    await dbDelete(SESSIONS_KEY, existing.id);
-  }
+  await dbDeleteWhere(SESSIONS_KEY, 'date', date);
 
   const session: Omit<AttendanceSession, 'id' | 'createdAt'> & {
     id?: string;
@@ -218,7 +255,7 @@ export async function getSessionByDate(
   date: string
 ): Promise<AttendanceSession | undefined> {
   const sessions = await dbQuery<AttendanceSession>(SESSIONS_KEY, 'date', date);
-  return sessions[0] ?? undefined;
+  return dedupeSessionsByDate(sessions)[0] ?? undefined;
 }
 
 // Get recent sessions
@@ -234,14 +271,16 @@ export async function getRecentSessions(
 // Delete attendance for a date
 export async function deleteAttendanceForDate(date: string): Promise<boolean> {
   const records = await getAttendanceByDate(date);
-  if (records.length === 0) return false;
+  const sessions = await dbQuery<AttendanceSession>(SESSIONS_KEY, 'date', date);
 
-  await dbDeleteWhere(ATTENDANCE_KEY, 'date', date);
+  if (records.length === 0 && sessions.length === 0) return false;
 
-  const sessions = await getAllSessions();
-  const sessionForDate = sessions.find((s) => s.date === date);
-  if (sessionForDate) {
-    await dbDelete(SESSIONS_KEY, sessionForDate.id);
+  if (records.length > 0) {
+    await dbDeleteWhere(ATTENDANCE_KEY, 'date', date);
+  }
+
+  if (sessions.length > 0) {
+    await dbDeleteWhere(SESSIONS_KEY, 'date', date);
   }
 
   return true;

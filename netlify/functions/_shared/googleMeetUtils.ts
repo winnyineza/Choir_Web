@@ -23,12 +23,35 @@ export interface GoogleIntegrationRecord {
   updated_at: string;
 }
 
+export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+export const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+
 export const ALLOWED_SCOPES = [
-  "https://www.googleapis.com/auth/calendar.events",
+  GOOGLE_CALENDAR_SCOPE,
   "https://www.googleapis.com/auth/userinfo.email",
   "openid",
 ];
 export const GOOGLE_INTEGRATION_ID = "primary";
+
+export function parseGoogleScopeSet(scope?: string | null) {
+  return new Set((scope || "").split(/\s+/).map((value) => value.trim()).filter(Boolean));
+}
+
+export function hasRequiredGoogleCalendarScope(scope?: string | null) {
+  const scopeSet = parseGoogleScopeSet(scope);
+  return scopeSet.has(GOOGLE_CALENDAR_SCOPE) || scopeSet.has(GOOGLE_CALENDAR_EVENTS_SCOPE);
+}
+
+export function isGoogleScopeInsufficientMessage(message: string) {
+  return message.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT")
+    || message.includes("insufficient authentication scopes")
+    || message.includes("insufficientPermissions");
+}
+
+export function formatGoogleScopeSummary(scope?: string | null) {
+  const values = [...parseGoogleScopeSet(scope)];
+  return values.length > 0 ? values.join(", ") : "none";
+}
 
 export function buildHeaders() {
   return {
@@ -140,6 +163,14 @@ export async function getGoogleIntegration() {
   }
 
   return data as GoogleIntegrationRecord | null;
+}
+
+export async function revokeGoogleIntegration(integrationId: string) {
+  const supabase = getSupabaseAdminClient();
+  await supabase
+    .from("google_calendar_integrations")
+    .update({ revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", integrationId);
 }
 
 export async function exchangeRefreshTokenForAccessToken(refreshToken: string) {

@@ -3,6 +3,9 @@ export interface GoogleConnectionStatus {
   googleEmail: string | null;
   connectedAt: string | null;
   calendarId: string | null;
+  reconnectRequired?: boolean;
+  statusMessage?: string | null;
+  scope?: string | null;
 }
 
 export interface GoogleMeetingPayload {
@@ -65,6 +68,9 @@ export async function getGoogleConnectionStatus(adminId: string): Promise<Google
     googleEmail: data.googleEmail || null,
     connectedAt: data.connectedAt || null,
     calendarId: data.calendarId || null,
+    reconnectRequired: Boolean(data.reconnectRequired),
+    statusMessage: data.statusMessage || null,
+    scope: data.scope || null,
   };
 }
 

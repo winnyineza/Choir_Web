@@ -6,7 +6,10 @@ import {
   exchangeRefreshTokenForAccessToken,
   getClientIp,
   getGoogleIntegration,
+  hasRequiredGoogleCalendarScope,
+  isGoogleScopeInsufficientMessage,
   normalizeGoogleCalendarId,
+  revokeGoogleIntegration,
   getSupabaseAdminClient,
   requireActiveAdmin,
 } from "./_shared/googleMeetUtils";
@@ -92,8 +95,13 @@ function getGoogleErrorCodeFromMessage(message: string): number | null {
   return codeMatch ? Number(codeMatch[1]) : null;
 }
 
+function isInvalidGrantErrorMessage(message: string) {
+  return message.includes("invalid_grant");
+}
+
 const handler: Handler = async (event) => {
   const headers = buildHeaders();
+  let integrationId: string | null = null;
 
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers, body: "" };
@@ -119,6 +127,22 @@ const handler: Handler = async (event) => {
       };
     }
 
+    integrationId = integration.id;
+
+    if (!hasRequiredGoogleCalendarScope(integration.scope)) {
+      await revokeGoogleIntegration(integration.id);
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({
+          error: "Google Calendar connection is missing required calendar permissions. Please reconnect Google Calendar.",
+          code: "GOOGLE_SCOPE_UPGRADE_REQUIRED",
+        }),
+      };
+    }
+
+    const supabase = getSupabaseAdminClient();
+
     const rawCalendarId = process.env.GOOGLE_TARGET_CALENDAR_ID || integration.calendar_id;
     const calendarId = normalizeGoogleCalendarId(rawCalendarId);
     if (!calendarId) {
@@ -130,8 +154,28 @@ const handler: Handler = async (event) => {
     }
 
     const refreshToken = decryptRefreshToken(integration);
-    const accessToken = await exchangeRefreshTokenForAccessToken(refreshToken);
-    const supabase = getSupabaseAdminClient();
+    let accessToken: string;
+    try {
+      accessToken = await exchangeRefreshTokenForAccessToken(refreshToken);
+    } catch (error: any) {
+      const message = String(error?.message || "");
+      if (isInvalidGrantErrorMessage(message)) {
+        await supabase
+          .from("google_calendar_integrations")
+          .update({ revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq("id", integration.id);
+
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({
+            error: "Google token expired or revoked. Please reconnect Google Calendar.",
+            code: "GOOGLE_RECONNECT_REQUIRED",
+          }),
+        };
+      }
+      throw error;
+    }
 
     const { data: members, error: membersError } = await supabase
       .from("members")
@@ -240,6 +284,42 @@ const handler: Handler = async (event) => {
       }),
     };
   } catch (error: any) {
+    const message = String(error?.message || "");
+
+    if (integrationId && isInvalidGrantErrorMessage(message)) {
+      try {
+        await revokeGoogleIntegration(integrationId);
+      } catch {
+        // Best-effort update: keep returning original auth error even if status persistence fails.
+      }
+
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({
+          error: "Google token expired or revoked. Please reconnect Google Calendar.",
+          code: "GOOGLE_RECONNECT_REQUIRED",
+        }),
+      };
+    }
+
+    if (integrationId && isGoogleScopeInsufficientMessage(message)) {
+      try {
+        await revokeGoogleIntegration(integrationId);
+      } catch {
+        // Best-effort update: keep returning original auth error even if status persistence fails.
+      }
+
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({
+          error: "Google Calendar permissions are insufficient. Please reconnect Google Calendar and approve calendar access.",
+          code: "GOOGLE_SCOPE_UPGRADE_REQUIRED",
+        }),
+      };
+    }
+
     return {
       statusCode: 400,
       headers,

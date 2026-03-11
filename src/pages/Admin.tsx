@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,6 +103,8 @@ import {
 } from "@/lib/leaveService";
 import {
   getAllAttendanceRecords,
+  canEditAttendanceDate,
+  getAttendanceEditDeadline,
   getAttendanceByDate,
   getRecentSessions,
   saveAttendance,
@@ -317,6 +319,7 @@ export default function Admin() {
   const [sessionTitle, setSessionTitle] = useState("Regular Practice");
   const [isTakingAttendance, setIsTakingAttendance] = useState(false);
   const [membersOnLeave, setMembersOnLeave] = useState<{ memberId: string; memberName: string; reason: string }[]>([]);
+  const [attendanceMemberSearch, setAttendanceMemberSearch] = useState("");
   const [dashboardStats, setDashboardStats] = useState({
     totalMembers: 0,
     newMembersThisMonth: 0,
@@ -359,8 +362,13 @@ export default function Admin() {
     googleEmail: null,
     connectedAt: null,
     calendarId: null,
+    reconnectRequired: false,
+    statusMessage: null,
+    scope: null,
   });
   const [googleConnectionLoading, setGoogleConnectionLoading] = useState(false);
+  const googleStatusRefreshInFlightRef = useRef(false);
+  const googleBirthdaySyncInFlightRef = useRef(false);
 
   // My Account state
   const [accountName, setAccountName] = useState(currentUser?.name || "");
@@ -392,13 +400,59 @@ export default function Admin() {
       setDashboardStats(dashboardData);
       setUnreadMessages(unreadCount);
 
-      if (currentUser?.id) {
-        void syncGoogleBirthdayCalendar(currentUser.id).catch((syncError) => {
-          console.warn("[Admin] Google birthday sync skipped:", syncError?.message || syncError);
-        });
-      }
     } catch (err) {
       console.error("[Admin] Error loading core data:", err);
+    }
+  };
+
+  const runGoogleBirthdaySync = async (source: string, showSyncFeedback = false) => {
+    if (!currentUser?.id) return;
+    if (googleBirthdaySyncInFlightRef.current) {
+      console.info(`[Admin] Google birthday sync skipped (${source}): sync already in-flight`);
+      return;
+    }
+
+    googleBirthdaySyncInFlightRef.current = true;
+    try {
+      console.info(`[Admin] Google birthday sync started (${source})`);
+      const result = await syncGoogleBirthdayCalendar(currentUser.id);
+      console.info(`[Admin] Google birthday sync success (${source}):`, result);
+      if (showSyncFeedback) {
+        toast({
+          title: "Google Birthday Sync Complete",
+          description: `Created ${result.created}, updated ${result.updated}, removed ${result.deleted} (calendar: ${result.calendarId || googleConnectionStatus.calendarId || "unknown"})`,
+        });
+      }
+    } catch (syncError: any) {
+      const message = syncError?.message || "Could not sync birthdays to Google Calendar";
+      console.warn(`[Admin] Google birthday sync failed (${source}):`, message);
+
+      if (
+        message.includes("GOOGLE_RECONNECT_REQUIRED")
+        || message.includes("GOOGLE_SCOPE_UPGRADE_REQUIRED")
+        || message.includes("expired or revoked")
+        || message.includes("insufficient authentication scopes")
+      ) {
+        setGoogleConnectionStatus({
+          connected: false,
+          googleEmail: null,
+          connectedAt: null,
+          calendarId: null,
+          reconnectRequired: true,
+          statusMessage: "Google Calendar needs to be reconnected with calendar access permissions.",
+          scope: null,
+        });
+      }
+
+      if (showSyncFeedback) {
+        toast({
+          title: "Birthday Sync Failed",
+          description: message,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      googleBirthdaySyncInFlightRef.current = false;
     }
   };
 
@@ -538,38 +592,44 @@ export default function Admin() {
 
   const refreshGoogleIntegrationStatus = async (showSyncFeedback = false) => {
     if (!currentUser?.id) return;
+    if (googleStatusRefreshInFlightRef.current) {
+      console.info("[Admin] Google integration status refresh skipped: request already in-flight");
+      return;
+    }
+
+    googleStatusRefreshInFlightRef.current = true;
     setGoogleConnectionLoading(true);
     try {
       const status = await getGoogleConnectionStatus(currentUser.id);
+      console.info("[Admin] Google integration status:", status);
       setGoogleConnectionStatus(status);
       if (status.connected) {
-        try {
-          const result = await syncGoogleBirthdayCalendar(currentUser.id);
-          if (showSyncFeedback) {
-            toast({
-              title: "Google Birthday Sync Complete",
-              description: `Created ${result.created}, updated ${result.updated}, removed ${result.deleted} (calendar: ${result.calendarId || status.calendarId || "unknown"})`,
-            });
-          }
-        } catch (syncError: any) {
-          console.warn("[Admin] Google birthday sync skipped:", syncError?.message || syncError);
-          if (showSyncFeedback) {
-            toast({
-              title: "Birthday Sync Failed",
-              description: syncError?.message || "Could not sync birthdays to Google Calendar",
-              variant: "destructive",
-            });
-          }
-        }
+        await runGoogleBirthdaySync(showSyncFeedback ? "settings-manual-refresh" : "status-refresh", showSyncFeedback);
+      } else if (showSyncFeedback && status.reconnectRequired) {
+        toast({
+          title: "Google Reconnect Required",
+          description: status.statusMessage || "Reconnect Google Calendar and approve calendar access.",
+          variant: "destructive",
+        });
       }
     } catch (error: any) {
-      setGoogleConnectionStatus({ connected: false, googleEmail: null, connectedAt: null, calendarId: null });
+      setGoogleConnectionStatus({
+        connected: false,
+        googleEmail: null,
+        connectedAt: null,
+        calendarId: null,
+        reconnectRequired: false,
+        statusMessage: null,
+        scope: null,
+      });
+      console.warn("[Admin] Google status check failed:", error?.message || error);
       toast({
         title: "Google Status Check Failed",
         description: error.message || "Could not load Google integration status",
         variant: "destructive",
       });
     } finally {
+      googleStatusRefreshInFlightRef.current = false;
       setGoogleConnectionLoading(false);
     }
   };
@@ -793,6 +853,17 @@ export default function Admin() {
   };
 
   const attendanceTrend = getAttendanceRate();
+  const isAttendanceSuperAdmin = currentUser?.role === "super_admin";
+  const attendanceEditDeadline = attendanceDate ? getAttendanceEditDeadline(attendanceDate) : null;
+  const canEditSelectedAttendance = attendanceDate ? canEditAttendanceDate(attendanceDate, isAttendanceSuperAdmin) : false;
+  const filteredAttendanceMembers = members.filter((member) => {
+    const query = attendanceMemberSearch.trim().toLowerCase();
+    if (!query) return true;
+
+    return member.name.toLowerCase().includes(query)
+      || member.email.toLowerCase().includes(query)
+      || member.voice.toLowerCase().includes(query);
+  });
   const revenueTrend = getRevenueByDay();
   const topRevenueEvents = getRevenueByEvent();
   const topVisitedPages = dashboardPageStats.viewsByPage.slice(0, 6);
@@ -2632,15 +2703,11 @@ export default function Admin() {
                         }}
                         className="w-40 bg-secondary border-primary/20"
                       />
-                      {(() => {
-                        const d = new Date(attendanceDate);
-                        const m = d.getMonth() + 1;
-                        const y = d.getFullYear();
-                        if (isMonthLocked(m, y) && currentUser?.role !== "super_admin") {
-                          return <span className="text-[10px] text-red-400 mt-0.5 block">Month locked</span>;
-                        }
-                        return null;
-                      })()}
+                      {!canEditSelectedAttendance && attendanceEditDeadline && (
+                        <span className="text-[10px] text-red-400 mt-0.5 block">
+                          Editing locked after {attendanceEditDeadline.toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                     {canManageAttendance && (
                       <Input
@@ -2654,6 +2721,7 @@ export default function Admin() {
                     {canManageAttendance && !isTakingAttendance ? (
                       <Button
                         variant="gold"
+                        disabled={!canEditSelectedAttendance}
                         onClick={async () => {
                           if (members.length === 0) {
                             toast({
@@ -2663,21 +2731,14 @@ export default function Admin() {
                             });
                             return;
                           }
-                          
-                          // Check if the date falls in a locked month
-                          const attDate = new Date(attendanceDate);
-                          const attMonth = attDate.getMonth() + 1;
-                          const attYear = attDate.getFullYear();
-                          if (isMonthLocked(attMonth, attYear) && currentUser?.role !== "super_admin") {
-                            const tempUnlocked = await isMonthTemporarilyUnlocked(attMonth, attYear, "attendance");
-                            if (!tempUnlocked) {
-                              toast({
-                                title: "Month Locked",
-                                description: `${CONTRIB_MONTH_NAMES[attMonth - 1]} ${attYear} is locked. Attendance can't be modified after the ${getLockDay()}th of the following month.`,
-                                variant: "destructive",
-                              });
-                              return;
-                            }
+
+                          if (!canEditAttendanceDate(attendanceDate, isAttendanceSuperAdmin)) {
+                            toast({
+                              title: "Attendance Locked",
+                              description: `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`,
+                              variant: "destructive",
+                            });
+                            return;
                           }
                           
                           // Pre-fill with existing attendance if any
@@ -2701,23 +2762,24 @@ export default function Admin() {
                         }}
                       >
                         <UserCheck className="w-4 h-4 mr-2" />
-                        {attendanceSessions.some(s => s.date === attendanceDate) ? 'Edit Attendance' : 'Start Attendance'}
+                        {!canEditSelectedAttendance
+                          ? 'Attendance Locked'
+                          : attendanceSessions.some(s => s.date === attendanceDate)
+                            ? 'Edit Attendance'
+                            : 'Start Attendance'}
                       </Button>
                     ) : canManageAttendance ? (
                       <div className="flex gap-2">
                         <Button
                           variant="gold"
                         onClick={async () => {
-                          // Re-check lock before saving
-                          const savDate = new Date(attendanceDate);
-                          const savMonth = savDate.getMonth() + 1;
-                          const savYear = savDate.getFullYear();
-                          if (isMonthLocked(savMonth, savYear) && currentUser?.role !== "super_admin") {
-                            const savTempUnlocked = await isMonthTemporarilyUnlocked(savMonth, savYear, "attendance");
-                            if (!savTempUnlocked) {
-                              toast({ title: "Month Locked", description: `${CONTRIB_MONTH_NAMES[savMonth - 1]} ${savYear} is locked.`, variant: "destructive" });
-                              return;
-                            }
+                          if (!canEditAttendanceDate(attendanceDate, isAttendanceSuperAdmin)) {
+                            toast({
+                              title: "Attendance Locked",
+                              description: `Attendance can only be edited within 3 days of the session date. This one locked on ${getAttendanceEditDeadline(attendanceDate).toLocaleDateString()}.`,
+                              variant: "destructive",
+                            });
+                            return;
                           }
                           const records = members.map(m => ({
                             memberId: m.id,
@@ -2786,9 +2848,25 @@ export default function Admin() {
                       </Button>
                     </div>
 
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          value={attendanceMemberSearch}
+                          onChange={(e) => setAttendanceMemberSearch(e.target.value)}
+                          placeholder="Search members by name, email, or voice"
+                          className="pl-9 bg-secondary border-primary/20"
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredAttendanceMembers.length} of {members.length}
+                      </p>
+                    </div>
+
                     {/* Members List */}
                     <div className="grid gap-2">
-                      {members.map((member) => {
+                      {filteredAttendanceMembers.map((member) => {
                         const onLeave = membersOnLeave.find(l => l.memberId === member.id);
                         
                         return (
@@ -2849,6 +2927,13 @@ export default function Admin() {
                         <p>No members found. Add members first.</p>
                       </div>
                     )}
+
+                    {members.length > 0 && filteredAttendanceMembers.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                        <p>No members match your attendance search.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2858,7 +2943,9 @@ export default function Admin() {
                       ✅ Attendance already recorded for {new Date(attendanceDate).toLocaleDateString()}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Click "Edit Attendance" to modify the records.
+                      {canEditSelectedAttendance
+                        ? 'Click "Edit Attendance" to modify the records.'
+                        : `Editing closed on ${attendanceEditDeadline?.toLocaleDateString()}.`}
                     </p>
                   </div>
                 )}
@@ -2885,7 +2972,11 @@ export default function Admin() {
                     <tbody>
                       {attendanceSessions
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map((session) => (
+                        .map((session) => {
+                        const canEditSession = canEditAttendanceDate(session.date, isAttendanceSuperAdmin);
+                        const sessionDeadline = getAttendanceEditDeadline(session.date);
+
+                        return (
                         <tr key={session.id} className="border-t border-primary/10">
                           <td className="p-4 font-medium text-foreground">
                             {new Date(session.date).toLocaleDateString('en-US', {
@@ -2909,7 +3000,17 @@ export default function Admin() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                disabled={!canEditSession}
+                                title={!canEditSession ? `Attendance locked after ${sessionDeadline.toLocaleDateString()}` : undefined}
                                 onClick={async () => {
+                                  if (!canEditSession) {
+                                    toast({
+                                      title: "Attendance Locked",
+                                      description: `Attendance can only be edited within 3 days of the session date. This one locked on ${sessionDeadline.toLocaleDateString()}.`,
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
                                   setAttendanceDate(session.date);
                                   setSessionTitle(session.title);
                                   const existing = await getAttendanceByDate(session.date);
@@ -2931,11 +3032,38 @@ export default function Admin() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                disabled={!canEditSession}
+                                title={!canEditSession ? `Attendance locked after ${sessionDeadline.toLocaleDateString()}` : undefined}
                                 onClick={async () => {
+                                  if (!canEditSession) {
+                                    toast({
+                                      title: "Attendance Locked",
+                                      description: `Attendance can only be edited within 3 days of the session date. This one locked on ${sessionDeadline.toLocaleDateString()}.`,
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
                                   if (confirm(`Delete attendance for ${new Date(session.date).toLocaleDateString()}?`)) {
-                                    await deleteAttendanceForDate(session.date);
-                                    loadData();
-                                    toast({ title: "Attendance Deleted" });
+                                    try {
+                                      const deleted = await deleteAttendanceForDate(session.date);
+                                      await loadData();
+
+                                      if (deleted) {
+                                        toast({ title: "Attendance Deleted" });
+                                      } else {
+                                        toast({
+                                          title: "Nothing to Delete",
+                                          description: "No attendance records were found for that date.",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    } catch (error: any) {
+                                      toast({
+                                        title: "Delete Failed",
+                                        description: error?.message || "Could not delete attendance.",
+                                        variant: "destructive",
+                                      });
+                                    }
                                   }
                                 }}
                               >
@@ -2944,7 +3072,7 @@ export default function Admin() {
                             )}
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 ) : (
@@ -3332,7 +3460,11 @@ export default function Admin() {
                       "font-medium",
                       googleConnectionStatus.connected ? "text-green-500" : "text-red-500"
                     )}>
-                      {googleConnectionStatus.connected ? "Connected" : "Disconnected"}
+                      {googleConnectionStatus.connected
+                        ? "Connected"
+                        : googleConnectionStatus.reconnectRequired
+                          ? "Reconnect Required"
+                          : "Disconnected"}
                     </span>
                   </div>
 
@@ -3354,6 +3486,17 @@ export default function Admin() {
                     <span className="text-muted-foreground">Target calendar:</span>{" "}
                     <span className="text-foreground">{googleConnectionStatus.calendarId || "N/A"}</span>
                   </div>
+
+                  <div>
+                    <span className="text-muted-foreground">Granted scope:</span>{" "}
+                    <span className="text-foreground break-all">{googleConnectionStatus.scope || "N/A"}</span>
+                  </div>
+
+                  {googleConnectionStatus.statusMessage && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200">
+                      {googleConnectionStatus.statusMessage}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-4">

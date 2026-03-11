@@ -5,8 +5,10 @@ import {
   addAuditLogServer,
   buildHeaders,
   encryptRefreshToken,
+  formatGoogleScopeSummary,
   getBaseUrl,
   getSupabaseAdminClient,
+  hasRequiredGoogleCalendarScope,
 } from "./_shared/googleMeetUtils";
 
 function decodeJwtEmail(idToken?: string): string | null {
@@ -125,6 +127,12 @@ const handler: Handler = async (event) => {
       throw new Error("Google did not return a refresh token. Re-consent with prompt=consent.");
     }
 
+    if (!hasRequiredGoogleCalendarScope(scope)) {
+      throw new Error(
+        `Google did not grant calendar access. Returned scopes: ${formatGoogleScopeSummary(scope)}. Reconnect and approve Google Calendar permissions.`,
+      );
+    }
+
     let googleEmail: string | null = null;
     try {
       const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -171,7 +179,7 @@ const handler: Handler = async (event) => {
     await addAuditLogServer(
       admin,
       "GOOGLE_CALENDAR_CONNECTED",
-      `Connected Google Calendar integration (${googleEmail}) with scope: ${scope || ALLOWED_SCOPES.join(" ")}`,
+      `Connected Google Calendar integration (${googleEmail}) with scope: ${formatGoogleScopeSummary(scope || ALLOWED_SCOPES.join(" "))}`,
     );
 
     return redirectTo(stateRow.redirect_path || "/admin", "success", "Google Calendar connected");

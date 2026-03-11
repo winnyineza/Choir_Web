@@ -34,7 +34,7 @@ import {
   type MeetingAgendaItem,
   type MeetingStats,
 } from "@/lib/meetingService";
-import { getAttendanceByDate, hasAttendanceForDate, saveAttendance, getSessionByDate, deleteAttendanceForDate } from "@/lib/attendanceService";
+import { canEditAttendanceDate, getAttendanceByDate, hasAttendanceForDate, saveAttendance, getSessionByDate, deleteAttendanceForDate } from "@/lib/attendanceService";
 import {
   createOrUpdateGoogleMeeting,
   deleteGoogleMeeting,
@@ -408,7 +408,9 @@ export function MeetingMinutesComponent() {
           );
 
           if (isLinkedAttendance) {
-            attendanceDeleted = await deleteAttendanceForDate(meeting.date);
+            attendanceDeleted = canEditAttendanceDate(meeting.date, currentUser?.role === "super_admin")
+              ? await deleteAttendanceForDate(meeting.date)
+              : false;
           }
         }
 
@@ -419,7 +421,9 @@ export function MeetingMinutesComponent() {
           title: "Meeting Deleted",
           description: attendanceDeleted
             ? "Meeting and its linked attendance were deleted."
-            : "Meeting has been deleted.",
+            : meeting?.date && !canEditAttendanceDate(meeting.date, currentUser?.role === "super_admin")
+              ? "Meeting was deleted. Linked attendance was kept because the 3-day edit window has closed."
+              : "Meeting has been deleted.",
         });
         await loadData();
       } else {
