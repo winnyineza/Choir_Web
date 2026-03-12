@@ -22,6 +22,7 @@ import { getAllDonations, Donation } from "./donationService";
 import logo from "@/assets/LogoTSC.jpg";
 import montserratRegularTtf from "@/assets/fonts/Montserrat-Regular.ttf";
 import montserratBoldTtf from "@/assets/fonts/Montserrat-Bold.ttf";
+import montserratSemiBoldTtf from "@/assets/fonts/Montserrat-SemiBold.ttf";
 
 type ReportCell = string | number | boolean | null | undefined;
 
@@ -444,8 +445,9 @@ export function downloadBrandedTableReport({
     getImageDataUrl(logo),
     getFontBinary(montserratRegularTtf),
     getFontBinary(montserratBoldTtf),
+    getFontBinary(montserratSemiBoldTtf),
     getSettings(),
-  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBinary, montserratBoldBinary, settings]) => {
+  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBinary, montserratBoldBinary, montserratSemiBoldBinary, settings]) => {
     const { jsPDF } = jspdfModule;
     const autoTable = autoTableModule.default;
     const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
@@ -456,19 +458,23 @@ export function downloadBrandedTableReport({
     const choirPhone = settings?.phone?.trim() || "+250 780 623 144";
     let hasMontserrat = false;
 
-    if (montserratRegularBinary && montserratBoldBinary) {
+    if (montserratRegularBinary && montserratBoldBinary && montserratSemiBoldBinary) {
       try {
         doc.addFileToVFS("Montserrat-Regular.ttf", montserratRegularBinary);
         doc.addFont("Montserrat-Regular.ttf", "Montserrat", "normal");
         doc.addFileToVFS("Montserrat-Bold.ttf", montserratBoldBinary);
-        doc.addFont("Montserrat-Bold.ttf", "Montserrat", "bold");
+        doc.addFont("Montserrat-Bold.ttf", "MontserratBold", "normal");
+        doc.addFileToVFS("Montserrat-SemiBold.ttf", montserratSemiBoldBinary);
+        doc.addFont("Montserrat-SemiBold.ttf", "MontserratSemiBold", "normal");
         hasMontserrat = true;
       } catch (fontError) {
         console.warn("[Export] Falling back to Helvetica; failed to register Montserrat font.", fontError);
       }
     }
 
-    const fontFamily = hasMontserrat ? "Montserrat" : "helvetica";
+    const regularFontFamily = hasMontserrat ? "Montserrat" : "helvetica";
+    const semiBoldFontFamily = hasMontserrat ? "MontserratSemiBold" : "helvetica";
+    const boldFontFamily = hasMontserrat ? "MontserratBold" : "helvetica";
 
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pageWidth, pageHeight, "F");
@@ -482,11 +488,11 @@ export function downloadBrandedTableReport({
       doc.addImage(logoDataUrl, "JPEG", marginX, 5, 16, 16);
     }
 
-    doc.setFont(fontFamily, "bold");
+    doc.setFont(boldFontFamily, "normal");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.text("Serenades of Praise Choir", logoDataUrl ? 32 : marginX, 13);
-    doc.setFont(fontFamily, "bold");
+    doc.setFont(semiBoldFontFamily, "normal");
     doc.setFontSize(10);
     doc.setTextColor(245, 208, 95);
     doc.text([title, subtitle].filter(Boolean).join(" • "), logoDataUrl ? 32 : marginX, 20);
@@ -502,11 +508,11 @@ export function downloadBrandedTableReport({
         doc.setDrawColor(226, 232, 240);
         doc.setFillColor(255, 255, 255);
         doc.roundedRect(x, y, cardWidth, 10, 2, 2, "FD");
-        doc.setFont(fontFamily, "bold");
+        doc.setFont(semiBoldFontFamily, "normal");
         doc.setFontSize(7.2);
         doc.setTextColor(0, 0, 0);
         doc.text(String(item.label).toUpperCase(), x + 2, y + 3.5);
-        doc.setFont(fontFamily, "bold");
+        doc.setFont(semiBoldFontFamily, "normal");
         doc.setFontSize(9.4);
         doc.setTextColor(0, 0, 0);
         doc.text(String(item.value ?? ""), x + 2, y + 7.5, { maxWidth: cardWidth - 4 });
@@ -533,9 +539,9 @@ export function downloadBrandedTableReport({
       theme: "grid",
       margin: { left: marginX, right: marginX, bottom: 18 },
       styles: {
-        font: fontFamily,
+        font: semiBoldFontFamily,
         fontSize: 9,
-        fontStyle: "bold",
+        fontStyle: "normal",
         cellPadding: 2.5,
         textColor: [0, 0, 0],
         lineColor: [203, 213, 225],
@@ -543,17 +549,17 @@ export function downloadBrandedTableReport({
         fillColor: [255, 255, 255],
       },
       headStyles: {
-        font: fontFamily,
+        font: boldFontFamily,
         fillColor: [11, 11, 11],
         textColor: [255, 255, 255],
-        fontStyle: "bold",
+        fontStyle: "normal",
       },
       alternateRowStyles: {
         fillColor: [255, 255, 255],
       },
       bodyStyles: rows.length === 0
-        ? { textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "bold" }
-        : { textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "bold" },
+        ? { font: semiBoldFontFamily, textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "normal" }
+        : { font: semiBoldFontFamily, textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "normal" },
       didParseCell: (data: {
         section: string;
         column: { index: number };
@@ -568,7 +574,7 @@ export function downloadBrandedTableReport({
         const colors = getPdfStatusColors(rawStatus);
         data.cell.styles.fillColor = colors.fill;
         data.cell.styles.textColor = colors.text;
-        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fontStyle = "normal";
         data.cell.styles.halign = "center";
       },
       didDrawPage: (data: { pageNumber: number }) => {
@@ -583,22 +589,22 @@ export function downloadBrandedTableReport({
         doc.circle(marginX + 2, footerTop + 5.8, 1.1, "F");
         doc.circle(pageWidth - marginX - 2, footerTop + 5.8, 1.1, "F");
 
-        doc.setFont(fontFamily, "bold");
+        doc.setFont(boldFontFamily, "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(255, 255, 255);
         doc.text(choirEmail, marginX + 6, footerTop + 4.6);
 
-        doc.setFont(fontFamily, "bold");
+        doc.setFont(boldFontFamily, "normal");
         doc.setFontSize(7.4);
         doc.setTextColor(245, 208, 95);
         doc.text(choirPhone, marginX + 6, footerTop + 8.7);
 
-        doc.setFont(fontFamily, "bold");
+        doc.setFont(boldFontFamily, "normal");
         doc.setFontSize(7.2);
         doc.setTextColor(245, 208, 95);
         doc.text("Excellence in worship • Discipline in service", pageWidth / 2, footerTop + 6.8, { align: "center" });
 
-        doc.setFont(fontFamily, "bold");
+        doc.setFont(boldFontFamily, "normal");
         doc.setFontSize(7.2);
         doc.setTextColor(255, 255, 255);
         doc.text(`Generated on ${generatedAt}`, pageWidth - marginX - 6, footerTop + 4.6, { align: "right" });
