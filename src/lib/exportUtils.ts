@@ -70,6 +70,28 @@ function createTimestamp(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+async function waitForRenderableAssets(container: HTMLElement): Promise<void> {
+  const images = Array.from(container.querySelectorAll("img"));
+
+  await Promise.all(
+    images.map(
+      (image) => new Promise<void>((resolve) => {
+        if (image.complete) {
+          resolve();
+          return;
+        }
+
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => resolve(), { once: true });
+      })
+    )
+  );
+
+  if (typeof document !== "undefined" && "fonts" in document) {
+    await (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts?.ready;
+  }
+}
+
 function triggerDownload(content: string, mimeType: string, filename: string): void {
   const blob = new Blob([content], { type: mimeType });
   const link = document.createElement("a");
@@ -343,8 +365,14 @@ export function downloadBrandedTableReport({
 
   const container = document.createElement("div");
   container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
+  container.style.inset = "0";
+  container.style.width = "1280px";
+  container.style.padding = "24px";
+  container.style.opacity = "0";
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "-1";
+  container.style.overflow = "hidden";
+  container.style.background = "#ffffff";
   container.innerHTML = reportHtml;
   document.body.appendChild(container);
 
@@ -354,13 +382,19 @@ export function downloadBrandedTableReport({
     throw new Error("Failed to generate report preview");
   }
 
-  void import("html2pdf.js")
+  void waitForRenderableAssets(container)
+    .then(() => import("html2pdf.js"))
     .then(({ default: html2pdf }) => html2pdf()
       .set({
         margin: 8,
         filename: `${filename}-${fileDate}.pdf`,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
         pagebreak: { mode: ["css", "legacy"] },
       })

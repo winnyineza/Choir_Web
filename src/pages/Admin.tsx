@@ -419,6 +419,36 @@ export default function Admin() {
     setLeaveRequests(pendingLeaveData);
   };
 
+  const normalizeAttendanceRecordDate = (value: string) => {
+    if (!value) return "";
+    return value.includes("T") ? value.split("T")[0] : value;
+  };
+
+  const loadAttendanceSessionRecords = async (session: AttendanceSession) => {
+    let records = await getAttendanceByDate(session.date);
+
+    if (records.length === 0) {
+      const allRecords = await getAllAttendanceRecords();
+      records = allRecords.filter((record) => normalizeAttendanceRecordDate(record.date) === session.date);
+    }
+
+    const memberMap = new Map(members.map((member) => [member.id, member]));
+
+    return records
+      .map((record) => {
+        const member = memberMap.get(record.memberId);
+
+        return {
+          ...record,
+          memberName: record.memberName || member?.name || "Unknown member",
+          memberEmail: record.memberEmail || member?.email || "",
+          memberVoice: record.memberVoice || member?.voice || "",
+          date: normalizeAttendanceRecordDate(record.date) || session.date,
+        };
+      })
+      .sort((left, right) => left.memberName.localeCompare(right.memberName));
+  };
+
   const runGoogleBirthdaySync = async (source: string, showSyncFeedback = false) => {
     if (!currentUser?.id) return;
     if (googleBirthdaySyncInFlightRef.current) {
@@ -757,8 +787,7 @@ export default function Admin() {
 
   const handleViewAttendanceSession = async (session: AttendanceSession) => {
     try {
-      const records = await getAttendanceByDate(session.date);
-      const sortedRecords = [...records].sort((left, right) => left.memberName.localeCompare(right.memberName));
+      const sortedRecords = await loadAttendanceSessionRecords(session);
       setViewingAttendanceSession(session);
       setViewingAttendanceRecords(sortedRecords);
     } catch (error: any) {
@@ -795,8 +824,7 @@ export default function Admin() {
 
   const handleDownloadAttendanceSession = async (session: AttendanceSession) => {
     try {
-      const records = await getAttendanceByDate(session.date);
-      const sortedRecords = [...records].sort((left, right) => left.memberName.localeCompare(right.memberName));
+      const sortedRecords = await loadAttendanceSessionRecords(session);
       const sessionDateLabel = new Date(`${session.date}T00:00:00`).toLocaleDateString();
       const totalMembers = sortedRecords.length;
       const totalPresent = sortedRecords.filter((record) => record.status === "present" || record.status === "late").length;
@@ -4273,6 +4301,13 @@ export default function Admin() {
                         <td className="p-3 text-sm text-muted-foreground">{record.markedBy || "N/A"}</td>
                       </tr>
                     ))}
+                    {viewingAttendanceRecords.length === 0 && (
+                      <tr className="border-t border-primary/10">
+                        <td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">
+                          No member-level attendance records were found for this session.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
