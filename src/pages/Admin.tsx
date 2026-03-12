@@ -240,7 +240,10 @@ function getTabFromHash(): Tab {
 }
 
 export default function Admin() {
+  const TAB_DATA_TTL_MS = 60_000;
   const [activeTab, setActiveTabState] = useState<Tab>(getTabFromHash);
+  const initialTabLoadDoneRef = useRef(false);
+  const tabLoadTimestampsRef = useRef<Partial<Record<Tab, number>>>({});
 
   const setActiveTab = (tab: Tab) => {
     setActiveTabState(tab);
@@ -523,7 +526,14 @@ export default function Admin() {
   };
 
   // Load tab-specific data on demand
-  const loadTabData = async (tab: string) => {
+  const loadTabData = async (tab: Tab, options?: { force?: boolean }) => {
+    const shouldUseCachedTabData = !options?.force
+      && (Date.now() - (tabLoadTimestampsRef.current[tab] ?? 0) < TAB_DATA_TTL_MS);
+
+    if (shouldUseCachedTabData) {
+      return;
+    }
+
     setTabLoading(true);
     try {
     switch (tab) {
@@ -635,6 +645,7 @@ export default function Admin() {
         break;
       }
     }
+      tabLoadTimestampsRef.current[tab] = Date.now();
     } catch (err) {
       console.error(`[Admin] Error loading tab "${tab}":`, err);
     } finally {
@@ -644,7 +655,15 @@ export default function Admin() {
 
   // Combined load for full refresh (used after mutations)
   const loadData = async () => {
-    await Promise.all([loadCoreData(), loadTabData(activeTab)]);
+    await Promise.all([loadCoreData(), loadTabData(activeTab, { force: true })]);
+  };
+
+  const refreshCoreData = async () => {
+    await loadCoreData();
+  };
+
+  const refreshTabData = async (tab: Tab = activeTab) => {
+    await loadTabData(tab, { force: true });
   };
 
   // Load settings on mount
@@ -722,12 +741,17 @@ export default function Admin() {
   // Load core data on mount, then tab-specific data
   useEffect(() => {
     loadCoreData();
-    loadTabData(activeTab);
+    loadTabData(activeTab, { force: true });
+    initialTabLoadDoneRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load tab-specific data when switching tabs
   useEffect(() => {
+    if (!initialTabLoadDoneRef.current) {
+      return;
+    }
+
     loadTabData(activeTab);
   }, [activeTab]);
 
@@ -1122,7 +1146,7 @@ export default function Admin() {
     if (updated) {
       // Dispatch event to update Events page
       window.dispatchEvent(new Event("eventsUpdated"));
-      loadData();
+      refreshTabData("tickets");
       toast({ title: "Order Confirmed", description: `Order ${updated.txRef} has been confirmed.` });
     }
   };
@@ -1130,7 +1154,7 @@ export default function Admin() {
   const handleCancelOrder = async (orderId: string) => {
     const updated = await updateOrderStatus(orderId, "cancelled");
     if (updated) {
-      loadData();
+      refreshTabData("tickets");
       toast({ title: "Order Cancelled", description: `Order ${updated.txRef} has been cancelled.` });
     }
   };
@@ -1138,7 +1162,7 @@ export default function Admin() {
   const handleMarkUsed = async (orderId: string) => {
     const updated = await updateOrderStatus(orderId, "used");
     if (updated) {
-      loadData();
+      refreshTabData("tickets");
       toast({ title: "Ticket Used", description: `Order ${updated.txRef} marked as used.` });
     }
   };
@@ -1160,7 +1184,7 @@ export default function Admin() {
         if (currentUser) {
           addAuditLog(currentUser, "SEND_MEMBER_INVITE", `Sent portal invite to: ${member.name} (${member.email})`);
         }
-        await loadData();
+        await refreshCoreData();
       } else {
         toast({ title: "Invite Failed", description: result.message, variant: "destructive" });
       }
@@ -1200,7 +1224,7 @@ export default function Admin() {
         addAuditLog(currentUser, "BULK_SEND_INVITES", `Sent ${result.sent} portal invites (${result.failed} failed)`);
       }
       setSelectedMembers([]);
-      await loadData();
+      await refreshCoreData();
     } catch {
       toast({ title: "Error", description: "Failed to send invites", variant: "destructive" });
     } finally {
@@ -1215,7 +1239,7 @@ export default function Admin() {
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_MEMBER", `Deleted member: ${name}`);
       }
-      await loadData();
+      await refreshCoreData();
       toast({ title: "Member Removed", description: `${name} has been removed.` });
     }
   };
@@ -1250,7 +1274,7 @@ export default function Admin() {
       }
     }
     
-    await loadData();
+    await refreshCoreData();
     setSelectedMembers([]);
     toast({ 
       title: "Members Updated", 
@@ -1264,7 +1288,7 @@ export default function Admin() {
     
     await Promise.all(selectedMembers.map(id => deleteMember(id)));
     
-    await loadData();
+    await refreshCoreData();
     setSelectedMembers([]);
     toast({ 
       title: "Members Deleted", 
@@ -1278,7 +1302,7 @@ export default function Admin() {
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_EVENT", `Deleted event: ${title}`);
       }
-      await loadData();
+      await refreshCoreData();
       toast({ title: "Event Deleted", description: `"${title}" has been deleted.` });
     }
   };
@@ -1289,7 +1313,7 @@ export default function Admin() {
       if (currentUser) {
         addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${title}`);
       }
-      await loadData();
+      await refreshTabData("gallery");
       toast({ title: "Media Deleted", description: `"${title}" has been removed.` });
     }
   };
@@ -1297,7 +1321,7 @@ export default function Admin() {
   const handleDeleteAlbum = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete album "${title}"?`)) {
       await deleteAlbum(id);
-      await loadData();
+      await refreshTabData("releases");
       toast({ title: "Album Deleted", description: `"${title}" has been removed.` });
     }
   };
@@ -1305,7 +1329,7 @@ export default function Admin() {
   const handleDeleteMusicVideo = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
       await deleteMusicVideo(id);
-      await loadData();
+      await refreshTabData("releases");
       toast({ title: "Video Deleted", description: `"${title}" has been removed.` });
     }
   };
@@ -2475,7 +2499,7 @@ export default function Admin() {
                               title: "Cleanup Complete",
                               description: `${count} pending order(s) older than 24 hours marked as cancelled.`,
                             });
-                            loadData();
+                            refreshTabData("tickets");
                           } else {
                             toast({
                               title: "No orders to clean",
@@ -2499,7 +2523,7 @@ export default function Admin() {
                                 title: "Archived",
                                 description: `${count} pending order(s) archived.`,
                               });
-                              loadData();
+                              refreshTabData("tickets");
                             } else {
                               toast({ title: "No orders to archive", description: "All pending orders are less than 24 hours old." });
                             }
@@ -3456,7 +3480,7 @@ export default function Admin() {
                                             currentUser?.id || "admin",
                                             currentUser?.name || "Admin"
                                           );
-                                          loadData();
+                                          refreshTabData("leave");
                                           if (result && 'error' in result) {
                                             toast({
                                               title: "Error",
@@ -3498,7 +3522,7 @@ export default function Admin() {
                                             currentUser?.name || "Admin", 
                                             notes || undefined
                                           );
-                                          loadData();
+                                          refreshTabData("leave");
                                           if (result && 'error' in result) {
                                             toast({
                                               title: "Error",
@@ -4086,7 +4110,7 @@ export default function Admin() {
                                 if (requester) {
                                   notifyUnlockRequestDecision(requester.email, requester.name, req.month, req.year, "approved", currentUser?.name || "Admin", 3);
                                 }
-                                loadData();
+                                refreshTabData("settings");
                               }}
                             >
                               Approve (3 days)
@@ -4101,7 +4125,7 @@ export default function Admin() {
                                 if (requester) {
                                   notifyUnlockRequestDecision(requester.email, requester.name, req.month, req.year, "denied", currentUser?.name || "Admin");
                                 }
-                                loadData();
+                                refreshTabData("settings");
                               }}
                             >
                               Deny
@@ -4208,7 +4232,7 @@ export default function Admin() {
             addAuditLog(currentUser, editingMember ? "UPDATE_MEMBER" : "CREATE_MEMBER", 
               editingMember ? `Updated member: ${editingMember.name}` : "Created new member");
           }
-          loadData();
+          refreshCoreData();
         }}
         editMember={editingMember}
       />
@@ -4220,7 +4244,7 @@ export default function Admin() {
           if (currentUser) {
             addAuditLog(currentUser, "CREATE_MEMBER", "Bulk added members");
           }
-          loadData();
+          refreshCoreData();
         }}
       />
 
@@ -4232,7 +4256,7 @@ export default function Admin() {
             addAuditLog(currentUser, editingEvent ? "UPDATE_EVENT" : "CREATE_EVENT", 
               editingEvent ? `Updated event: ${editingEvent.title}` : "Created new event");
           }
-          loadData();
+          refreshCoreData();
         }}
         editEvent={editingEvent}
       />
@@ -4251,7 +4275,7 @@ export default function Admin() {
           if (currentUser) {
             addAuditLog(currentUser, "UPLOAD_GALLERY", "Uploaded gallery item");
           }
-          loadData();
+          refreshTabData("gallery");
         }}
       />
 
@@ -4267,14 +4291,14 @@ export default function Admin() {
       <AddAlbumModal
         isOpen={showAddAlbum}
         onClose={() => { setShowAddAlbum(false); setEditingAlbum(null); }}
-        onSuccess={loadData}
+        onSuccess={() => refreshTabData("releases")}
         editAlbum={editingAlbum}
       />
 
       <AddMusicVideoModal
         isOpen={showAddMusicVideo}
         onClose={() => { setShowAddMusicVideo(false); setEditingMusicVideo(null); }}
-        onSuccess={loadData}
+        onSuccess={() => refreshTabData("releases")}
         editVideo={editingMusicVideo}
       />
 

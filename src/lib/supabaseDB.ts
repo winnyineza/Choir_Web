@@ -27,8 +27,26 @@ interface CacheEntry<T> {
 }
 
 const dataCache = new Map<string, CacheEntry<any>>();
-const CACHE_TTL = 30_000; // 30 seconds
+const CACHE_TTL = 120_000; // 2 minutes
 const pendingRequests = new Map<string, Promise<any>>();
+
+function createQueryCacheKey(storageKey: string, column: string, value: unknown): string {
+  return `${storageKey}::query::${column}::${JSON.stringify(value)}`;
+}
+
+function clearCacheEntries(matcher: (key: string) => boolean): void {
+  for (const key of dataCache.keys()) {
+    if (matcher(key)) {
+      dataCache.delete(key);
+    }
+  }
+
+  for (const key of pendingRequests.keys()) {
+    if (matcher(key)) {
+      pendingRequests.delete(key);
+    }
+  }
+}
 
 function getCached<T>(key: string): T | null {
   const entry = dataCache.get(key);
@@ -47,8 +65,7 @@ function setCache<T>(key: string, data: T): void {
 /** Invalidate cache for a specific table (called after mutations) */
 export function invalidateCache(storageKey?: string): void {
   if (storageKey) {
-    dataCache.delete(storageKey);
-    pendingRequests.delete(storageKey);
+    clearCacheEntries((key) => key === storageKey || key.startsWith(`${storageKey}::query::`));
   } else {
     dataCache.clear();
     pendingRequests.clear();
@@ -112,6 +129,14 @@ export async function dbGetById<T>(storageKey: string, id: string): Promise<T | 
 
 /** Query rows by a column value (use DB column name) */
 export async function dbQuery<T>(storageKey: string, column: string, value: any): Promise<T[]> {
+  const cacheKey = createQueryCacheKey(storageKey, column, value);
+  const cached = getCached<T[]>(cacheKey);
+  if (cached) return cached;
+
+  const pending = pendingRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const request = (async () => {
   try {
     const config = getConfig(storageKey);
     const { data, error } = await supabase
@@ -119,10 +144,18 @@ export async function dbQuery<T>(storageKey: string, column: string, value: any)
       .select('*')
       .eq(column, value);
     if (error) return [];
-    return (data || []).map(row => config.fromDb(row) as T);
+    const result = (data || []).map(row => config.fromDb(row) as T);
+    setCache(cacheKey, result);
+    return result;
   } catch {
     return [];
+  } finally {
+    pendingRequests.delete(cacheKey);
   }
+  })();
+
+  pendingRequests.set(cacheKey, request);
+  return request;
 }
 
 /** Insert a new row */
@@ -215,6 +248,14 @@ export async function dbCount(storageKey: string): Promise<number> {
 
 /** Get settings object from choir_settings table */
 export async function dbGetSettings<T>(defaults: T): Promise<T> {
+  const cacheKey = 'settings';
+  const cached = getCached<T>(cacheKey);
+  if (cached) return cached;
+
+  const pending = pendingRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const request = (async () => {
   try {
     if (!isSupabaseConfigured()) return defaults;
     const { data, error } = await supabase
@@ -232,10 +273,17 @@ export async function dbGetSettings<T>(defaults: T): Promise<T> {
         }
       }
     }
+    setCache(cacheKey, settings as T);
     return settings;
   } catch {
     return defaults;
+  } finally {
+    pendingRequests.delete(cacheKey);
   }
+  })();
+
+  pendingRequests.set(cacheKey, request);
+  return request;
 }
 
 /** Save settings key-value pairs to choir_settings table */
