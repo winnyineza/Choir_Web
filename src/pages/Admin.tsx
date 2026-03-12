@@ -3461,7 +3461,7 @@ export default function Admin() {
                           .map((request) => (
                           <tr key={request.id} className="border-t border-primary/10">
                             <td className="p-4">
-                              <p className="font-medium text-foreground">{request.memberName}</p>
+                              <p className="font-medium text-foreground">{request.memberName || request.memberEmail?.split("@")[0] || "Unknown Member"}</p>
                               <p className="text-xs text-muted-foreground">{request.memberEmail}</p>
                             </td>
                             <td className="p-4">

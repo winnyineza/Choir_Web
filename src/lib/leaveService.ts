@@ -1,7 +1,7 @@
 // Leave Request Service - Manages member leave requests (Supabase)
 
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbDeleteWhere, invalidateCache, supabase } from './supabaseDB';
-import { getSettings } from './dataService';
+import { getAllMembers, getSettings } from './dataService';
 
 // Approval vote from an admin
 export interface ApprovalVote {
@@ -127,7 +127,30 @@ export async function verifyPortalPin(pin: string): Promise<boolean> {
 
 // Leave Request CRUD
 export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
-  return dbGetAll<LeaveRequest>(LEAVE_REQUESTS_KEY);
+  const [requests, members] = await Promise.all([
+    dbGetAll<LeaveRequest>(LEAVE_REQUESTS_KEY),
+    getAllMembers(),
+  ]);
+
+  return requests.map((request) => {
+    if (request.memberName?.trim()) {
+      return request;
+    }
+
+    const matchingMember = members.find((member) => {
+      if (request.memberId && member.id === request.memberId) {
+        return true;
+      }
+
+      return Boolean(request.memberEmail) && member.email?.toLowerCase() === request.memberEmail.toLowerCase();
+    });
+
+    return {
+      ...request,
+      memberName: matchingMember?.name || request.memberEmail?.split('@')[0] || 'Unknown Member',
+      memberEmail: request.memberEmail || matchingMember?.email || '',
+    };
+  });
 }
 
 export async function getPendingLeaveRequests(): Promise<LeaveRequest[]> {
