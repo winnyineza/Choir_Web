@@ -83,15 +83,15 @@ function getPdfStatusColors(status: string): {
 } {
   switch (status.toLowerCase()) {
     case "present":
-      return { fill: [220, 252, 231], text: [21, 128, 61] };
+      return { fill: [220, 252, 231], text: [22, 101, 52] };
     case "absent":
-      return { fill: [254, 226, 226], text: [185, 28, 28] };
+      return { fill: [254, 226, 226], text: [153, 27, 27] };
     case "excused":
-      return { fill: [254, 249, 195], text: [161, 98, 7] };
+      return { fill: [254, 243, 199], text: [146, 64, 14] };
     case "late":
-      return { fill: [255, 237, 213], text: [194, 65, 12] };
+      return { fill: [255, 237, 213], text: [154, 52, 18] };
     default:
-      return { fill: [241, 245, 249], text: [51, 65, 85] };
+      return { fill: [241, 245, 249], text: [30, 41, 59] };
   }
 }
 
@@ -487,9 +487,6 @@ export function downloadBrandedTableReport({
     doc.setFontSize(10);
     doc.setTextColor(240, 240, 240);
     doc.text([title, subtitle].filter(Boolean).join(" • "), logoDataUrl ? 32 : marginX, 20);
-    doc.setFontSize(8.5);
-    doc.setTextColor(232, 232, 232);
-    doc.text("Styled for Serenades of Praise administration", pageWidth - marginX, 20, { align: "right" });
 
     let cursorY = 38;
     const drawMetricGroup = (items: ReportMetric[], startX: number, startY: number, columns: number) => {
@@ -503,12 +500,12 @@ export function downloadBrandedTableReport({
         doc.setFillColor(248, 250, 252);
         doc.roundedRect(x, y, cardWidth, 10, 2, 2, "FD");
         doc.setFont(fontFamily, "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(107, 114, 128);
+        doc.setFontSize(7.2);
+        doc.setTextColor(71, 85, 105);
         doc.text(String(item.label).toUpperCase(), x + 2, y + 3.5);
-        doc.setFont(fontFamily, "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(17, 24, 39);
+        doc.setFont(fontFamily, "bold");
+        doc.setFontSize(9.4);
+        doc.setTextColor(15, 23, 42);
         doc.text(String(item.value ?? ""), x + 2, y + 7.5, { maxWidth: cardWidth - 4 });
       });
       return startY + Math.ceil(items.length / columns) * 13;
@@ -534,11 +531,11 @@ export function downloadBrandedTableReport({
       margin: { left: marginX, right: marginX, bottom: 18 },
       styles: {
         font: fontFamily,
-        fontSize: 8.5,
+        fontSize: 9,
         cellPadding: 2.5,
-        textColor: [17, 24, 39],
-        lineColor: [229, 231, 235],
-        lineWidth: 0.1,
+        textColor: [15, 23, 42],
+        lineColor: [203, 213, 225],
+        lineWidth: 0.18,
       },
       headStyles: {
         font: fontFamily,
@@ -547,9 +544,9 @@ export function downloadBrandedTableReport({
         fontStyle: "bold",
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252],
+        fillColor: [245, 247, 250],
       },
-      bodyStyles: rows.length === 0 ? { textColor: [107, 114, 128] } : undefined,
+      bodyStyles: rows.length === 0 ? { textColor: [71, 85, 105] } : { textColor: [15, 23, 42] },
       didParseCell: (data: {
         section: string;
         column: { index: number };
