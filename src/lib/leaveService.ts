@@ -1,6 +1,6 @@
 // Leave Request Service - Manages member leave requests (Supabase)
 
-import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbDeleteWhere } from './supabaseDB';
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbDeleteWhere, invalidateCache, supabase } from './supabaseDB';
 import { getSettings } from './dataService';
 
 // Approval vote from an admin
@@ -35,6 +35,7 @@ export interface LeaveRequest {
 export interface VerificationCode {
   id?: string;
   leaveId?: string;
+  approverId?: string;
   email: string;
   code: string;
   expiresAt: number;
@@ -296,7 +297,35 @@ export async function storeVerificationCode(email: string, code: string, leaveId
     expiresAt: Date.now() + 10 * 60 * 1000,
     used: false,
   };
-  await dbInsert(VERIFICATION_CODES_KEY, newCode);
+
+  try {
+    await dbInsert(VERIFICATION_CODES_KEY, newCode);
+  } catch (error: any) {
+    const message = error?.message || '';
+    const requiresLegacyApproverId = message.includes('approver_id') && message.includes('not-null');
+
+    if (!requiresLegacyApproverId) {
+      throw error;
+    }
+
+    const { error: legacyInsertError } = await supabase
+      .from('leave_verification_codes')
+      .insert({
+        id: newCode.id,
+        leave_id: normalizedLeaveId,
+        approver_id: normalizedEmail,
+        email: normalizedEmail,
+        code,
+        expires_at: new Date(newCode.expiresAt).toISOString(),
+        used: false,
+      });
+
+    if (legacyInsertError) {
+      throw legacyInsertError;
+    }
+
+    invalidateCache(VERIFICATION_CODES_KEY);
+  }
 }
 
 export async function verifyCode(email: string, code: string): Promise<boolean> {
