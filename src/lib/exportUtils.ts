@@ -601,8 +601,8 @@ export function downloadBrandedTableReport({
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.2);
         doc.setTextColor(255, 255, 255);
-        doc.text(`Generated on ${generatedAt}`, pageWidth - marginX, footerTop + 4.6, { align: "right" });
-        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX, footerTop + 8.7, { align: "right" });
+        doc.text(`Generated on ${generatedAt}`, pageWidth - marginX - 6, footerTop + 4.6, { align: "right" });
+        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX - 6, footerTop + 8.7, { align: "right" });
       },
     });
 
