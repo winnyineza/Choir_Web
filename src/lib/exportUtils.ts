@@ -72,6 +72,11 @@ function createTimestamp(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+function toTitleCase(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
 function getPdfStatusColors(status: string): {
   fill: [number, number, number];
   text: [number, number, number];
@@ -515,7 +520,10 @@ export function downloadBrandedTableReport({
     cursorY += 6;
 
     const bodyRows = rows.length > 0
-      ? rows.map((row) => row.map((cell) => String(cell ?? "")))
+      ? rows.map((row) => row.map((cell, cellIndex) => {
+        const stringValue = String(cell ?? "");
+        return cellIndex === statusColumnIndex ? toTitleCase(stringValue) : stringValue;
+      }))
       : [[emptyMessage, ...Array(Math.max(headers.length - 1, 0)).fill("")]];
 
     autoTable(doc, {

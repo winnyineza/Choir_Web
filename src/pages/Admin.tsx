@@ -465,6 +465,9 @@ export default function Admin() {
     }
   };
 
+  const formatAttendanceStatusLabel = (status: AttendanceStatus) =>
+    status.charAt(0).toUpperCase() + status.slice(1);
+
   const runGoogleBirthdaySync = async (source: string, showSyncFeedback = false) => {
     if (!currentUser?.id) return;
     if (googleBirthdaySyncInFlightRef.current) {
@@ -4326,7 +4329,7 @@ export default function Admin() {
                         <td className="p-3 text-sm text-muted-foreground">{new Date(`${record.date}T00:00:00`).toLocaleDateString()}</td>
                         <td className="p-3 text-sm text-foreground">
                           <span className={cn("inline-flex min-w-20 items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium capitalize", getAttendanceStatusBadgeClass(record.status))}>
-                            {record.status}
+                            {formatAttendanceStatusLabel(record.status)}
                           </span>
                         </td>
                         <td className="p-3 text-sm text-muted-foreground">{record.markedBy || "N/A"}</td>
