@@ -939,7 +939,7 @@ export default function Admin() {
   // Chart filters
   const [chartTimePeriod, setChartTimePeriod] = useState<"7d" | "30d" | "90d" | "year" | "all">("30d");
   const [chartEventFilter, setChartEventFilter] = useState<string>("all");
-  const [attendanceTimePeriod, setAttendanceTimePeriod] = useState<"10" | "30" | "year" | "all">("10");
+  const [attendanceTimePeriod, setAttendanceTimePeriod] = useState<"30" | "120" | "year" | "all">("30");
 
   // Chart colors
   const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#f59e0b", "#14b8a6"];
@@ -1067,7 +1067,7 @@ export default function Admin() {
     const now = new Date();
     now.setHours(23, 59, 59, 999);
 
-    if (attendanceTimePeriod === "10" || attendanceTimePeriod === "30") {
+    if (attendanceTimePeriod === "30" || attendanceTimePeriod === "120") {
       const days = Number(attendanceTimePeriod);
       const cutoff = new Date(now);
       cutoff.setDate(cutoff.getDate() - days + 1);
@@ -2909,8 +2909,8 @@ export default function Admin() {
                     <h3 className="font-semibold text-sm text-muted-foreground">Attendance Rate Trend</h3>
                     <div className="flex gap-1">
                       {[
-                        { value: "10", label: "Last 10" },
                         { value: "30", label: "Last 30" },
+                        { value: "120", label: "Last 120" },
                         { value: "year", label: "This Year" },
                         { value: "all", label: "All" },
                       ].map((period) => (
