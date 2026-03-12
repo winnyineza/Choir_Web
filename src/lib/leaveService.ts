@@ -53,6 +53,71 @@ export const MINIMUM_NOTICE_DAYS = 2;
 
 const LEAVE_REQUESTS_KEY = 'choir_leave_requests';
 const VERIFICATION_CODES_KEY = 'choir_verification_codes';
+const VERIFICATION_SCHEMA_MODE_KEY = 'leave_verification_schema_mode';
+
+type VerificationSchemaMode = 'modern' | 'legacy';
+
+function getDefaultVerificationSchemaMode(): VerificationSchemaMode {
+  if (typeof window === 'undefined') {
+    return 'modern';
+  }
+
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1' ? 'modern' : 'legacy';
+}
+
+function getPreferredVerificationSchemaMode(): VerificationSchemaMode {
+  if (typeof window === 'undefined') {
+    return 'modern';
+  }
+
+  const storedMode = window.localStorage.getItem(VERIFICATION_SCHEMA_MODE_KEY);
+  return storedMode === 'legacy' || storedMode === 'modern'
+    ? storedMode
+    : getDefaultVerificationSchemaMode();
+}
+
+function setPreferredVerificationSchemaMode(mode: VerificationSchemaMode): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(VERIFICATION_SCHEMA_MODE_KEY, mode);
+}
+
+function isLegacySchemaError(error: any): boolean {
+  const message = (error?.message || '').toLowerCase();
+  return message.includes('approver_id') && message.includes('not-null');
+}
+
+function isModernSchemaError(error: any): boolean {
+  const message = (error?.message || '').toLowerCase();
+  return message.includes('approver_id') && (message.includes('schema cache') || message.includes('column'));
+}
+
+async function insertVerificationCodeModern(newCode: VerificationCode & { id: string }): Promise<void> {
+  await dbInsert(VERIFICATION_CODES_KEY, newCode);
+}
+
+async function insertVerificationCodeLegacy(newCode: VerificationCode & { id: string }, normalizedEmail: string, normalizedLeaveId: string): Promise<void> {
+  const { error } = await supabase
+    .from('leave_verification_codes')
+    .insert({
+      id: newCode.id,
+      leave_id: normalizedLeaveId,
+      approver_id: normalizedEmail,
+      email: normalizedEmail,
+      code: newCode.code,
+      expires_at: new Date(newCode.expiresAt).toISOString(),
+      used: false,
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  invalidateCache(VERIFICATION_CODES_KEY);
+}
 
 // PIN Verification - gets PIN from settings (configurable in admin)
 export async function verifyPortalPin(pin: string): Promise<boolean> {
@@ -292,39 +357,38 @@ export async function storeVerificationCode(email: string, code: string, leaveId
   const newCode: VerificationCode & { id: string } = {
     id: crypto.randomUUID(),
     leaveId: normalizedLeaveId,
+    approverId: normalizedEmail,
     email: normalizedEmail,
     code,
     expiresAt: Date.now() + 10 * 60 * 1000,
     used: false,
   };
 
+  const preferredMode = getPreferredVerificationSchemaMode();
+
   try {
-    await dbInsert(VERIFICATION_CODES_KEY, newCode);
+    if (preferredMode === 'legacy') {
+      await insertVerificationCodeLegacy(newCode, normalizedEmail, normalizedLeaveId);
+      setPreferredVerificationSchemaMode('legacy');
+      return;
+    }
+
+    await insertVerificationCodeModern(newCode);
+    setPreferredVerificationSchemaMode('modern');
   } catch (error: any) {
-    const message = error?.message || '';
-    const requiresLegacyApproverId = message.includes('approver_id') && message.includes('not-null');
-
-    if (!requiresLegacyApproverId) {
-      throw error;
+    if (preferredMode === 'legacy' && isModernSchemaError(error)) {
+      await insertVerificationCodeModern(newCode);
+      setPreferredVerificationSchemaMode('modern');
+      return;
     }
 
-    const { error: legacyInsertError } = await supabase
-      .from('leave_verification_codes')
-      .insert({
-        id: newCode.id,
-        leave_id: normalizedLeaveId,
-        approver_id: normalizedEmail,
-        email: normalizedEmail,
-        code,
-        expires_at: new Date(newCode.expiresAt).toISOString(),
-        used: false,
-      });
-
-    if (legacyInsertError) {
-      throw legacyInsertError;
+    if (preferredMode === 'modern' && isLegacySchemaError(error)) {
+      await insertVerificationCodeLegacy(newCode, normalizedEmail, normalizedLeaveId);
+      setPreferredVerificationSchemaMode('legacy');
+      return;
     }
 
-    invalidateCache(VERIFICATION_CODES_KEY);
+    throw error;
   }
 }
 
