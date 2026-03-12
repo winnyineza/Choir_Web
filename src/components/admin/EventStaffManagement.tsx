@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 export function EventStaffManagement() {
   const [staff, setStaff] = useState<EventStaff[]>([]);
@@ -157,11 +158,15 @@ export function EventStaffManagement() {
   };
 
   const handleDelete = async (staffMember: EventStaff) => {
-    if (confirm(`Are you sure you want to delete ${staffMember.name}?`)) {
-      await deleteEventStaff(staffMember.id);
-      toast({ title: "Staff Deleted", description: `${staffMember.name} has been removed.` });
-      await loadData();
-    }
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `event staff member ${staffMember.name}`,
+      warning: "This staff profile will be removed from event staff management.",
+    })) return;
+
+    await deleteEventStaff(staffMember.id);
+    toast({ title: "Staff Deleted", description: `${staffMember.name} has been removed.` });
+    await loadData();
   };
 
   const handleAssignEvent = async (eventId: string) => {

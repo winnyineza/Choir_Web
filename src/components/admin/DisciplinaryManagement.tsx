@@ -91,7 +91,9 @@ export function DisciplinaryManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<DisciplinaryRecord | null>(null);
+  const [recordToArchive, setRecordToArchive] = useState<DisciplinaryRecord | null>(null);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const { toast } = useToast();
   const { currentUser } = useAuth();
@@ -113,6 +115,7 @@ export function DisciplinaryManagement() {
   const [selectedWitnesses, setSelectedWitnesses] = useState<string[]>([]);
   const [showWitnessDropdown, setShowWitnessDropdown] = useState(false);
   const [resolution, setResolution] = useState("");
+  const [archiveConfirmationText, setArchiveConfirmationText] = useState("");
   const [stats, setStats] = useState<DisciplinaryStats>({ total: 0, active: 0, resolved: 0, warnings: 0, suspensions: 0, fines: 0, commendations: 0, byMember: [] });
 
   useEffect(() => {
@@ -249,17 +252,25 @@ export function DisciplinaryManagement() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Archive this record? It will be hidden from active views but retained for history.")) return;
-    const record = records.find(r => r.id === id);
+  const openArchiveModal = (record: DisciplinaryRecord) => {
+    setRecordToArchive(record);
+    setArchiveConfirmationText("");
+    setShowArchiveModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!recordToArchive || archiveConfirmationText !== "DELETE") return;
     try {
-      const deleted = await deleteDisciplinaryRecord(id);
+      const deleted = await deleteDisciplinaryRecord(recordToArchive.id);
       if (deleted) {
-        if (currentUser && record) {
-          addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Archived disciplinary record for ${record.memberName}`);
+        if (currentUser) {
+          addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Archived disciplinary record for ${recordToArchive.memberName}`);
         }
         toast({ title: "Record Archived", description: "Disciplinary record has been archived." });
         await loadData();
+        setShowArchiveModal(false);
+        setRecordToArchive(null);
+        setArchiveConfirmationText("");
       } else {
         toast({ title: "Error", description: "Record not found or could not be deleted", variant: "destructive" });
       }
@@ -575,7 +586,7 @@ export function DisciplinaryManagement() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(record.id)}
+                            onClick={() => openArchiveModal(record)}
                           >
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
@@ -945,6 +956,70 @@ export function DisciplinaryManagement() {
               <Button variant="gold" className="flex-1" onClick={handleResolve}>
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Mark Resolved
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showArchiveModal}
+        onOpenChange={(open) => {
+          setShowArchiveModal(open);
+          if (!open) {
+            setRecordToArchive(null);
+            setArchiveConfirmationText("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-charcoal border-red-500/20">
+          <DialogHeader>
+            <DialogTitle className="font-display text-red-400">Archive Disciplinary Record</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              This will hide the record from active views but keep it in history and reports.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm">
+              <p className="text-foreground">
+                You are archiving the record for <span className="font-medium">{recordToArchive?.memberName}</span>.
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Reason: <span className="text-foreground">{recordToArchive?.reason}</span>
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="archive-confirmation">Type DELETE to confirm</Label>
+              <Input
+                id="archive-confirmation"
+                value={archiveConfirmationText}
+                onChange={(event) => setArchiveConfirmationText(event.target.value)}
+                placeholder="DELETE"
+                className="mt-1 bg-secondary"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowArchiveModal(false);
+                  setRecordToArchive(null);
+                  setArchiveConfirmationText("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={archiveConfirmationText !== "DELETE"}
+                onClick={handleDelete}
+              >
+                Archive Record
               </Button>
             </div>
           </div>

@@ -26,6 +26,7 @@ import {
   type GalleryItem,
 } from "@/lib/dataService";
 import { addAuditLog } from "@/lib/adminService";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { cn } from "@/lib/utils";
 import {
   Image,
@@ -134,8 +135,13 @@ export function GalleryManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
     const item = items.find(i => i.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `gallery item "${item?.title || "this item"}"`,
+      warning: "This media item will be removed from the gallery.",
+    })) return;
+
     await deleteGalleryItem(id);
     if (currentUser && item) {
       addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${item.title}`);
@@ -145,7 +151,12 @@ export function GalleryManagement() {
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selectedItems.length} selected items?`)) return;
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `${selectedItems.length} selected gallery item(s)`,
+      warning: "These media items will be removed from the gallery.",
+    })) return;
+
     for (const id of selectedItems) {
       await deleteGalleryItem(id);
     }

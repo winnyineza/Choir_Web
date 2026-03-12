@@ -41,6 +41,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
 import { downloadBrandedTableReport } from "@/lib/exportUtils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import {
   Package,
   Plus,
@@ -201,8 +202,13 @@ export function InventoryManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this inventory item?")) return;
     const item = items.find(i => i.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `inventory item "${item?.name || "this item"}"`,
+      warning: "This item and its assignments history will be removed.",
+    })) return;
+
     try {
       const deleted = await deleteInventoryItem(id);
       if (deleted) {

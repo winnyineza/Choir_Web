@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
 import { downloadBrandedTableReport } from "@/lib/exportUtils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import {
   FileText,
   Plus,
@@ -236,8 +237,13 @@ export function DocumentManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this document?")) return;
     const doc = documents.find((d) => d.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `document "${doc?.title || "this document"}"`,
+      warning: "The document file and its metadata will be removed.",
+    })) return;
+
     const ok = await deleteDocument(id);
     if (ok) {
       if (user && doc) {

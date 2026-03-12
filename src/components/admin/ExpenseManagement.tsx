@@ -45,6 +45,7 @@ import {
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
 import { downloadBrandedTableReport } from "@/lib/exportUtils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 export function ExpenseManagement() {
   const { toast } = useToast();
@@ -185,14 +186,19 @@ export function ExpenseManagement() {
   };
   
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this expense?")) {
-      await deleteExpense(id);
-      if (currentUser) {
-        addAuditLog(currentUser, "DELETE_EXPENSE", "Deleted an expense record");
-      }
-      toast({ title: "Deleted", description: "Expense deleted." });
-      await loadData();
+    const expense = expenses.find((item) => item.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `expense "${expense?.description || "this expense"}"`,
+      warning: "This expense record will be permanently removed.",
+    })) return;
+
+    await deleteExpense(id);
+    if (currentUser) {
+      addAuditLog(currentUser, "DELETE_EXPENSE", "Deleted an expense record");
     }
+    toast({ title: "Deleted", description: "Expense deleted." });
+    await loadData();
   };
   
   const exportToCSV = () => {

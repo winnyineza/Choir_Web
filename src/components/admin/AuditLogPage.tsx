@@ -66,6 +66,7 @@ import {
 } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
 import { downloadBrandedTableReport } from "@/lib/exportUtils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 const ITEMS_PER_PAGE = 25;
 
@@ -419,7 +420,11 @@ export function AuditLogPage() {
   };
 
   const handleCleanup = () => {
-    if (!confirm("This will delete all audit logs older than 90 days. Continue?")) {
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: "audit logs older than 90 days",
+      warning: "This cleanup cannot be undone.",
+    })) {
       return;
     }
     

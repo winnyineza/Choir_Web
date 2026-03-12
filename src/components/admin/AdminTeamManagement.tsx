@@ -55,6 +55,7 @@ import {
 } from "@/lib/adminService";
 import { getAllMembers, type Member } from "@/lib/dataService";
 import { sendAdminInviteEmail } from "@/lib/memberInviteService";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 export function AdminTeamManagement() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -287,7 +288,11 @@ export function AdminTeamManagement() {
   };
 
   const handleDeleteUser = (user: AdminUser) => {
-    if (!confirm(`Are you sure you want to permanently delete ${user.name}? This cannot be undone.`)) {
+    if (!confirmDestructiveAction({
+      action: "permanently delete",
+      subject: `admin user ${user.name}`,
+      warning: "This cannot be undone.",
+    })) {
       return;
     }
     

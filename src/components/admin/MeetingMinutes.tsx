@@ -47,6 +47,7 @@ const OFFICIAL_CHOIR_EMAIL = "theserenadeschoir@gmail.com";
 import { addAuditLog, canApproveMeetingMinutes } from "@/lib/adminService";
 import { notifyMeetingMinutesApproved } from "@/lib/notificationEmailService";
 import { getMembersOnLeaveForDate } from "@/lib/leaveService";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { cn } from "@/lib/utils";
 import { downloadBrandedTableReport } from "@/lib/exportUtils";
 import {
@@ -388,8 +389,13 @@ export function MeetingMinutesComponent() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this meeting record?")) return;
     const meeting = meetings.find(m => m.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `meeting record "${meeting?.title || "this meeting"}"`,
+      warning: "If linked attendance is still editable, it may be deleted too.",
+    })) return;
+
     try {
       if (meeting?.googleEventId && currentUser?.id) {
         await deleteGoogleMeeting(currentUser.id, id, meeting.googleEventId);

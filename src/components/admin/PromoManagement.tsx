@@ -30,6 +30,7 @@ import {
 import { getAllEvents, type Event } from "@/lib/dataService";
 import { addAuditLog } from "@/lib/adminService";
 import { cn } from "@/lib/utils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import {
   Tag,
   Plus,
@@ -142,8 +143,13 @@ export function PromoManagement() {
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm("Delete this promo code?")) return;
     const promo = promoCodes.find(p => p.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `promo code ${promo?.code || "this code"}`,
+      warning: "This promo code will no longer be available for orders.",
+    })) return;
+
     deletePromoCode(id);
     if (currentUser && promo) {
       addAuditLog(currentUser, "DELETE_PROMO", `Deleted promo code: ${promo.code}`);

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import {
   getAllAlbums,
   addAlbum,
@@ -139,8 +140,13 @@ export function MusicReleasesManagement() {
   };
 
   const handleAlbumDelete = async (id: string) => {
-    if (!confirm("Delete this album?")) return;
     const album = albums.find(a => a.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `album "${album?.title || "this album"}"`,
+      warning: "This album will be removed from the music releases list.",
+    })) return;
+
     await deleteAlbum(id);
     if (currentUser && album) {
       addAuditLog(currentUser, "DELETE_ALBUM", `Deleted album: ${album.title}`);
@@ -210,8 +216,13 @@ export function MusicReleasesManagement() {
   };
 
   const handleVideoDelete = async (id: string) => {
-    if (!confirm("Delete this video?")) return;
     const video = musicVideos.find(v => v.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `music video "${video?.title || "this video"}"`,
+      warning: "This video will be removed from the music releases list.",
+    })) return;
+
     await deleteMusicVideo(id);
     if (currentUser && video) {
       addAuditLog(currentUser, "DELETE_VIDEO", `Deleted music video: ${video.title}`);

@@ -33,6 +33,7 @@ import {
   getContactStats,
   type ContactSubmission,
 } from "@/lib/contactService";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { cn } from "@/lib/utils";
 
 interface ContactSubmissionsProps {
@@ -142,16 +143,21 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this submission?")) {
-      const ok = await deleteContactSubmission(id);
-      if (ok) {
-        await loadSubmissions();
-        setIsViewModalOpen(false);
-        toast({
-          title: "Deleted",
-          description: "Submission has been deleted.",
-        });
-      }
+    const submission = submissions.find((item) => item.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `contact submission from ${submission?.name || "this sender"}`,
+      warning: "This message will be permanently removed.",
+    })) return;
+
+    const ok = await deleteContactSubmission(id);
+    if (ok) {
+      await loadSubmissions();
+      setIsViewModalOpen(false);
+      toast({
+        title: "Deleted",
+        description: "Submission has been deleted.",
+      });
     }
   };
 

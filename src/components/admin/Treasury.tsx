@@ -52,6 +52,7 @@ import { getAllDisciplinaryRecords, getOutstandingFineBalanceTotal } from "@/lib
 import { getAllDonations, createDonation, updateDonation, deleteDonation, Donation } from "@/lib/donationService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { TicketHealthWidget } from "@/components/admin/TicketHealthWidget";
 import { getTicketedEvents } from "@/lib/ticketVisibility";
 import {
@@ -391,14 +392,18 @@ export function Treasury({ onRefresh }: TreasuryProps) {
   };
 
   const handleDeleteDonation = async (id: string) => {
-    if (confirm("Are you sure you want to delete this donation record?")) {
-      const donation = donations.find(d => d.id === id);
-      await deleteDonation(id);
-      if (currentUser && donation) {
-        addAuditLog(currentUser, "DELETE_DONATION", `Deleted donation from ${donation.donorName}`);
-      }
-      await loadFinancialData();
+    const donation = donations.find(d => d.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `donation record from ${donation?.donorName || "this donor"}`,
+      warning: "This donation record will be permanently removed.",
+    })) return;
+
+    await deleteDonation(id);
+    if (currentUser && donation) {
+      addAuditLog(currentUser, "DELETE_DONATION", `Deleted donation from ${donation.donorName}`);
     }
+    await loadFinancialData();
   };
 
   const getMethodIcon = (method: string) => {

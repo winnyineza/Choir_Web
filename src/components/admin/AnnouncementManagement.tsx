@@ -46,6 +46,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { notifyAnnouncementPosted } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 const typeConfig = {
   info: { icon: Info, color: "text-blue-500", bg: "bg-blue-500/20" },
@@ -162,15 +163,19 @@ export function AnnouncementManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this announcement?")) {
-      const announcement = announcements.find(a => a.id === id);
-      await deleteAnnouncement(id);
-      if (currentUser && announcement) {
-        addAuditLog(currentUser, "DELETE_ANNOUNCEMENT", `Deleted announcement: ${announcement.title}`);
-      }
-      toast({ title: "Announcement Deleted" });
-      loadData();
+    const announcement = announcements.find(a => a.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `announcement "${announcement?.title || "this announcement"}"`,
+      warning: "The announcement will be removed from member-facing views.",
+    })) return;
+
+    await deleteAnnouncement(id);
+    if (currentUser && announcement) {
+      addAuditLog(currentUser, "DELETE_ANNOUNCEMENT", `Deleted announcement: ${announcement.title}`);
     }
+    toast({ title: "Announcement Deleted" });
+    loadData();
   };
 
   const handleTogglePin = async (id: string) => {

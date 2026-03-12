@@ -201,6 +201,7 @@ const SurveyManagement = lazy(() => import("@/components/admin/SurveyManagement"
 import { Package, FileText as FileTextIcon, FolderOpen, Mic2, ClipboardList } from "lucide-react";
 import { BackupRestore } from "@/components/admin/BackupRestore";
 import { getTicketedEvents } from "@/lib/ticketVisibility";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "event-staff" | "team" | "audit" | "settings";
 
@@ -1250,14 +1251,18 @@ export default function Admin() {
 
   // Delete actions
   const handleDeleteMember = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to remove ${name} from the choir?`)) {
-      await deleteMember(id);
-      if (currentUser) {
-        addAuditLog(currentUser, "DELETE_MEMBER", `Deleted member: ${name}`);
-      }
-      await refreshCoreData();
-      toast({ title: "Member Removed", description: `${name} has been removed.` });
+    if (!confirmDestructiveAction({
+      action: "remove",
+      subject: name,
+      warning: "This will permanently remove the member from the choir records.",
+    })) return;
+
+    await deleteMember(id);
+    if (currentUser) {
+      addAuditLog(currentUser, "DELETE_MEMBER", `Deleted member: ${name}`);
     }
+    await refreshCoreData();
+    toast({ title: "Member Removed", description: `${name} has been removed.` });
   };
 
   // Bulk member actions
@@ -1300,7 +1305,11 @@ export default function Admin() {
 
   const handleBulkDelete = async () => {
     if (selectedMembers.length === 0) return;
-    if (!confirm(`Delete ${selectedMembers.length} member(s)? This cannot be undone.`)) return;
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `${selectedMembers.length} member(s)`,
+      warning: "This cannot be undone.",
+    })) return;
     
     await Promise.all(selectedMembers.map(id => deleteMember(id)));
     
@@ -1313,41 +1322,57 @@ export default function Admin() {
   };
 
   const handleDeleteEvent = async (id: string, title: string) => {
-    if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      await deleteEvent(id);
-      if (currentUser) {
-        addAuditLog(currentUser, "DELETE_EVENT", `Deleted event: ${title}`);
-      }
-      await refreshCoreData();
-      toast({ title: "Event Deleted", description: `"${title}" has been deleted.` });
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `event "${title}"`,
+      warning: "This will remove the event from the platform.",
+    })) return;
+
+    await deleteEvent(id);
+    if (currentUser) {
+      addAuditLog(currentUser, "DELETE_EVENT", `Deleted event: ${title}`);
     }
+    await refreshCoreData();
+    toast({ title: "Event Deleted", description: `"${title}" has been deleted.` });
   };
 
   const handleDeleteGalleryItem = async (id: string, title: string) => {
-    if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      await deleteGalleryItem(id);
-      if (currentUser) {
-        addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${title}`);
-      }
-      await refreshTabData("gallery");
-      toast({ title: "Media Deleted", description: `"${title}" has been removed.` });
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `gallery item "${title}"`,
+      warning: "This media item will be removed from the gallery.",
+    })) return;
+
+    await deleteGalleryItem(id);
+    if (currentUser) {
+      addAuditLog(currentUser, "DELETE_GALLERY", `Deleted gallery item: ${title}`);
     }
+    await refreshTabData("gallery");
+    toast({ title: "Media Deleted", description: `"${title}" has been removed.` });
   };
 
   const handleDeleteAlbum = async (id: string, title: string) => {
-    if (confirm(`Are you sure you want to delete album "${title}"?`)) {
-      await deleteAlbum(id);
-      await refreshTabData("releases");
-      toast({ title: "Album Deleted", description: `"${title}" has been removed.` });
-    }
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `album "${title}"`,
+      warning: "This album entry will be removed from releases.",
+    })) return;
+
+    await deleteAlbum(id);
+    await refreshTabData("releases");
+    toast({ title: "Album Deleted", description: `"${title}" has been removed.` });
   };
 
   const handleDeleteMusicVideo = async (id: string, title: string) => {
-    if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      await deleteMusicVideo(id);
-      await refreshTabData("releases");
-      toast({ title: "Video Deleted", description: `"${title}" has been removed.` });
-    }
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `music video "${title}"`,
+      warning: "This video entry will be removed from releases.",
+    })) return;
+
+    await deleteMusicVideo(id);
+    await refreshTabData("releases");
+    toast({ title: "Video Deleted", description: `"${title}" has been removed.` });
   };
 
   // Settings save
@@ -2532,17 +2557,21 @@ export default function Admin() {
                         size="sm"
                         className="text-red-400 hover:text-red-300"
                         onClick={async () => {
-                          if (confirm("This will archive all pending orders older than 24 hours (kept for records). Continue?")) {
-                            const count = await deletePendingOrders(24);
-                            if (count > 0) {
-                              toast({
-                                title: "Archived",
-                                description: `${count} pending order(s) archived.`,
-                              });
-                              refreshTabData("tickets");
-                            } else {
-                              toast({ title: "No orders to archive", description: "All pending orders are less than 24 hours old." });
-                            }
+                          if (!confirmDestructiveAction({
+                            action: "archive",
+                            subject: "pending orders older than 24 hours",
+                            warning: "These orders stay in records but will be removed from active pending workflows.",
+                          })) return;
+
+                          const count = await deletePendingOrders(24);
+                          if (count > 0) {
+                            toast({
+                              title: "Archived",
+                              description: `${count} pending order(s) archived.`,
+                            });
+                            refreshTabData("tickets");
+                          } else {
+                            toast({ title: "No orders to archive", description: "All pending orders are less than 24 hours old." });
                           }
                         }}
                       >

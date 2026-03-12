@@ -10,6 +10,7 @@ import { createAudition, deleteAudition, getAllAuditions, updateAudition, type A
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, CheckCircle, Clock, Plus, Search, Star, Trash2, UserCheck, X } from "lucide-react";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { cn } from "@/lib/utils";
 
 const statusOptions: { value: AuditionStatus; label: string; color: string }[] = [
@@ -114,7 +115,13 @@ export function AuditionManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this audition?")) return;
+    const audition = auditions.find((item) => item.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `audition for ${audition?.candidateName || "this candidate"}`,
+      warning: "This audition record will be removed.",
+    })) return;
+
     await deleteAudition(id, currentUser || undefined);
     const list = await getAllAuditions();
     setAuditions(list);

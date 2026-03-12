@@ -78,6 +78,7 @@ import {
   exportMonthlyDuesReport,
   exportAnnualFinancialSummary,
 } from "@/lib/exportUtils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { getExpenseStats, getExpensesByYear } from "@/lib/expenseService";
 
 export function ContributionManagement() {
@@ -610,11 +611,16 @@ export function ContributionManagement() {
   };
   
   const handleDeleteContribution = async (id: string) => {
-    if (confirm("Delete this contribution record?")) {
-      await deleteContribution(id);
-      toast({ title: "Deleted", description: "Contribution deleted." });
-      await loadData();
-    }
+    const contribution = contributions.find((item) => item.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `contribution record for ${contribution?.memberName || "this member"}`,
+      warning: "This contribution record will be permanently removed.",
+    })) return;
+
+    await deleteContribution(id);
+    toast({ title: "Deleted", description: "Contribution deleted." });
+    await loadData();
   };
   
   const handleDeleteType = async (id: string) => {
@@ -628,11 +634,16 @@ export function ContributionManagement() {
       return;
     }
     
-    if (confirm("Delete this contribution type?")) {
-      await deleteContributionType(id);
-      toast({ title: "Deleted", description: "Contribution type deleted." });
-      await loadData();
-    }
+    const contributionType = contributionTypes.find((item) => item.id === id);
+    if (!confirmDestructiveAction({
+      action: "delete",
+      subject: `contribution type "${contributionType?.name || "this type"}"`,
+      warning: "This type will be removed from contribution setup.",
+    })) return;
+
+    await deleteContributionType(id);
+    toast({ title: "Deleted", description: "Contribution type deleted." });
+    await loadData();
   };
   
   const handleToggleTypeActive = async (type: ContributionType) => {
