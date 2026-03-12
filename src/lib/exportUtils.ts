@@ -485,7 +485,7 @@ export function downloadBrandedTableReport({
     doc.text("Serenades of Praise Choir", logoDataUrl ? 32 : marginX, 13);
     doc.setFont(fontFamily, "bold");
     doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(245, 208, 95);
     doc.text([title, subtitle].filter(Boolean).join(" • "), logoDataUrl ? 32 : marginX, 20);
 
     let cursorY = 38;
@@ -532,6 +532,7 @@ export function downloadBrandedTableReport({
       styles: {
         font: fontFamily,
         fontSize: 9,
+        fontStyle: "bold",
         cellPadding: 2.5,
         textColor: [0, 0, 0],
         lineColor: [203, 213, 225],
@@ -547,7 +548,9 @@ export function downloadBrandedTableReport({
       alternateRowStyles: {
         fillColor: [255, 255, 255],
       },
-      bodyStyles: rows.length === 0 ? { textColor: [0, 0, 0], fillColor: [255, 255, 255] } : { textColor: [0, 0, 0], fillColor: [255, 255, 255] },
+      bodyStyles: rows.length === 0
+        ? { textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "bold" }
+        : { textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "bold" },
       didParseCell: (data: {
         section: string;
         column: { index: number };
@@ -584,11 +587,12 @@ export function downloadBrandedTableReport({
 
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.4);
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(245, 208, 95);
         doc.text("Admin report • Attendance and records archive", marginX + 6, footerTop + 8.7);
 
+        doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.2);
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(245, 208, 95);
         doc.text("Excellence in worship • Discipline in service", pageWidth / 2, footerTop + 6.8, { align: "center" });
 
         doc.setFont(fontFamily, "bold");
