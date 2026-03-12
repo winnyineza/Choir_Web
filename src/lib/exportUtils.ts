@@ -83,15 +83,15 @@ function getPdfStatusColors(status: string): {
 } {
   switch (status.toLowerCase()) {
     case "present":
-      return { fill: [220, 252, 231], text: [22, 101, 52] };
+      return { fill: [220, 252, 231], text: [0, 0, 0] };
     case "absent":
-      return { fill: [254, 226, 226], text: [153, 27, 27] };
+      return { fill: [254, 226, 226], text: [0, 0, 0] };
     case "excused":
-      return { fill: [254, 243, 199], text: [146, 64, 14] };
+      return { fill: [254, 243, 199], text: [0, 0, 0] };
     case "late":
-      return { fill: [255, 237, 213], text: [154, 52, 18] };
+      return { fill: [255, 237, 213], text: [0, 0, 0] };
     default:
-      return { fill: [241, 245, 249], text: [30, 41, 59] };
+      return { fill: [241, 245, 249], text: [0, 0, 0] };
   }
 }
 
@@ -483,9 +483,9 @@ export function downloadBrandedTableReport({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.text("Serenades of Praise Choir", logoDataUrl ? 32 : marginX, 13);
-    doc.setFont(fontFamily, "normal");
+    doc.setFont(fontFamily, "bold");
     doc.setFontSize(10);
-    doc.setTextColor(240, 240, 240);
+    doc.setTextColor(255, 255, 255);
     doc.text([title, subtitle].filter(Boolean).join(" • "), logoDataUrl ? 32 : marginX, 20);
 
     let cursorY = 38;
@@ -497,15 +497,15 @@ export function downloadBrandedTableReport({
         const x = startX + column * (cardWidth + 4);
         const y = startY + row * 13;
         doc.setDrawColor(226, 232, 240);
-        doc.setFillColor(248, 250, 252);
+        doc.setFillColor(255, 255, 255);
         doc.roundedRect(x, y, cardWidth, 10, 2, 2, "FD");
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.2);
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(0, 0, 0);
         doc.text(String(item.label).toUpperCase(), x + 2, y + 3.5);
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(9.4);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.text(String(item.value ?? ""), x + 2, y + 7.5, { maxWidth: cardWidth - 4 });
       });
       return startY + Math.ceil(items.length / columns) * 13;
@@ -533,9 +533,10 @@ export function downloadBrandedTableReport({
         font: fontFamily,
         fontSize: 9,
         cellPadding: 2.5,
-        textColor: [15, 23, 42],
+        textColor: [0, 0, 0],
         lineColor: [203, 213, 225],
         lineWidth: 0.18,
+        fillColor: [255, 255, 255],
       },
       headStyles: {
         font: fontFamily,
@@ -544,9 +545,9 @@ export function downloadBrandedTableReport({
         fontStyle: "bold",
       },
       alternateRowStyles: {
-        fillColor: [245, 247, 250],
+        fillColor: [255, 255, 255],
       },
-      bodyStyles: rows.length === 0 ? { textColor: [71, 85, 105] } : { textColor: [15, 23, 42] },
+      bodyStyles: rows.length === 0 ? { textColor: [0, 0, 0], fillColor: [255, 255, 255] } : { textColor: [0, 0, 0], fillColor: [255, 255, 255] },
       didParseCell: (data: {
         section: string;
         column: { index: number };
@@ -567,12 +568,10 @@ export function downloadBrandedTableReport({
       didDrawPage: (data: { pageNumber: number }) => {
         const footerTop = pageHeight - 14;
 
-        doc.setFillColor(250, 247, 237);
-        doc.rect(0, footerTop - 3, pageWidth, 17, "F");
         doc.setFillColor(212, 175, 55);
-        doc.rect(0, footerTop - 3, pageWidth, 1.4, "F");
+        doc.rect(0, footerTop - 2, pageWidth, 1.2, "F");
         doc.setFillColor(11, 11, 11);
-        doc.rect(0, footerTop - 1.6, pageWidth, 15.6, "F");
+        doc.rect(0, footerTop - 0.8, pageWidth, 14.8, "F");
 
         doc.setFillColor(212, 175, 55);
         doc.circle(marginX + 2, footerTop + 5.8, 1.1, "F");
@@ -583,18 +582,18 @@ export function downloadBrandedTableReport({
         doc.setTextColor(255, 255, 255);
         doc.text("Serenades of Praise Choir", marginX + 6, footerTop + 4.6);
 
-        doc.setFont(fontFamily, "normal");
+        doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.4);
-        doc.setTextColor(226, 232, 240);
+        doc.setTextColor(255, 255, 255);
         doc.text("Admin report • Attendance and records archive", marginX + 6, footerTop + 8.7);
 
         doc.setFontSize(7.2);
-        doc.setTextColor(245, 208, 95);
+        doc.setTextColor(255, 255, 255);
         doc.text("Excellence in worship • Discipline in service", pageWidth / 2, footerTop + 6.8, { align: "center" });
 
-        doc.setFont(fontFamily, "normal");
+        doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.2);
-        doc.setTextColor(203, 213, 225);
+        doc.setTextColor(255, 255, 255);
         doc.text(`Generated on ${generatedAt}`, pageWidth - marginX, footerTop + 4.6, { align: "right" });
         doc.text(`Page ${data.pageNumber}`, pageWidth - marginX, footerTop + 8.7, { align: "right" });
       },
