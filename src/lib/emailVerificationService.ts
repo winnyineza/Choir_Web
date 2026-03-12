@@ -20,11 +20,11 @@ function isDev(): boolean {
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 }
 
-export async function sendVerificationCode(email: string, memberName: string): Promise<SendCodeResult> {
+export async function sendVerificationCode(email: string, memberName: string, leaveId: string): Promise<SendCodeResult> {
   const code = generateVerificationCode();
 
   // Store the code
-  await storeVerificationCode(email, code);
+  await storeVerificationCode(email, code, leaveId);
 
   if (isDev()) {
     // In development, log the code to console

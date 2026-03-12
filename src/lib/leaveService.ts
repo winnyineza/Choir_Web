@@ -34,10 +34,15 @@ export interface LeaveRequest {
 
 export interface VerificationCode {
   id?: string;
+  leaveId?: string;
   email: string;
   code: string;
   expiresAt: number;
   used: boolean;
+}
+
+export function generateLeaveRequestId(): string {
+  return `leave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 // Constants for approval rules
@@ -136,7 +141,7 @@ export function validateLeaveRequestDate(startDate: string): { valid: boolean; e
 }
 
 export async function createLeaveRequest(
-  request: Omit<LeaveRequest, 'id' | 'status' | 'createdAt' | 'votes' | 'approvalCount' | 'denialCount'>
+  request: Omit<LeaveRequest, 'status' | 'createdAt' | 'votes' | 'approvalCount' | 'denialCount'>
 ): Promise<LeaveRequest | { error: string }> {
   const validation = validateLeaveRequestDate(request.startDate);
   if (!validation.valid) {
@@ -145,7 +150,7 @@ export async function createLeaveRequest(
 
   const newRequest: LeaveRequest = {
     ...request,
-    id: `leave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: request.id || generateLeaveRequestId(),
     status: 'pending',
     votes: [],
     approvalCount: 0,
@@ -275,12 +280,18 @@ export function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export async function storeVerificationCode(email: string, code: string): Promise<void> {
-  await dbDeleteWhere(VERIFICATION_CODES_KEY, 'email', email.toLowerCase());
+export async function storeVerificationCode(email: string, code: string, leaveId: string): Promise<void> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedLeaveId = typeof leaveId === 'string' && leaveId.trim()
+    ? leaveId.trim()
+    : generateLeaveRequestId();
+
+  await dbDeleteWhere(VERIFICATION_CODES_KEY, 'email', normalizedEmail);
 
   const newCode: VerificationCode & { id: string } = {
     id: crypto.randomUUID(),
-    email: email.toLowerCase(),
+    leaveId: normalizedLeaveId,
+    email: normalizedEmail,
     code,
     expiresAt: Date.now() + 10 * 60 * 1000,
     used: false,

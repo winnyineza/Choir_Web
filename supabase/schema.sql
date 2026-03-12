@@ -184,6 +184,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
 -- =============================================
 CREATE TABLE IF NOT EXISTS leave_verification_codes (
   id TEXT PRIMARY KEY,
+  leave_id TEXT NOT NULL,
   email VARCHAR(255) NOT NULL,
   code VARCHAR(20) NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,

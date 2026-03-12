@@ -66,6 +66,7 @@ import { BirthdayAlert } from "@/components/BirthdayAlert";
 import {
   verifyPortalPin,
   createLeaveRequest,
+  generateLeaveRequestId,
   getLeaveRequestsByEmail,
   validateLeaveRequestDate,
   MINIMUM_NOTICE_DAYS,
@@ -154,6 +155,7 @@ export default function MemberPortal() {
 
   // Verification
   const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""]);
+  const [pendingLeaveRequestId, setPendingLeaveRequestId] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [canResend, setCanResend] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
@@ -483,11 +485,12 @@ export default function MemberPortal() {
   // Send verification code
   const handleSendCode = async () => {
     setIsLoading(true);
-    setCanResend(false);
-    setResendTimer(60);
 
     try {
-      const result = await sendVerificationCode(email, memberInfo?.name || "Member");
+      const leaveRequestId = pendingLeaveRequestId || generateLeaveRequestId();
+      setPendingLeaveRequestId(leaveRequestId);
+
+      const result = await sendVerificationCode(email, memberInfo?.name || "Member", leaveRequestId);
 
       if (result.success) {
         if (result.code) {
@@ -497,6 +500,8 @@ export default function MemberPortal() {
           title: "Code sent! 📧",
           description: result.message,
         });
+        setCanResend(false);
+        setResendTimer(60);
         setView("submit");
       } else {
         toast({
@@ -504,6 +509,8 @@ export default function MemberPortal() {
           description: result.message,
           variant: "destructive",
         });
+        setCanResend(true);
+        setResendTimer(0);
       }
     } catch (error: any) {
       toast({
@@ -511,6 +518,8 @@ export default function MemberPortal() {
         description: error?.message || "Failed to send verification code. Please try again.",
         variant: "destructive",
       });
+      setCanResend(true);
+      setResendTimer(0);
     } finally {
       setIsLoading(false);
     }
@@ -564,6 +573,7 @@ export default function MemberPortal() {
 
     if (result.success) {
       const leaveResult = await createLeaveRequest({
+        id: pendingLeaveRequestId || generateLeaveRequestId(),
         memberId: memberInfo?.id || "",
         memberName: memberInfo?.name || "",
         memberEmail: email,
@@ -607,6 +617,7 @@ export default function MemberPortal() {
     setEndDate("");
     setReason("");
     setVerificationCode(["", "", "", "", "", ""]);
+    setPendingLeaveRequestId(null);
     setDevCode(null);
     setView("dashboard");
     // Refresh requests

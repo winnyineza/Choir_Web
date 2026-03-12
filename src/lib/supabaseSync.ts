@@ -101,6 +101,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     orderAsc: false,
     toDb: (v: any) => ({
       id: v.id,
+      leave_id: v.leaveId ?? v.leave_id ?? v.leaveRequestId ?? v.id,
       email: v.email,
       code: v.code,
       expires_at: typeof v.expiresAt === 'number' ? new Date(v.expiresAt).toISOString() : v.expiresAt,
@@ -108,6 +109,7 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     }),
     fromDb: (r: any) => ({
       id: r.id,
+      leaveId: r.leave_id,
       email: r.email,
       code: r.code,
       expiresAt: typeof r.expires_at === 'string' ? new Date(r.expires_at).getTime() : r.expires_at,
