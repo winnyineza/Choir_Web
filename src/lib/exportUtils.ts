@@ -90,9 +90,9 @@ function getPdfStatusColors(status: string): {
   }
 }
 
-const assetBase64Cache = new Map<string, Promise<string | null>>();
+const fontBinaryCache = new Map<string, Promise<string | null>>();
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+function arrayBufferToBinaryString(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 0x8000;
   let binary = "";
@@ -102,11 +102,21 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(...chunk);
   }
 
-  return btoa(binary);
+  return binary;
 }
 
-async function getAssetBase64(src: string): Promise<string | null> {
-  const cached = assetBase64Cache.get(src);
+function isValidFontBuffer(buffer: ArrayBuffer): boolean {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length < 4) return false;
+
+  const signature = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  const isTrueType = bytes[0] === 0x00 && bytes[1] === 0x01 && bytes[2] === 0x00 && bytes[3] === 0x00;
+
+  return isTrueType || signature === "OTTO" || signature === "true" || signature === "ttcf";
+}
+
+async function getFontBinary(src: string): Promise<string | null> {
+  const cached = fontBinaryCache.get(src);
   if (cached) return cached;
 
   const promise = fetch(src)
@@ -115,11 +125,17 @@ async function getAssetBase64(src: string): Promise<string | null> {
         throw new Error(`Failed to load asset: ${src}`);
       }
 
-      return arrayBufferToBase64(await response.arrayBuffer());
+      const buffer = await response.arrayBuffer();
+      if (!isValidFontBuffer(buffer)) {
+        console.warn(`[Export] Skipping invalid font asset: ${src}`);
+        return null;
+      }
+
+      return arrayBufferToBinaryString(buffer);
     })
     .catch(() => null);
 
-  assetBase64Cache.set(src, promise);
+  fontBinaryCache.set(src, promise);
   return promise;
 }
 
@@ -421,22 +437,27 @@ export function downloadBrandedTableReport({
     import("jspdf"),
     import("jspdf-autotable"),
     getImageDataUrl(logo),
-    getAssetBase64(montserratRegularTtf),
-    getAssetBase64(montserratBoldTtf),
-  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBase64, montserratBoldBase64]) => {
+    getFontBinary(montserratRegularTtf),
+    getFontBinary(montserratBoldTtf),
+  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBinary, montserratBoldBinary]) => {
     const { jsPDF } = jspdfModule;
     const autoTable = autoTableModule.default;
     const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 12;
-    const hasMontserrat = Boolean(montserratRegularBase64 && montserratBoldBase64);
+    let hasMontserrat = false;
 
-    if (montserratRegularBase64 && montserratBoldBase64) {
-      doc.addFileToVFS("Montserrat-Regular.ttf", montserratRegularBase64);
-      doc.addFont("Montserrat-Regular.ttf", "Montserrat", "normal");
-      doc.addFileToVFS("Montserrat-Bold.ttf", montserratBoldBase64);
-      doc.addFont("Montserrat-Bold.ttf", "Montserrat", "bold");
+    if (montserratRegularBinary && montserratBoldBinary) {
+      try {
+        doc.addFileToVFS("Montserrat-Regular.ttf", montserratRegularBinary);
+        doc.addFont("Montserrat-Regular.ttf", "Montserrat", "normal");
+        doc.addFileToVFS("Montserrat-Bold.ttf", montserratBoldBinary);
+        doc.addFont("Montserrat-Bold.ttf", "Montserrat", "bold");
+        hasMontserrat = true;
+      } catch (fontError) {
+        console.warn("[Export] Falling back to Helvetica; failed to register Montserrat font.", fontError);
+      }
     }
 
     const fontFamily = hasMontserrat ? "Montserrat" : "helvetica";
