@@ -212,6 +212,11 @@ export async function saveAttendance(
 
   await Promise.all(newRecords.map((record) => dbInsert<AttendanceRecord>(ATTENDANCE_KEY, record)));
 
+  const persistedRecords = await getAttendanceByDate(date);
+  if (persistedRecords.length !== newRecords.length) {
+    throw new Error('Attendance details could not be fully saved. Please try again.');
+  }
+
   await saveSession(date, sessionTitle, newRecords, markedBy);
 
   return newRecords;

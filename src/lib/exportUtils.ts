@@ -70,26 +70,30 @@ function createTimestamp(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-async function waitForRenderableAssets(container: HTMLElement): Promise<void> {
-  const images = Array.from(container.querySelectorAll("img"));
-
-  await Promise.all(
-    images.map(
-      (image) => new Promise<void>((resolve) => {
-        if (image.complete) {
-          resolve();
+async function getImageDataUrl(src: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          resolve(null);
           return;
         }
 
-        image.addEventListener("load", () => resolve(), { once: true });
-        image.addEventListener("error", () => resolve(), { once: true });
-      })
-    )
-  );
-
-  if (typeof document !== "undefined" && "fonts" in document) {
-    await (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts?.ready;
-  }
+        context.drawImage(image, 0, 0);
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
+      } catch {
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
 }
 
 function triggerDownload(content: string, mimeType: string, filename: string): void {
@@ -353,56 +357,109 @@ export function downloadBrandedTableReport({
   emptyMessage = "No records available for this report.",
 }: BrandedTableReportOptions): void {
   const fileDate = createTimestamp();
-  const reportHtml = buildReportHtml({
-    title,
-    headers,
-    rows,
-    subtitle,
-    meta,
-    summary,
-    emptyMessage,
-  });
+  const generatedAt = new Date().toLocaleString();
+  const finalMeta = meta.length > 0 ? meta : [{ label: "Generated", value: generatedAt }];
+  const finalSummary = summary.length > 0
+    ? summary
+    : [{ label: "Records", value: rows.length }, { label: "Generated", value: generatedAt }];
 
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.inset = "0";
-  container.style.width = "1280px";
-  container.style.padding = "24px";
-  container.style.opacity = "0";
-  container.style.pointerEvents = "none";
-  container.style.zIndex = "-1";
-  container.style.overflow = "hidden";
-  container.style.background = "#ffffff";
-  container.innerHTML = reportHtml;
-  document.body.appendChild(container);
+  void Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+    getImageDataUrl(logo),
+  ]).then(([jspdfModule, autoTableModule, logoDataUrl]) => {
+    const { jsPDF } = jspdfModule;
+    const autoTable = autoTableModule.default;
+    const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 12;
 
-  const target = container.firstElementChild as HTMLElement | null;
-  if (!target) {
-    document.body.removeChild(container);
-    throw new Error("Failed to generate report preview");
-  }
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, "F");
 
-  void waitForRenderableAssets(container)
-    .then(() => import("html2pdf.js"))
-    .then(({ default: html2pdf }) => html2pdf()
-      .set({
-        margin: 8,
-        filename: `${filename}-${fileDate}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-        pagebreak: { mode: ["css", "legacy"] },
-      })
-      .from(target)
-      .save())
-    .finally(() => {
-      document.body.removeChild(container);
+    doc.setFillColor(11, 11, 11);
+    doc.rect(0, 0, pageWidth, 28, "F");
+    doc.setFillColor(212, 175, 55);
+    doc.rect(0, 28, pageWidth, 2, "F");
+
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "JPEG", marginX, 5, 16, 16);
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text("Serenades of Praise Choir", logoDataUrl ? 32 : marginX, 13);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(240, 240, 240);
+    doc.text([title, subtitle].filter(Boolean).join(" • "), logoDataUrl ? 32 : marginX, 20);
+
+    let cursorY = 38;
+    const drawMetricGroup = (items: ReportMetric[], startX: number, startY: number, columns: number) => {
+      const cardWidth = (pageWidth - (marginX * 2) - ((columns - 1) * 4)) / columns;
+      items.forEach((item, index) => {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        const x = startX + column * (cardWidth + 4);
+        const y = startY + row * 13;
+        doc.setDrawColor(226, 232, 240);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x, y, cardWidth, 10, 2, 2, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(107, 114, 128);
+        doc.text(String(item.label).toUpperCase(), x + 2, y + 3.5);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(17, 24, 39);
+        doc.text(String(item.value ?? ""), x + 2, y + 7.5, { maxWidth: cardWidth - 4 });
+      });
+      return startY + Math.ceil(items.length / columns) * 13;
+    };
+
+    cursorY = drawMetricGroup(finalMeta.slice(0, 4), marginX, cursorY, Math.min(Math.max(finalMeta.slice(0, 4).length, 1), 4));
+    cursorY += 4;
+    cursorY = drawMetricGroup(finalSummary.slice(0, 4), marginX, cursorY, Math.min(Math.max(finalSummary.slice(0, 4).length, 1), 4));
+    cursorY += 6;
+
+    const bodyRows = rows.length > 0
+      ? rows.map((row) => row.map((cell) => String(cell ?? "")))
+      : [[emptyMessage, ...Array(Math.max(headers.length - 1, 0)).fill("")]];
+
+    autoTable(doc, {
+      startY: cursorY,
+      head: [headers],
+      body: bodyRows,
+      theme: "grid",
+      margin: { left: marginX, right: marginX },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 2.5,
+        textColor: [17, 24, 39],
+        lineColor: [229, 231, 235],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [11, 11, 11],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      bodyStyles: rows.length === 0 ? { textColor: [107, 114, 128] } : undefined,
+      didDrawPage: (data: { pageNumber: number }) => {
+        doc.setFontSize(8);
+        doc.setTextColor(107, 114, 128);
+        doc.text(`Generated on ${generatedAt}`, marginX, pageHeight - 6);
+        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX - 12, pageHeight - 6);
+      },
     });
+
+    doc.save(`${filename}-${fileDate}.pdf`);
+  });
 }
 
 export function downloadSpreadsheetReport({

@@ -790,6 +790,14 @@ export default function Admin() {
       const sortedRecords = await loadAttendanceSessionRecords(session);
       setViewingAttendanceSession(session);
       setViewingAttendanceRecords(sortedRecords);
+
+      if (sortedRecords.length === 0 && (session.totalPresent + session.totalAbsent + session.totalExcused + session.totalLate) > 0) {
+        toast({
+          title: "Detailed Records Missing",
+          description: "This session still has a saved summary, but the member-level attendance rows for that date are missing from the database.",
+          variant: "destructive",
+        });
+      }
     } catch (error: any) {
       toast({
         title: "View Failed",
@@ -4254,7 +4262,7 @@ export default function Admin() {
           setViewingAttendanceRecords([]);
         }
       }}>
-        <DialogContent className="max-w-2xl bg-background border-primary/20 max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[min(96vw,72rem)] max-w-5xl bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-5 h-5 text-primary" />
@@ -4278,7 +4286,7 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="max-h-[22rem] overflow-y-auto rounded-xl border border-primary/10">
+              <div className="max-h-[30rem] overflow-auto rounded-xl border border-primary/10">
                 <table className="w-full">
                   <thead className="sticky top-0 bg-secondary/80 backdrop-blur">
                     <tr>
@@ -4304,7 +4312,7 @@ export default function Admin() {
                     {viewingAttendanceRecords.length === 0 && (
                       <tr className="border-t border-primary/10">
                         <td colSpan={6} className="p-6 text-center text-sm text-muted-foreground">
-                          No member-level attendance records were found for this session.
+                          No member-level attendance records were found for this session. The session summary exists, but the detailed member rows for this date are missing.
                         </td>
                       </tr>
                     )}
