@@ -1,6 +1,6 @@
 // Disciplinary Service - manages disciplinary records (Supabase-direct)
 
-import { dbGetAll, dbGetById, dbInsert, dbUpdate, generateId } from './supabaseDB';
+import { dbDelete, dbGetAll, dbGetById, dbInsert, dbUpdate, generateId } from './supabaseDB';
 
 export interface DisciplinaryRecord {
   id: string;
@@ -47,7 +47,8 @@ export interface DisciplinaryStats {
 const DISCIPLINARY_KEY = "choir_disciplinary_records";
 
 export async function getAllDisciplinaryRecords(): Promise<DisciplinaryRecord[]> {
-  return dbGetAll<DisciplinaryRecord>(DISCIPLINARY_KEY);
+  const records = await dbGetAll<DisciplinaryRecord>(DISCIPLINARY_KEY);
+  return records.filter((record) => record.status !== "archived");
 }
 
 export async function getDisciplinaryRecordById(id: string): Promise<DisciplinaryRecord | undefined> {
@@ -148,12 +149,7 @@ export async function deleteDisciplinaryRecord(id: string): Promise<boolean> {
   try {
     const record = await dbGetById<DisciplinaryRecord>(DISCIPLINARY_KEY, id);
     if (!record) return false;
-    await dbUpdate<DisciplinaryRecord>(DISCIPLINARY_KEY, id, {
-      ...record,
-      status: "archived",
-      archivedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    await dbDelete(DISCIPLINARY_KEY, id);
     return true;
   } catch {
     return false;

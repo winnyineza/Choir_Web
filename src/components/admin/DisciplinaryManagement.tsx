@@ -266,7 +266,7 @@ export function DisciplinaryManagement() {
         if (currentUser) {
           addAuditLog(currentUser, "DELETE_DISCIPLINARY", `Archived disciplinary record for ${recordToArchive.memberName}`);
         }
-        toast({ title: "Record Archived", description: "Disciplinary record has been archived." });
+        toast({ title: "Record Deleted", description: "Disciplinary record has been deleted." });
         await loadData();
         setShowArchiveModal(false);
         setRecordToArchive(null);
@@ -470,7 +470,6 @@ export function DisciplinaryManagement() {
             <SelectItem value="resolved">Resolved</SelectItem>
             <SelectItem value="appealed">Appealed</SelectItem>
             <SelectItem value="expired">Expired</SelectItem>
-            <SelectItem value="archived">Archived</SelectItem>
           </SelectContent>
         </Select>
 
@@ -974,16 +973,16 @@ export function DisciplinaryManagement() {
       >
         <DialogContent className="sm:max-w-md bg-charcoal border-red-500/20">
           <DialogHeader>
-            <DialogTitle className="font-display text-red-400">Archive Disciplinary Record</DialogTitle>
+            <DialogTitle className="font-display text-red-400">Delete Disciplinary Record</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
-              This will hide the record from active views but keep it in history and reports.
+              This will remove the disciplinary record from the module. Only the audit log entry will remain.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
             <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm">
               <p className="text-foreground">
-                You are archiving the record for <span className="font-medium">{recordToArchive?.memberName}</span>.
+                You are deleting the record for <span className="font-medium">{recordToArchive?.memberName}</span>.
               </p>
               <p className="mt-1 text-muted-foreground">
                 Reason: <span className="text-foreground">{recordToArchive?.reason}</span>
@@ -1019,7 +1018,7 @@ export function DisciplinaryManagement() {
                 disabled={archiveConfirmationText !== "DELETE"}
                 onClick={handleDelete}
               >
-                Archive Record
+                Delete Record
               </Button>
             </div>
           </div>
