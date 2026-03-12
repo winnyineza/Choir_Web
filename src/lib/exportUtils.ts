@@ -502,7 +502,7 @@ export function downloadBrandedTableReport({
       head: [headers],
       body: bodyRows,
       theme: "grid",
-      margin: { left: marginX, right: marginX },
+      margin: { left: marginX, right: marginX, bottom: 18 },
       styles: {
         font: fontFamily,
         fontSize: 8.5,
@@ -539,16 +539,38 @@ export function downloadBrandedTableReport({
         data.cell.styles.halign = "center";
       },
       didDrawPage: (data: { pageNumber: number }) => {
-        doc.setDrawColor(212, 175, 55);
-        doc.setLineWidth(0.6);
-        doc.line(marginX, pageHeight - 10, pageWidth - marginX, pageHeight - 10);
+        const footerTop = pageHeight - 14;
+
+        doc.setFillColor(250, 247, 237);
+        doc.rect(0, footerTop - 3, pageWidth, 17, "F");
+        doc.setFillColor(212, 175, 55);
+        doc.rect(0, footerTop - 3, pageWidth, 1.4, "F");
+        doc.setFillColor(11, 11, 11);
+        doc.rect(0, footerTop - 1.6, pageWidth, 15.6, "F");
+
+        doc.setFillColor(212, 175, 55);
+        doc.circle(marginX + 2, footerTop + 5.8, 1.1, "F");
+        doc.circle(pageWidth - marginX - 2, footerTop + 5.8, 1.1, "F");
+
+        doc.setFont(fontFamily, "bold");
+        doc.setFontSize(8.2);
+        doc.setTextColor(255, 255, 255);
+        doc.text("Serenades of Praise Choir", marginX + 6, footerTop + 4.6);
 
         doc.setFont(fontFamily, "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(107, 114, 128);
-        doc.text(`Generated on ${generatedAt}`, marginX, pageHeight - 6);
-        doc.text("Serenades of Praise Choir • Admin Report", pageWidth / 2, pageHeight - 6, { align: "center" });
-        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX, pageHeight - 6, { align: "right" });
+        doc.setFontSize(7.4);
+        doc.setTextColor(226, 232, 240);
+        doc.text("Admin report • Attendance and records archive", marginX + 6, footerTop + 8.7);
+
+        doc.setFontSize(7.2);
+        doc.setTextColor(245, 208, 95);
+        doc.text("Excellence in worship • Discipline in service", pageWidth / 2, footerTop + 6.8, { align: "center" });
+
+        doc.setFont(fontFamily, "normal");
+        doc.setFontSize(7.2);
+        doc.setTextColor(203, 213, 225);
+        doc.text(`Generated on ${generatedAt}`, pageWidth - marginX, footerTop + 4.6, { align: "right" });
+        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX, footerTop + 8.7, { align: "right" });
       },
     });
 
