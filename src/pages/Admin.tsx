@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -447,6 +448,21 @@ export default function Admin() {
         };
       })
       .sort((left, right) => left.memberName.localeCompare(right.memberName));
+  };
+
+  const getAttendanceStatusBadgeClass = (status: AttendanceStatus) => {
+    switch (status) {
+      case "present":
+        return "border border-green-500/30 bg-green-500/10 text-green-400";
+      case "absent":
+        return "border border-red-500/30 bg-red-500/10 text-red-400";
+      case "excused":
+        return "border border-yellow-500/30 bg-yellow-500/10 text-yellow-300";
+      case "late":
+        return "border border-orange-500/30 bg-orange-500/10 text-orange-300";
+      default:
+        return "border border-primary/20 bg-secondary/40 text-foreground";
+    }
   };
 
   const runGoogleBirthdaySync = async (source: string, showSyncFeedback = false) => {
@@ -4268,6 +4284,9 @@ export default function Admin() {
               <Eye className="w-5 h-5 text-primary" />
               Attendance Details
             </DialogTitle>
+            <DialogDescription>
+              Review the member-by-member attendance breakdown for the selected session and export it if needed.
+            </DialogDescription>
           </DialogHeader>
           {viewingAttendanceSession && (
             <div className="space-y-4 pt-2">
@@ -4305,7 +4324,11 @@ export default function Admin() {
                         <td className="p-3 text-sm text-muted-foreground">{record.memberEmail || "N/A"}</td>
                         <td className="p-3 text-sm text-muted-foreground">{record.memberVoice}</td>
                         <td className="p-3 text-sm text-muted-foreground">{new Date(`${record.date}T00:00:00`).toLocaleDateString()}</td>
-                        <td className="p-3 text-sm capitalize text-foreground">{record.status}</td>
+                        <td className="p-3 text-sm text-foreground">
+                          <span className={cn("inline-flex min-w-20 items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium capitalize", getAttendanceStatusBadgeClass(record.status))}>
+                            {record.status}
+                          </span>
+                        </td>
                         <td className="p-3 text-sm text-muted-foreground">{record.markedBy || "N/A"}</td>
                       </tr>
                     ))}
@@ -4348,6 +4371,9 @@ export default function Admin() {
               <Eye className="w-5 h-5 text-primary" />
               Member Profile
             </DialogTitle>
+            <DialogDescription>
+              View the selected choir member&apos;s profile details, status, and contact information.
+            </DialogDescription>
           </DialogHeader>
           {viewingMember && (
             <div className="space-y-5 pt-2">

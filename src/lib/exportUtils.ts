@@ -20,6 +20,8 @@ import {
 import { getAllExpenses, getCategoryLabel } from "./expenseService";
 import { getAllDonations, Donation } from "./donationService";
 import logo from "@/assets/LogoTSC.jpg";
+import montserratRegularTtf from "@/assets/fonts/Montserrat-Regular.ttf";
+import montserratBoldTtf from "@/assets/fonts/Montserrat-Bold.ttf";
 
 type ReportCell = string | number | boolean | null | undefined;
 
@@ -68,6 +70,57 @@ function formatReportTitle(filename: string): string {
 
 function createTimestamp(): string {
   return new Date().toISOString().split("T")[0];
+}
+
+function getPdfStatusColors(status: string): {
+  fill: [number, number, number];
+  text: [number, number, number];
+} {
+  switch (status.toLowerCase()) {
+    case "present":
+      return { fill: [220, 252, 231], text: [21, 128, 61] };
+    case "absent":
+      return { fill: [254, 226, 226], text: [185, 28, 28] };
+    case "excused":
+      return { fill: [254, 249, 195], text: [161, 98, 7] };
+    case "late":
+      return { fill: [255, 237, 213], text: [194, 65, 12] };
+    default:
+      return { fill: [241, 245, 249], text: [51, 65, 85] };
+  }
+}
+
+const assetBase64Cache = new Map<string, Promise<string | null>>();
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+async function getAssetBase64(src: string): Promise<string | null> {
+  const cached = assetBase64Cache.get(src);
+  if (cached) return cached;
+
+  const promise = fetch(src)
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load asset: ${src}`);
+      }
+
+      return arrayBufferToBase64(await response.arrayBuffer());
+    })
+    .catch(() => null);
+
+  assetBase64Cache.set(src, promise);
+  return promise;
 }
 
 async function getImageDataUrl(src: string): Promise<string | null> {
@@ -362,18 +415,31 @@ export function downloadBrandedTableReport({
   const finalSummary = summary.length > 0
     ? summary
     : [{ label: "Records", value: rows.length }, { label: "Generated", value: generatedAt }];
+  const statusColumnIndex = headers.findIndex((header) => header.toLowerCase() === "status");
 
   void Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
     getImageDataUrl(logo),
-  ]).then(([jspdfModule, autoTableModule, logoDataUrl]) => {
+    getAssetBase64(montserratRegularTtf),
+    getAssetBase64(montserratBoldTtf),
+  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBase64, montserratBoldBase64]) => {
     const { jsPDF } = jspdfModule;
     const autoTable = autoTableModule.default;
     const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 12;
+    const hasMontserrat = Boolean(montserratRegularBase64 && montserratBoldBase64);
+
+    if (montserratRegularBase64 && montserratBoldBase64) {
+      doc.addFileToVFS("Montserrat-Regular.ttf", montserratRegularBase64);
+      doc.addFont("Montserrat-Regular.ttf", "Montserrat", "normal");
+      doc.addFileToVFS("Montserrat-Bold.ttf", montserratBoldBase64);
+      doc.addFont("Montserrat-Bold.ttf", "Montserrat", "bold");
+    }
+
+    const fontFamily = hasMontserrat ? "Montserrat" : "helvetica";
 
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pageWidth, pageHeight, "F");
@@ -387,14 +453,17 @@ export function downloadBrandedTableReport({
       doc.addImage(logoDataUrl, "JPEG", marginX, 5, 16, 16);
     }
 
-    doc.setFont("helvetica", "bold");
+    doc.setFont(fontFamily, "bold");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.text("Serenades of Praise Choir", logoDataUrl ? 32 : marginX, 13);
-    doc.setFont("helvetica", "normal");
+    doc.setFont(fontFamily, "normal");
     doc.setFontSize(10);
     doc.setTextColor(240, 240, 240);
     doc.text([title, subtitle].filter(Boolean).join(" • "), logoDataUrl ? 32 : marginX, 20);
+    doc.setFontSize(8.5);
+    doc.setTextColor(232, 232, 232);
+    doc.text("Styled for Serenades of Praise administration", pageWidth - marginX, 20, { align: "right" });
 
     let cursorY = 38;
     const drawMetricGroup = (items: ReportMetric[], startX: number, startY: number, columns: number) => {
@@ -407,11 +476,11 @@ export function downloadBrandedTableReport({
         doc.setDrawColor(226, 232, 240);
         doc.setFillColor(248, 250, 252);
         doc.roundedRect(x, y, cardWidth, 10, 2, 2, "FD");
-        doc.setFont("helvetica", "bold");
+        doc.setFont(fontFamily, "bold");
         doc.setFontSize(7);
         doc.setTextColor(107, 114, 128);
         doc.text(String(item.label).toUpperCase(), x + 2, y + 3.5);
-        doc.setFont("helvetica", "normal");
+        doc.setFont(fontFamily, "normal");
         doc.setFontSize(9);
         doc.setTextColor(17, 24, 39);
         doc.text(String(item.value ?? ""), x + 2, y + 7.5, { maxWidth: cardWidth - 4 });
@@ -435,6 +504,7 @@ export function downloadBrandedTableReport({
       theme: "grid",
       margin: { left: marginX, right: marginX },
       styles: {
+        font: fontFamily,
         fontSize: 8.5,
         cellPadding: 2.5,
         textColor: [17, 24, 39],
@@ -442,6 +512,7 @@ export function downloadBrandedTableReport({
         lineWidth: 0.1,
       },
       headStyles: {
+        font: fontFamily,
         fillColor: [11, 11, 11],
         textColor: [255, 255, 255],
         fontStyle: "bold",
@@ -450,11 +521,34 @@ export function downloadBrandedTableReport({
         fillColor: [248, 250, 252],
       },
       bodyStyles: rows.length === 0 ? { textColor: [107, 114, 128] } : undefined,
+      didParseCell: (data: {
+        section: string;
+        column: { index: number };
+        cell: { styles: { fillColor?: [number, number, number]; textColor?: [number, number, number]; fontStyle?: string; halign?: string } };
+        row: { raw: string[] };
+      }) => {
+        if (data.section !== "body" || statusColumnIndex === -1 || data.column.index !== statusColumnIndex) {
+          return;
+        }
+
+        const rawStatus = String(data.row.raw[statusColumnIndex] ?? "");
+        const colors = getPdfStatusColors(rawStatus);
+        data.cell.styles.fillColor = colors.fill;
+        data.cell.styles.textColor = colors.text;
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.halign = "center";
+      },
       didDrawPage: (data: { pageNumber: number }) => {
+        doc.setDrawColor(212, 175, 55);
+        doc.setLineWidth(0.6);
+        doc.line(marginX, pageHeight - 10, pageWidth - marginX, pageHeight - 10);
+
+        doc.setFont(fontFamily, "normal");
         doc.setFontSize(8);
         doc.setTextColor(107, 114, 128);
         doc.text(`Generated on ${generatedAt}`, marginX, pageHeight - 6);
-        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX - 12, pageHeight - 6);
+        doc.text("Serenades of Praise Choir • Admin Report", pageWidth / 2, pageHeight - 6, { align: "center" });
+        doc.text(`Page ${data.pageNumber}`, pageWidth - marginX, pageHeight - 6, { align: "right" });
       },
     });
 
