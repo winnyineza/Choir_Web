@@ -1059,17 +1059,33 @@ export default function Admin() {
   };
 
   const getAttendanceRate = () => {
-    let sessionsToShow = attendanceSessions;
-    
-    if (attendanceTimePeriod === "10") {
-      sessionsToShow = attendanceSessions.slice(-10);
-    } else if (attendanceTimePeriod === "30") {
-      sessionsToShow = attendanceSessions.slice(-30);
+    const sortedSessions = [...attendanceSessions].sort(
+      (left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()
+    );
+
+    let sessionsToShow = sortedSessions;
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+
+    if (attendanceTimePeriod === "10" || attendanceTimePeriod === "30") {
+      const days = Number(attendanceTimePeriod);
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - days + 1);
+      cutoff.setHours(0, 0, 0, 0);
+      sessionsToShow = sortedSessions.filter((session) => {
+        const sessionDate = new Date(`${session.date}T00:00:00`);
+        return sessionDate.getTime() >= cutoff.getTime();
+      });
     } else if (attendanceTimePeriod === "year") {
-      const yearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-      sessionsToShow = attendanceSessions.filter(s => new Date(s.date).getTime() > yearAgo);
+      const cutoff = new Date(now);
+      cutoff.setFullYear(cutoff.getFullYear() - 1);
+      cutoff.setHours(0, 0, 0, 0);
+      sessionsToShow = sortedSessions.filter((session) => {
+        const sessionDate = new Date(`${session.date}T00:00:00`);
+        return sessionDate.getTime() >= cutoff.getTime();
+      });
     }
-    
+
     return sessionsToShow.map(session => {
       const total = session.totalPresent + session.totalAbsent + session.totalExcused + session.totalLate;
       const rate = total > 0 ? (session.totalPresent / total) * 100 : 0;
