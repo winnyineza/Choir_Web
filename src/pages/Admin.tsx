@@ -104,6 +104,7 @@ import {
 } from "@/lib/leaveService";
 import {
   getAllAttendanceRecords,
+  getAllSessions,
   canEditAttendanceDate,
   getAttendanceEditDeadline,
   getAttendanceByDate,
@@ -409,13 +410,15 @@ export default function Admin() {
   };
 
   const loadAttendanceData = async () => {
-    const [recentSessionsData, attendanceStatsData, pendingLeaveData] = await Promise.all([
-      getRecentSessions(20),
+    const [allSessionsData, attendanceStatsData, pendingLeaveData] = await Promise.all([
+      getAllSessions(),
       getOverallAttendanceStats(),
       getPendingLeaveRequests(),
     ]);
 
-    setAttendanceSessions(recentSessionsData);
+    setAttendanceSessions(
+      allSessionsData.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    );
     setOverallAttendanceStats(attendanceStatsData);
     setLeaveRequests(pendingLeaveData);
   };
@@ -2888,7 +2891,7 @@ export default function Admin() {
                   </div>
                   <div className="h-44">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getAttendanceRate()}>
+                      <LineChart data={attendanceTrend}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
                         <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} />
                         <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} domain={[0, 100]} />
@@ -2909,9 +2912,9 @@ export default function Admin() {
                     </ResponsiveContainer>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Showing {getAttendanceRate().length} sessions • Avg: {
-                      getAttendanceRate().length > 0 
-                        ? Math.round(getAttendanceRate().reduce((sum, s) => sum + s.rate, 0) / getAttendanceRate().length)
+                    Showing {attendanceTrend.length} sessions • Avg: {
+                      attendanceTrend.length > 0 
+                        ? Math.round(attendanceTrend.reduce((sum, s) => sum + s.rate, 0) / attendanceTrend.length)
                         : 0
                     }%
                   </p>
