@@ -444,13 +444,16 @@ export function downloadBrandedTableReport({
     getImageDataUrl(logo),
     getFontBinary(montserratRegularTtf),
     getFontBinary(montserratBoldTtf),
-  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBinary, montserratBoldBinary]) => {
+    getSettings(),
+  ]).then(([jspdfModule, autoTableModule, logoDataUrl, montserratRegularBinary, montserratBoldBinary, settings]) => {
     const { jsPDF } = jspdfModule;
     const autoTable = autoTableModule.default;
     const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginX = 12;
+    const choirEmail = settings?.email?.trim() || "theserenadeschoir@gmail.com";
+    const choirPhone = settings?.phone?.trim() || "+250 780 623 144";
     let hasMontserrat = false;
 
     if (montserratRegularBinary && montserratBoldBinary) {
@@ -583,12 +586,12 @@ export function downloadBrandedTableReport({
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(8.2);
         doc.setTextColor(255, 255, 255);
-        doc.text("Serenades of Praise Choir", marginX + 6, footerTop + 4.6);
+        doc.text(choirEmail, marginX + 6, footerTop + 4.6);
 
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.4);
         doc.setTextColor(245, 208, 95);
-        doc.text("Admin report • Attendance and records archive", marginX + 6, footerTop + 8.7);
+        doc.text(choirPhone, marginX + 6, footerTop + 8.7);
 
         doc.setFont(fontFamily, "bold");
         doc.setFontSize(7.2);
