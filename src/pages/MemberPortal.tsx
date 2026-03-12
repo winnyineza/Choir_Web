@@ -535,25 +535,51 @@ export default function MemberPortal() {
     }
   }, [view, resendTimer]);
 
+  const focusVerificationInput = (index: number) => {
+    const input = document.getElementById(`code-${index}`) as HTMLInputElement | null;
+    input?.focus();
+  };
+
+  const fillVerificationCode = (rawValue: string, startIndex = 0) => {
+    const digits = rawValue.replace(/\D/g, "").slice(0, 6 - startIndex).split("");
+    if (digits.length === 0) return;
+
+    const newCode = [...verificationCode];
+    digits.forEach((digit, offset) => {
+      newCode[startIndex + offset] = digit;
+    });
+    setVerificationCode(newCode);
+
+    const nextIndex = Math.min(startIndex + digits.length, 5);
+    focusVerificationInput(nextIndex);
+  };
+
   // Verification code input handling
   const handleCodeChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[0];
     if (!/^\d*$/.test(value)) return;
+
+    if (value.length > 1) {
+      fillVerificationCode(value, index);
+      return;
+    }
 
     const newCode = [...verificationCode];
     newCode[index] = value;
     setVerificationCode(newCode);
 
     if (value && index < 5) {
-      const nextInput = document.getElementById(`code-${index + 1}`);
-      nextInput?.focus();
+      focusVerificationInput(index + 1);
     }
+  };
+
+  const handleCodePaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    fillVerificationCode(e.clipboardData.getData("text"), index);
   };
 
   const handleCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !verificationCode[index] && index > 0) {
-      const prevInput = document.getElementById(`code-${index - 1}`);
-      prevInput?.focus();
+      focusVerificationInput(index - 1);
     }
   };
 
@@ -1557,9 +1583,11 @@ export default function MemberPortal() {
                       id={`code-${index}`}
                       type="text"
                       inputMode="numeric"
+                      autoComplete={index === 0 ? "one-time-code" : undefined}
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleCodeChange(index, e.target.value)}
+                      onPaste={(e) => handleCodePaste(index, e)}
                       onKeyDown={(e) => handleCodeKeyDown(index, e)}
                       className="w-12 h-14 text-center text-xl font-bold rounded-xl bg-secondary border-2 border-primary/20 focus:border-primary transition-all outline-none"
                       autoFocus={index === 0}

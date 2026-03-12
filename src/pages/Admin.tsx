@@ -349,6 +349,7 @@ export default function Admin() {
   const [showAddMusicVideo, setShowAddMusicVideo] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [viewingMember, setViewingMember] = useState<Member | null>(null);
+  const [viewingLeaveRequest, setViewingLeaveRequest] = useState<LeaveRequest | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [showEventSummary, setShowEventSummary] = useState(false);
   const [summaryEvent, setSummaryEvent] = useState<Event | null>(null);
@@ -3448,7 +3449,7 @@ export default function Admin() {
                         <tr>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground">Member</th>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground">Dates</th>
-                          <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Reason</th>
+                          <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell w-[30%] min-w-[280px]">Reason</th>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
                           <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
                         </tr>
@@ -3471,8 +3472,22 @@ export default function Admin() {
                                 {Math.ceil((new Date(request.endDate).getTime() - new Date(request.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
                               </p>
                             </td>
-                            <td className="p-4 hidden md:table-cell">
-                              <p className="text-muted-foreground text-sm max-w-[200px] truncate">{request.reason}</p>
+                            <td className="p-4 hidden md:table-cell align-top">
+                              <div className="max-w-md space-y-2">
+                                <p className="text-muted-foreground text-sm whitespace-normal break-words leading-6">
+                                  {request.reason.length > 180 ? `${request.reason.slice(0, 180)}...` : request.reason}
+                                </p>
+                                {request.reason.length > 180 && (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto p-0 text-primary"
+                                    onClick={() => setViewingLeaveRequest(request)}
+                                  >
+                                    View full reason
+                                  </Button>
+                                )}
+                              </div>
                             </td>
                             <td className="p-4">
                               <div className="flex flex-col gap-1">
@@ -3501,6 +3516,16 @@ export default function Admin() {
                               </div>
                             </td>
                             <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-primary hover:bg-primary/10"
+                                  onClick={() => setViewingLeaveRequest(request)}
+                                  title="View details"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
                               {(request.status === "pending" || request.status === "partial") && (
                                 <>
                                   {/* Prevent admins from approving their own leave requests */}
@@ -3606,6 +3631,7 @@ export default function Admin() {
                                   {request.approvalCount || 0} approvals, {request.denialCount || 0} denials
                                 </span>
                               )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -4431,6 +4457,107 @@ export default function Admin() {
                     <Pencil className="w-4 h-4 mr-2" />
                     Edit Attendance
                   </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingLeaveRequest} onOpenChange={(open) => { if (!open) setViewingLeaveRequest(null); }}>
+        <DialogContent className="w-[min(96vw,54rem)] max-w-3xl bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              Leave Request Details
+            </DialogTitle>
+            <DialogDescription>
+              Review the full leave request, member details, approval progress, and any votes already recorded.
+            </DialogDescription>
+          </DialogHeader>
+          {viewingLeaveRequest && (
+            <div className="space-y-5 pt-2">
+              <div className="grid gap-3 rounded-xl border border-primary/10 bg-secondary/20 p-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Member</p>
+                  <p className="font-medium text-foreground">{viewingLeaveRequest.memberName}</p>
+                  <p className="text-sm text-muted-foreground">{viewingLeaveRequest.memberEmail}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1",
+                      viewingLeaveRequest.status === "approved" && "bg-green-500/20 text-green-400",
+                      viewingLeaveRequest.status === "pending" && "bg-yellow-500/20 text-yellow-400",
+                      viewingLeaveRequest.status === "partial" && "bg-orange-500/20 text-orange-400",
+                      viewingLeaveRequest.status === "denied" && "bg-red-500/20 text-red-400"
+                    )}>
+                      {viewingLeaveRequest.status === "approved" && <CheckCircle className="w-3 h-3" />}
+                      {(viewingLeaveRequest.status === "pending" || viewingLeaveRequest.status === "partial") && <Clock className="w-3 h-3" />}
+                      {viewingLeaveRequest.status === "denied" && <XCircle className="w-3 h-3" />}
+                      {viewingLeaveRequest.status === "partial" ? "In Progress" : viewingLeaveRequest.status}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {viewingLeaveRequest.approvalCount || 0}/{REQUIRED_APPROVALS} approvals
+                    </span>
+                    {(viewingLeaveRequest.denialCount || 0) > 0 && (
+                      <span className="text-sm text-red-400">
+                        {viewingLeaveRequest.denialCount} denial{(viewingLeaveRequest.denialCount || 0) > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Dates</p>
+                  <p className="font-medium text-foreground">
+                    {new Date(viewingLeaveRequest.startDate).toLocaleDateString()} - {new Date(viewingLeaveRequest.endDate).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Duration</p>
+                  <p className="font-medium text-foreground">
+                    {Math.ceil((new Date(viewingLeaveRequest.endDate).getTime() - new Date(viewingLeaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} day(s)
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-primary/10 p-4 space-y-2">
+                <p className="text-sm font-medium text-foreground">Reason</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words leading-6">
+                  {viewingLeaveRequest.reason}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-primary/10 p-4 space-y-3">
+                <p className="text-sm font-medium text-foreground">Approval History</p>
+                {viewingLeaveRequest.votes?.length ? (
+                  <div className="space-y-3">
+                    {viewingLeaveRequest.votes.map((vote, index) => (
+                      <div key={`${vote.adminId}-${vote.votedAt}-${index}`} className="rounded-lg border border-primary/10 bg-secondary/20 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-foreground">{vote.adminName}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(vote.votedAt).toLocaleString()}</p>
+                          </div>
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1",
+                            vote.vote === "approve" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                          )}>
+                            {vote.vote === "approve" ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {vote.vote === "approve" ? "Approved" : "Denied"}
+                          </span>
+                        </div>
+                        {vote.notes && (
+                          <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                            {vote.notes}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No votes recorded yet.</p>
                 )}
               </div>
             </div>
