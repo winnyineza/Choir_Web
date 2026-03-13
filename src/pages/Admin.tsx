@@ -48,6 +48,7 @@ import {
   Send,
   Loader2,
   Lock,
+  Unlock,
   EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -1123,6 +1124,17 @@ export default function Admin() {
       if (request.status !== "approved") return false;
       if (!request.unlockedUntil) return false;
       if (new Date(request.unlockedUntil).getTime() < now) return false;
+      if (request.type !== "attendance" && request.type !== "both") return false;
+      return request.month === month && request.year === year;
+    });
+  };
+  const hasPendingAttendanceUnlock = (date: string) => {
+    const baseDate = new Date(`${date}T00:00:00`);
+    const month = baseDate.getMonth() + 1;
+    const year = baseDate.getFullYear();
+
+    return unlockRequests.some((request) => {
+      if (request.status !== "pending") return false;
       if (request.type !== "attendance" && request.type !== "both") return false;
       return request.month === month && request.year === year;
     });
@@ -3296,6 +3308,8 @@ export default function Admin() {
                         const canEditSession = isAttendancePrivilegedEditor
                           && (canEditAttendanceDate(session.date, isAttendancePrivilegedEditor) || isAttendanceDateTemporarilyUnlocked(session.date));
                         const sessionDeadline = getAttendanceEditDeadline(session.date);
+                        const isTemporarilyUnlocked = isAttendanceDateTemporarilyUnlocked(session.date);
+                        const hasPendingUnlock = hasPendingAttendanceUnlock(session.date);
 
                         return (
                         <tr key={session.id} className="border-t border-primary/10">
@@ -3332,18 +3346,54 @@ export default function Admin() {
                                 size="sm"
                                 onClick={() => {
                                   if (canEditSession) {
+                                    if (isTemporarilyUnlocked) {
+                                      toast({
+                                        title: "Temporarily Unlocked",
+                                        description: "This attendance is temporarily unlocked via admin approval. Open it with View to inspect or edit.",
+                                      });
+                                    } else {
+                                      toast({
+                                        title: "Attendance Editable",
+                                        description: `This attendance can be edited until ${sessionDeadline.toLocaleDateString()}. Open it with View to inspect or edit.`,
+                                      });
+                                    }
+                                    return;
+                                  }
+
+                                  if (hasPendingUnlock) {
                                     toast({
-                                      title: "Attendance Editable",
-                                      description: `This attendance can be edited until ${sessionDeadline.toLocaleDateString()}. Open it with View to inspect or edit.`,
+                                      title: "Unlock Request Pending",
+                                      description: "An attendance unlock request for this month is already awaiting approval.",
                                     });
                                     return;
                                   }
 
                                   requestAttendanceUnlock(session.date);
                                 }}
-                                title={canEditSession ? `Editable until ${sessionDeadline.toLocaleDateString()}` : "Request attendance unlock"}
+                                title={
+                                  isTemporarilyUnlocked
+                                    ? "Temporarily unlocked for editing"
+                                    : canEditSession
+                                      ? `Editable until ${sessionDeadline.toLocaleDateString()}`
+                                      : hasPendingUnlock
+                                        ? "Unlock request pending approval"
+                                        : "Request attendance unlock"
+                                }
                               >
-                                <Lock className={cn("w-4 h-4", canEditSession ? "text-muted-foreground" : "text-yellow-500")} />
+                                {isTemporarilyUnlocked ? (
+                                  <Unlock className={cn("w-4 h-4", "text-green-400")} />
+                                ) : (
+                                  <Lock
+                                    className={cn(
+                                      "w-4 h-4",
+                                      canEditSession
+                                        ? "text-muted-foreground"
+                                        : hasPendingUnlock
+                                          ? "text-yellow-400"
+                                          : "text-yellow-500",
+                                    )}
+                                  />
+                                )}
                               </Button>
                             )}
                             <Button
