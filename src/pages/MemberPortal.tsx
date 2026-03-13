@@ -111,6 +111,21 @@ import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
+const getLastVerificationSendAt = (email: string): number | null => {
+  if (typeof window === "undefined" || !email) return null;
+  const raw = window.localStorage.getItem(`choir_leave_verification_last_sent:${email.toLowerCase()}`);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const setLastVerificationSendAt = (email: string) => {
+  if (typeof window === "undefined" || !email) return;
+  window.localStorage.setItem(`choir_leave_verification_last_sent:${email.toLowerCase()}` , Date.now().toString());
+};
+
 const NAVIGABLE_VIEWS = new Set<View>(["dashboard", "attendance", "contributions", "requests", "leave-form"]);
 
 export default function MemberPortal() {
@@ -160,7 +175,7 @@ export default function MemberPortal() {
   const [pendingLeaveRequestId, setPendingLeaveRequestId] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [canResend, setCanResend] = useState(false);
-  const [resendTimer, setResendTimer] = useState(60);
+  const [resendTimer, setResendTimer] = useState(RESEND_COOLDOWN_SECONDS);
 
   // Data
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
@@ -487,6 +502,31 @@ export default function MemberPortal() {
 
   // Send verification code
   const handleSendCode = async () => {
+    if (!email) {
+      toast({
+        title: "Email Required",
+        description: "Enter your email before requesting a verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const lastSentAt = getLastVerificationSendAt(email);
+    if (lastSentAt) {
+      const elapsed = Math.floor((Date.now() - lastSentAt) / 1000);
+      if (elapsed < RESEND_COOLDOWN_SECONDS) {
+        const remaining = RESEND_COOLDOWN_SECONDS - elapsed;
+        setCanResend(false);
+        setResendTimer(remaining);
+        toast({
+          title: "Please wait",
+          description: `You can resend a code in ${remaining}s` ,
+        });
+        setView("submit");
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
@@ -499,12 +539,13 @@ export default function MemberPortal() {
         if (result.code) {
           setDevCode(result.code);
         }
+        setLastVerificationSendAt(email);
         toast({
           title: "Code sent! 📧",
           description: result.message,
         });
         setCanResend(false);
-        setResendTimer(60);
+        setResendTimer(RESEND_COOLDOWN_SECONDS);
         setView("submit");
       } else {
         toast({
@@ -537,6 +578,25 @@ export default function MemberPortal() {
       setCanResend(true);
     }
   }, [view, resendTimer]);
+
+  // Initialize resend timer and state from any existing cooldown in localStorage
+  useEffect(() => {
+    if (!email) return;
+
+    const lastSentAt = getLastVerificationSendAt(email);
+    if (!lastSentAt) {
+      return;
+    }
+
+    const elapsed = Math.floor((Date.now() - lastSentAt) / 1000);
+    if (elapsed >= RESEND_COOLDOWN_SECONDS) {
+      setCanResend(true);
+      setResendTimer(0);
+    } else {
+      setCanResend(false);
+      setResendTimer(RESEND_COOLDOWN_SECONDS - elapsed);
+    }
+  }, [email]);
 
   const focusVerificationInput = (index: number) => {
     const input = document.getElementById(`code-${index}`) as HTMLInputElement | null;
