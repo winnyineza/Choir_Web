@@ -1094,19 +1094,7 @@ export function ContributionManagement() {
                     const expectedAmount = monthlyType?.amount || 0;
                     let paidMonthsCount = 0;
                     let toleratedMonthsCount = 0;
-                    
-                    // Determine member's start month based on join date
-                    const joinDate = new Date(member.joinedDate);
-                    const joinYear = joinDate.getFullYear();
-                    const joinMonth = joinDate.getMonth() + 1;
-                    
-                    // Calculate how many months this member is responsible for
-                    let applicableMonths = 12;
-                    if (joinYear === bulkYear) {
-                      applicableMonths = 12 - joinMonth + 1; // From join month to December
-                    } else if (joinYear > bulkYear) {
-                      applicableMonths = 0; // Not a member yet in this year
-                    }
+                    const applicableMonths = 12;
                     
                     return (
                       <tr key={member.id} className="border-t border-primary/10 hover:bg-secondary/30 transition-colors">
@@ -1122,21 +1110,6 @@ export function ContributionManagement() {
                         </td>
                         {MONTH_NAMES.map((_, monthIndex) => {
                           const month = monthIndex + 1;
-                          
-                          // Check if member was a member during this month
-                          const wasNotMemberYet = (joinYear === bulkYear && month < joinMonth) || (joinYear > bulkYear);
-                          
-                          if (wasNotMemberYet) {
-                            // Show N/A for months before member joined
-                            return (
-                              <td key={month} className="p-1 text-center">
-                                <div className="w-full h-10 rounded-lg bg-secondary/20 flex items-center justify-center" title="Not a member yet">
-                                  <span className="text-[10px] text-muted-foreground/40">N/A</span>
-                                </div>
-                              </td>
-                            );
-                          }
-                          
                           // Use historical rate tracking - compare against rate at time of payment
                           const paymentDetails = paymentDetailsMap[`${member.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: expectedAmount, hasHistoricalRate: false };
                           const amountPaid = paymentDetails.amountPaid;
@@ -1295,12 +1268,6 @@ export function ContributionManagement() {
                 <Clock className="w-4 h-4 text-amber-400" />
               </div>
               <span>Tolerated / grace</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-secondary/20 flex items-center justify-center">
-                <span className="text-[10px] text-muted-foreground/40">N/A</span>
-              </div>
-              <span>Not a member yet</span>
             </div>
             <div className="ml-auto text-foreground font-medium">
               Click any cell to record payment or manage tolerance

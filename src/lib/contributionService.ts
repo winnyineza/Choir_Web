@@ -776,18 +776,7 @@ export async function getContributionStats(): Promise<ContributionStats> {
   let toleratedMonthsCount = 0;
   const activeMembers = members.filter(m => m.status === "Active");
   for (const member of activeMembers) {
-    const joinDate = new Date(member.joinedDate);
-    const joinYear = joinDate.getFullYear();
-    const joinMonth = joinDate.getMonth() + 1;
-
-    let startMonth = 1;
-    if (joinYear === currentYear) {
-      startMonth = joinMonth;
-    } else if (joinYear > currentYear) {
-      continue;
-    }
-
-    for (let month = startMonth; month <= currentMonth; month++) {
+    for (let month = 1; month <= currentMonth; month++) {
       const rateForMonth = await getMonthlyRateForPeriod(month, currentYear);
       const details = buildMonthlyDuesStatusDetails({
         memberId: member.id,
@@ -829,20 +818,13 @@ export async function getContributionStats(): Promise<ContributionStats> {
 }
 
 export async function getMonthlyDuesReport(month: number, year: number, members: { id: string; name: string; email: string }[]) {
-  const [contributions, types, allMembers, exceptions] = await Promise.all([
+  const [contributions, exceptions] = await Promise.all([
     getAllContributions(),
-    getAllContributionTypes(),
-    getAllMembers(),
     getAllMonthlyDuesExceptions(),
   ]);
   const rateForMonth = await getMonthlyRateForPeriod(month, year);
 
   return members.map(member => {
-    const fullMember = allMembers.find((entry) => entry.id === member.id);
-    const joinDate = fullMember ? new Date(fullMember.joinedDate) : null;
-    const isNotApplicable = joinDate
-      ? joinDate.getFullYear() > year || (joinDate.getFullYear() === year && joinDate.getMonth() + 1 > month)
-      : false;
     const details = buildMonthlyDuesStatusDetails({
       memberId: member.id,
       month,
@@ -850,7 +832,6 @@ export async function getMonthlyDuesReport(month: number, year: number, members:
       contributions,
       rateForMonth,
       exceptions,
-      applicable: !isNotApplicable,
     });
     const memberContributions = contributions.filter(
       c => c.memberId === member.id &&
