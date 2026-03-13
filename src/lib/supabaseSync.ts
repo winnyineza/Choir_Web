@@ -197,6 +197,39 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     }),
   },
 
+  // --- Monthly Dues Exceptions ---
+  choir_monthly_dues_exceptions: {
+    table: 'monthly_dues_exceptions',
+    orderBy: 'created_at',
+    orderAsc: false,
+    toDb: (e: any) => ({
+      id: e.id,
+      member_id: e.memberId,
+      month: e.month,
+      year: e.year,
+      status: e.status || 'tolerated',
+      created_by: e.createdBy || null,
+      created_by_role: e.createdByRole || null,
+      created_at: e.createdAt || new Date().toISOString(),
+      cleared_at: e.clearedAt || null,
+      cleared_by: e.clearedBy || null,
+      cleared_by_role: e.clearedByRole || null,
+    }),
+    fromDb: (r: any) => ({
+      id: r.id,
+      memberId: r.member_id,
+      month: r.month,
+      year: r.year,
+      status: r.status || 'tolerated',
+      createdBy: r.created_by || '',
+      createdByRole: r.created_by_role || '',
+      createdAt: r.created_at,
+      clearedAt: r.cleared_at || '',
+      clearedBy: r.cleared_by || '',
+      clearedByRole: r.cleared_by_role || '',
+    }),
+  },
+
   // --- Contact Submissions ---
   choir_contact_submissions: {
     table: 'contact_submissions',
