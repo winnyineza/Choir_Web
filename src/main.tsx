@@ -11,12 +11,38 @@ import "./index.css";
 import { registerSW } from "virtual:pwa-register";
 // No localStorage sync needed - all services read/write directly from Supabase
 
-registerSW({
+const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    window.location.reload();
+    void updateSW(true);
+  },
+  onOfflineReady() {
+    console.info("Serenades PWA is ready for offline use.");
   },
 });
+
+if (typeof window !== "undefined") {
+  let hasReloadedForUpdate = false;
+
+  navigator.serviceWorker?.addEventListener("controllerchange", () => {
+    if (hasReloadedForUpdate) return;
+    hasReloadedForUpdate = true;
+    window.location.reload();
+  });
+
+  const refreshServiceWorker = () => {
+    void updateSW();
+  };
+
+  window.addEventListener("focus", refreshServiceWorker);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      refreshServiceWorker();
+    }
+  });
+
+  window.setInterval(refreshServiceWorker, 60 * 1000);
+}
 
 // Error Boundary to catch rendering errors
 interface ErrorBoundaryState {
