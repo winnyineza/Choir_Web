@@ -8,6 +8,7 @@ import { getOutstandingFineBalanceByMember, getOutstandingFineBalanceTotal } fro
 
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
+const MONTHLY_DUES_EXCEPTIONS_KEY = "choir_monthly_dues_exceptions";
 
 export type ContributionCategory = "monthly" | "special";
 
@@ -47,6 +48,187 @@ export interface Contribution {
   notes?: string;
   recordedBy: string;
   createdAt: string;
+}
+
+export type MonthlyDuesExceptionStatus = "tolerated";
+
+export interface MonthlyDuesException {
+  id: string;
+  memberId: string;
+  month: number;
+  year: number;
+  status: MonthlyDuesExceptionStatus;
+  reason: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: string;
+  clearedAt?: string;
+  clearedBy?: string;
+  clearedByRole?: string;
+}
+
+export type MonthlyDuesStatus = "not_applicable" | "unpaid" | "partial" | "paid" | "tolerated";
+
+export interface MonthlyDuesStatusDetails {
+  status: MonthlyDuesStatus;
+  amountPaid: number;
+  expectedAmount: number;
+  hasHistoricalRate: boolean;
+  isTolerated: boolean;
+  toleratedReason?: string;
+  toleratedRecordId?: string;
+}
+
+export async function getAllMonthlyDuesExceptions(): Promise<MonthlyDuesException[]> {
+  return dbGetAll<MonthlyDuesException>(MONTHLY_DUES_EXCEPTIONS_KEY);
+}
+
+function getActiveToleranceRecord(
+  exceptions: MonthlyDuesException[],
+  memberId: string,
+  month: number,
+  year: number
+): MonthlyDuesException | undefined {
+  return exceptions.find(
+    (record) =>
+      record.memberId === memberId &&
+      record.month === month &&
+      record.year === year &&
+      record.status === "tolerated" &&
+      !record.clearedAt
+  );
+}
+
+function buildMonthlyDuesStatusDetails(params: {
+  memberId: string;
+  month: number;
+  year: number;
+  contributions: Contribution[];
+  rateForMonth: number;
+  exceptions: MonthlyDuesException[];
+  applicable?: boolean;
+}): MonthlyDuesStatusDetails {
+  const monthlyContribs = params.contributions.filter(
+    (c) => c.memberId === params.memberId && c.month === params.month && c.year === params.year && c.category === "monthly"
+  );
+  const amountPaid = monthlyContribs.reduce((sum, c) => sum + c.amount, 0);
+  const storedExpected = monthlyContribs.find((c) => c.expectedAmount)?.expectedAmount;
+  const expectedAmount = storedExpected ?? params.rateForMonth;
+  const toleratedRecord = getActiveToleranceRecord(params.exceptions, params.memberId, params.month, params.year);
+
+  if (params.applicable === false) {
+    return {
+      status: "not_applicable",
+      amountPaid,
+      expectedAmount,
+      hasHistoricalRate: !!storedExpected || params.rateForMonth > 0,
+      isTolerated: false,
+    };
+  }
+
+  if (amountPaid >= expectedAmount && expectedAmount > 0) {
+    return {
+      status: "paid",
+      amountPaid,
+      expectedAmount,
+      hasHistoricalRate: !!storedExpected || params.rateForMonth > 0,
+      isTolerated: false,
+    };
+  }
+
+  if (amountPaid > 0) {
+    return {
+      status: "partial",
+      amountPaid,
+      expectedAmount,
+      hasHistoricalRate: !!storedExpected || params.rateForMonth > 0,
+      isTolerated: false,
+    };
+  }
+
+  if (toleratedRecord) {
+    return {
+      status: "tolerated",
+      amountPaid,
+      expectedAmount,
+      hasHistoricalRate: !!storedExpected || params.rateForMonth > 0,
+      isTolerated: true,
+      toleratedReason: toleratedRecord.reason,
+      toleratedRecordId: toleratedRecord.id,
+    };
+  }
+
+  return {
+    status: "unpaid",
+    amountPaid,
+    expectedAmount,
+    hasHistoricalRate: !!storedExpected || params.rateForMonth > 0,
+    isTolerated: false,
+  };
+}
+
+export async function getMonthlyDuesExceptionForMember(
+  memberId: string,
+  month: number,
+  year: number
+): Promise<MonthlyDuesException | undefined> {
+  const exceptions = await getAllMonthlyDuesExceptions();
+  return getActiveToleranceRecord(exceptions, memberId, month, year);
+}
+
+export async function markMemberMonthlyTolerance(data: {
+  memberId: string;
+  month: number;
+  year: number;
+  reason: string;
+  createdBy: string;
+  createdByRole: string;
+}): Promise<MonthlyDuesException> {
+  const exceptions = await getAllMonthlyDuesExceptions();
+  const existing = getActiveToleranceRecord(exceptions, data.memberId, data.month, data.year);
+
+  if (existing) {
+    return dbUpdate<MonthlyDuesException>(MONTHLY_DUES_EXCEPTIONS_KEY, existing.id, {
+      ...existing,
+      reason: data.reason,
+      createdBy: data.createdBy,
+      createdByRole: data.createdByRole,
+      createdAt: new Date().toISOString(),
+      clearedAt: undefined,
+      clearedBy: undefined,
+      clearedByRole: undefined,
+    });
+  }
+
+  return dbInsert<MonthlyDuesException>(MONTHLY_DUES_EXCEPTIONS_KEY, {
+    id: generateId(),
+    memberId: data.memberId,
+    month: data.month,
+    year: data.year,
+    status: "tolerated",
+    reason: data.reason,
+    createdBy: data.createdBy,
+    createdByRole: data.createdByRole,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export async function clearMemberMonthlyTolerance(data: {
+  memberId: string;
+  month: number;
+  year: number;
+  clearedBy: string;
+  clearedByRole: string;
+}): Promise<MonthlyDuesException | null> {
+  const existing = await getMonthlyDuesExceptionForMember(data.memberId, data.month, data.year);
+  if (!existing) return null;
+
+  return dbUpdate<MonthlyDuesException>(MONTHLY_DUES_EXCEPTIONS_KEY, existing.id, {
+    ...existing,
+    clearedAt: new Date().toISOString(),
+    clearedBy: data.clearedBy,
+    clearedByRole: data.clearedByRole,
+  });
 }
 
 // ============ CONTRIBUTION TYPES ============
@@ -279,25 +461,21 @@ export async function getMemberMonthlyPayment(memberId: string, month: number, y
     .reduce((sum, c) => sum + c.amount, 0);
 }
 
-export async function getMemberMonthlyPaymentDetails(memberId: string, month: number, year: number): Promise<{
-  amountPaid: number;
-  expectedAmount: number;
-  hasHistoricalRate: boolean;
-}> {
-  const contributions = await getContributionsByMember(memberId);
-  const monthlyContribs = contributions.filter(
-    c => c.memberId === memberId && c.month === month && c.year === year && c.category === "monthly"
-  );
+export async function getMemberMonthlyPaymentDetails(memberId: string, month: number, year: number): Promise<MonthlyDuesStatusDetails> {
+  const [contributions, rateForMonth, exceptions] = await Promise.all([
+    getContributionsByMember(memberId),
+    getMonthlyRateForPeriod(month, year),
+    getAllMonthlyDuesExceptions(),
+  ]);
 
-  const amountPaid = monthlyContribs.reduce((sum, c) => sum + c.amount, 0);
-  const storedExpected = monthlyContribs.find(c => c.expectedAmount)?.expectedAmount;
-  const rateForMonth = await getMonthlyRateForPeriod(month, year);
-
-  return {
-    amountPaid,
-    expectedAmount: storedExpected ?? rateForMonth,
-    hasHistoricalRate: !!storedExpected || rateForMonth > 0,
-  };
+  return buildMonthlyDuesStatusDetails({
+    memberId,
+    month,
+    year,
+    contributions,
+    rateForMonth,
+    exceptions,
+  });
 }
 
 export async function setMemberMonthlyPayment(
@@ -308,6 +486,7 @@ export async function setMemberMonthlyPayment(
   year: number,
   amount: number,
   recordedBy: string,
+  recordedByRole?: string,
   expectedAmount?: number,
   forceOverride?: boolean
 ): Promise<Contribution | null> {
@@ -338,6 +517,14 @@ export async function setMemberMonthlyPayment(
     }
     return null;
   }
+
+  await clearMemberMonthlyTolerance({
+    memberId,
+    month,
+    year,
+    clearedBy: recordedBy,
+    clearedByRole: recordedByRole || (forceOverride ? "super_admin" : "finance"),
+  });
 
   if (existing) {
     const updates: Partial<Contribution> = {
@@ -447,6 +634,7 @@ export interface MemberContributionStatus {
   specialContributions: number;
   paidMonths: { month: number; year: number; amount: number }[];
   unpaidMonths: { month: number; year: number; expectedAmount: number }[];
+  toleratedMonths: { month: number; year: number; expectedAmount: number; reason: string }[];
   specialStatus: {
     typeId: string;
     typeName: string;
@@ -464,6 +652,7 @@ export async function getMemberContributionStatus(
   memberEmail: string
 ): Promise<MemberContributionStatus> {
   const contributions = await getContributionsByMember(memberId);
+  const exceptions = await getAllMonthlyDuesExceptions();
   const types = await getAllContributionTypes();
 
   const totalPaid = contributions.reduce((sum, c) => sum + c.amount, 0);
@@ -480,14 +669,23 @@ export async function getMemberContributionStatus(
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
-  const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
-  const monthlyAmount = monthlyType?.amount || 0;
 
   const unpaidMonths: { month: number; year: number; expectedAmount: number }[] = [];
+  const toleratedMonths: { month: number; year: number; expectedAmount: number; reason: string }[] = [];
   for (let month = 1; month <= currentMonth; month++) {
-    const isPaid = paidMonths.some(p => p.month === month && p.year === currentYear);
-    if (!isPaid && monthlyAmount > 0) {
-      unpaidMonths.push({ month, year: currentYear, expectedAmount: monthlyAmount });
+    const rateForMonth = await getMonthlyRateForPeriod(month, currentYear);
+    const details = buildMonthlyDuesStatusDetails({
+      memberId,
+      month,
+      year: currentYear,
+      contributions,
+      rateForMonth,
+      exceptions,
+    });
+    if (details.status === "tolerated") {
+      toleratedMonths.push({ month, year: currentYear, expectedAmount: details.expectedAmount, reason: details.toleratedReason || "" });
+    } else if (details.status === "unpaid" && details.expectedAmount > 0) {
+      unpaidMonths.push({ month, year: currentYear, expectedAmount: details.expectedAmount });
     }
   }
 
@@ -520,6 +718,7 @@ export async function getMemberContributionStatus(
     specialContributions: specialContributionsTotal,
     paidMonths,
     unpaidMonths,
+    toleratedMonths,
     specialStatus,
     outstandingFines,
     totalOutstanding,
@@ -537,14 +736,17 @@ export interface ContributionStats {
   contributionCount: number;
   uniqueContributors: number;
   outstandingDues: number;
+  toleratedDues: number;
+  toleratedMonthsCount: number;
   outstandingFines: number;
   totalOutstanding: number;
 }
 
 export async function getContributionStats(): Promise<ContributionStats> {
-  const [contributions, members] = await Promise.all([
+  const [contributions, members, exceptions] = await Promise.all([
     getAllContributions(),
     getAllMembers(),
+    getAllMonthlyDuesExceptions(),
   ]);
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -570,6 +772,8 @@ export async function getContributionStats(): Promise<ContributionStats> {
   const uniqueContributors = new Set(contributions.map(c => c.memberId)).size;
 
   let outstandingDues = 0;
+  let toleratedDues = 0;
+  let toleratedMonthsCount = 0;
   const activeMembers = members.filter(m => m.status === "Active");
   for (const member of activeMembers) {
     const joinDate = new Date(member.joinedDate);
@@ -585,20 +789,22 @@ export async function getContributionStats(): Promise<ContributionStats> {
 
     for (let month = startMonth; month <= currentMonth; month++) {
       const rateForMonth = await getMonthlyRateForPeriod(month, currentYear);
-      const paidForMonth = contributions.find(
-        c => c.memberId === member.id &&
-             c.category === "monthly" &&
-             c.month === month &&
-             c.year === currentYear
-      );
+      const details = buildMonthlyDuesStatusDetails({
+        memberId: member.id,
+        month,
+        year: currentYear,
+        contributions,
+        rateForMonth,
+        exceptions,
+      });
 
-      if (!paidForMonth) {
-        outstandingDues += rateForMonth;
-      } else {
-        const expectedAmountVal = paidForMonth.expectedAmount ?? rateForMonth;
-        if (paidForMonth.amount < expectedAmountVal) {
-          outstandingDues += (expectedAmountVal - paidForMonth.amount);
-        }
+      if (details.status === "tolerated") {
+        toleratedDues += details.expectedAmount;
+        toleratedMonthsCount += 1;
+      } else if (details.status === "unpaid") {
+        outstandingDues += details.expectedAmount;
+      } else if (details.status === "partial") {
+        outstandingDues += Math.max(0, details.expectedAmount - details.amountPaid);
       }
     }
   }
@@ -615,20 +821,37 @@ export async function getContributionStats(): Promise<ContributionStats> {
     contributionCount: contributions.length,
     uniqueContributors,
     outstandingDues,
+    toleratedDues,
+    toleratedMonthsCount,
     outstandingFines,
     totalOutstanding,
   };
 }
 
 export async function getMonthlyDuesReport(month: number, year: number, members: { id: string; name: string; email: string }[]) {
-  const [contributions, types] = await Promise.all([
+  const [contributions, types, allMembers, exceptions] = await Promise.all([
     getAllContributions(),
     getAllContributionTypes(),
+    getAllMembers(),
+    getAllMonthlyDuesExceptions(),
   ]);
-  const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
-  const expectedAmount = monthlyType?.amount || 0;
+  const rateForMonth = await getMonthlyRateForPeriod(month, year);
 
   return members.map(member => {
+    const fullMember = allMembers.find((entry) => entry.id === member.id);
+    const joinDate = fullMember ? new Date(fullMember.joinedDate) : null;
+    const isNotApplicable = joinDate
+      ? joinDate.getFullYear() > year || (joinDate.getFullYear() === year && joinDate.getMonth() + 1 > month)
+      : false;
+    const details = buildMonthlyDuesStatusDetails({
+      memberId: member.id,
+      month,
+      year,
+      contributions,
+      rateForMonth,
+      exceptions,
+      applicable: !isNotApplicable,
+    });
     const memberContributions = contributions.filter(
       c => c.memberId === member.id &&
            c.category === "monthly" &&
@@ -636,15 +859,16 @@ export async function getMonthlyDuesReport(month: number, year: number, members:
            c.year === year
     );
 
-    const paidAmount = memberContributions.reduce((sum, c) => sum + c.amount, 0);
-
     return {
       memberId: member.id,
       memberName: member.name,
       memberEmail: member.email,
-      expectedAmount,
-      paidAmount,
-      isPaid: paidAmount >= expectedAmount,
+      expectedAmount: details.expectedAmount,
+      paidAmount: details.amountPaid,
+      isPaid: details.status === "paid",
+      status: details.status,
+      isTolerated: details.isTolerated,
+      toleratedReason: details.toleratedReason,
       contributions: memberContributions,
     };
   });

@@ -48,6 +48,7 @@ import { addAuditLog } from "@/lib/adminService";
 import {
   getAllContributions,
   getAllContributionTypes,
+  getAllMonthlyDuesExceptions,
   createContribution,
   deleteContribution,
   createContributionType,
@@ -60,6 +61,8 @@ import {
   getMemberMonthlyPayment,
   getMemberMonthlyPaymentDetails,
   setMemberMonthlyPayment,
+  markMemberMonthlyTolerance,
+  clearMemberMonthlyTolerance,
   getMonthlyRateForPeriod,
   isMonthLocked,
   setLockDay,
@@ -69,6 +72,7 @@ import {
   type Contribution,
   type ContributionType,
   type ContributionCategory,
+  type MonthlyDuesException,
 } from "@/lib/contributionService";
 import { isMonthTemporarilyUnlocked, createUnlockRequest, type UnlockRequestType } from "@/lib/unlockRequestService";
 import { notifyUnlockRequestCreated, notifyContributionRecorded } from "@/lib/notificationEmailService";
@@ -90,6 +94,7 @@ export function ContributionManagement() {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [contributionTypes, setContributionTypes] = useState<ContributionType[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [monthlyExceptions, setMonthlyExceptions] = useState<MonthlyDuesException[]>([]);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getContributionStats>> | null>(null);
   const [monthlyReport, setMonthlyReport] = useState<Awaited<ReturnType<typeof getMonthlyDuesReport>>>([]);
   
@@ -107,7 +112,14 @@ export function ContributionManagement() {
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showFinancialSummary, setShowFinancialSummary] = useState(false);
   const [showUnlockRequest, setShowUnlockRequest] = useState(false);
-  const [unlockReason, setUnlockReason] = useState("");
+  const [unlockForm, setUnlockForm] = useState(() => {
+    const now = new Date();
+    return {
+      month: now.getMonth() === 0 ? 12 : now.getMonth(),
+      year: now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(),
+      reason: "",
+    };
+  });
   const [summaryYear, setSummaryYear] = useState(new Date().getFullYear());
   const [summaryYearExpenses, setSummaryYearExpenses] = useState<Awaited<ReturnType<typeof getExpensesByYear>>>([]);
   const [showBulkMonthlyDues, setShowBulkMonthlyDues] = useState(false);
@@ -128,6 +140,9 @@ export function ContributionManagement() {
     year: number;
     amount: string;
     expectedAmount: number;
+    isTolerated: boolean;
+    toleratedReason: string;
+    toleratedRecordId?: string;
   } | null>(null);
   
   // Special contribution cell payment state
@@ -142,6 +157,7 @@ export function ContributionManagement() {
     currentPaid: number;
   } | null>(null);
   const [savingCellPayment, setSavingCellPayment] = useState(false);
+  const [savingTolerance, setSavingTolerance] = useState(false);
   const [savingSpecialPayment, setSavingSpecialPayment] = useState(false);
   
   
@@ -184,11 +200,12 @@ export function ContributionManagement() {
   }, [filterMonth, filterYear, members]);
   
   const loadData = async () => {
-    const [contribs, types, memb, settings] = await Promise.all([
+    const [contribs, types, memb, settings, exceptions] = await Promise.all([
       getAllContributions(),
       getAllContributionTypes(),
       getAllMembers(),
       getSettings(),
+      getAllMonthlyDuesExceptions(),
     ]);
     // Sync the lock day from settings
     if (settings.contributionLockDay) {
@@ -197,6 +214,7 @@ export function ContributionManagement() {
     setContributions(contribs);
     setContributionTypes(types);
     setMembers(memb);
+    setMonthlyExceptions(exceptions);
     const [st, report] = await Promise.all([
       getContributionStats(),
       getMonthlyDuesReport(filterMonth, filterYear, memb.map(m => ({ id: m.id, name: m.name, email: m.email }))),
@@ -224,7 +242,14 @@ export function ContributionManagement() {
       }
       return applicableRate;
     };
-    const map: Record<string, { amountPaid: number; expectedAmount: number; hasHistoricalRate: boolean }> = {};
+    const map: Record<string, {
+      amountPaid: number;
+      expectedAmount: number;
+      hasHistoricalRate: boolean;
+      isTolerated: boolean;
+      toleratedReason?: string;
+      toleratedRecordId?: string;
+    }> = {};
     for (const m of members) {
       for (let month = 1; month <= 12; month++) {
         const key = `${m.id}-${month}-${bulkYear}`;
@@ -234,15 +259,32 @@ export function ContributionManagement() {
         const amountPaid = monthlyContribs.reduce((sum, c) => sum + c.amount, 0);
         const storedExpected = monthlyContribs.find(c => c.expectedAmount)?.expectedAmount;
         const rateForMonth = getRateForPeriod(month, bulkYear);
+        const toleratedRecord = monthlyExceptions.find(
+          (record) => record.memberId === m.id && record.month === month && record.year === bulkYear && !record.clearedAt
+        );
         map[key] = {
           amountPaid,
           expectedAmount: storedExpected ?? rateForMonth,
           hasHistoricalRate: !!storedExpected || rateForMonth > 0,
+          isTolerated: !!toleratedRecord && amountPaid <= 0,
+          toleratedReason: toleratedRecord?.reason,
+          toleratedRecordId: toleratedRecord?.id,
         };
       }
     }
     return map;
-  }, [contributions, contributionTypes, members, bulkYear]);
+  }, [contributions, contributionTypes, members, bulkYear, monthlyExceptions]);
+
+  const canManageTolerance = currentUser?.role === "finance" || currentUser?.role === "main_admin" || currentUser?.role === "super_admin";
+
+  const openUnlockRequestDialog = (month: number, year: number) => {
+    setUnlockForm({
+      month,
+      year,
+      reason: "",
+    });
+    setShowUnlockRequest(true);
+  };
   
   // Filter contributions
   const filteredContributions = contributions
@@ -353,11 +395,15 @@ export function ContributionManagement() {
 
   // Handle cell click in the overview table
   const handleCellClick = async (member: Member, month: number, year: number) => {
-    // Check if month is locked (super_admin can override)
-    if (isMonthLocked(month, year) && currentUser?.role !== "super_admin") {
+    if (isMonthLocked(month, year)) {
       const tempUnlocked = await isMonthTemporarilyUnlocked(month, year, "contributions");
       if (!tempUnlocked) {
-        toast({ title: "Month Locked", description: `${MONTH_NAMES[month - 1]} ${year} is locked. Contributions can't be modified after the ${getLockDay()}th of the following month.`, variant: "destructive" });
+        toast({
+          title: "Month Locked",
+          description: `${MONTH_NAMES[month - 1]} ${year} is locked. Request a temporary unlock to edit it.`,
+          variant: "destructive",
+        });
+        openUnlockRequestDialog(month, year);
         return;
       }
     }
@@ -378,6 +424,9 @@ export function ContributionManagement() {
       // Show current amount if already paid (for editing), otherwise start empty
       amount: paymentDetails.amountPaid > 0 ? paymentDetails.amountPaid.toString() : "",
       expectedAmount: effectiveExpected,
+      isTolerated: paymentDetails.isTolerated,
+      toleratedReason: paymentDetails.toleratedReason || "",
+      toleratedRecordId: paymentDetails.toleratedRecordId,
     });
   };
   
@@ -461,11 +510,9 @@ export function ContributionManagement() {
     if (!cellPayment) return;
     
     const amount = parseFloat(cellPayment.amount) || 0;
-    const isSuperAdmin = currentUser?.role === "super_admin";
     
     setSavingCellPayment(true);
     try {
-      // Pass the expected amount to store the historical rate
       await setMemberMonthlyPayment(
         cellPayment.memberId,
         cellPayment.memberName,
@@ -474,8 +521,9 @@ export function ContributionManagement() {
         cellPayment.year,
         amount,
         currentUser?.name || "Admin",
+        currentUser?.role,
         cellPayment.expectedAmount, // Historical rate tracking
-        isSuperAdmin // Allow super_admin to override lock
+        false
       );
     
       if (amount > 0) {
@@ -508,6 +556,63 @@ export function ContributionManagement() {
     setCellPayment(null);
     loadData();
     setSavingCellPayment(false);
+  };
+
+  const handleMarkTolerance = async () => {
+    if (!cellPayment || !canManageTolerance) return;
+    if (!cellPayment.toleratedReason.trim()) {
+      toast({ title: "Reason Required", description: "Add a reason before marking this month as tolerated.", variant: "destructive" });
+      return;
+    }
+
+    setSavingTolerance(true);
+    try {
+      await markMemberMonthlyTolerance({
+        memberId: cellPayment.memberId,
+        month: cellPayment.month,
+        year: cellPayment.year,
+        reason: cellPayment.toleratedReason.trim(),
+        createdBy: currentUser?.name || "Admin",
+        createdByRole: currentUser?.role || "finance",
+      });
+      addAuditLog(currentUser, "MONTHLY_DUES_TOLERATED", `${cellPayment.memberName} marked tolerated for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`);
+      toast({
+        title: "Marked as Tolerated",
+        description: `${cellPayment.memberName} is now tolerated for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}.`,
+      });
+      setCellPayment(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to mark tolerated month", variant: "destructive" });
+    } finally {
+      setSavingTolerance(false);
+    }
+  };
+
+  const handleClearTolerance = async () => {
+    if (!cellPayment || !canManageTolerance) return;
+
+    setSavingTolerance(true);
+    try {
+      await clearMemberMonthlyTolerance({
+        memberId: cellPayment.memberId,
+        month: cellPayment.month,
+        year: cellPayment.year,
+        clearedBy: currentUser?.name || "Admin",
+        clearedByRole: currentUser?.role || "finance",
+      });
+      addAuditLog(currentUser, "MONTHLY_DUES_TOLERANCE_REMOVED", `${cellPayment.memberName} tolerance removed for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`);
+      toast({
+        title: "Tolerance Removed",
+        description: `${cellPayment.memberName} is back to normal dues tracking for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}.`,
+      });
+      setCellPayment(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to remove tolerated month", variant: "destructive" });
+    } finally {
+      setSavingTolerance(false);
+    }
   };
   
   // Handle add contribution
@@ -665,13 +770,16 @@ export function ContributionManagement() {
     });
   };
   
-  const paidCount = monthlyReport.filter(r => r.isPaid).length;
-  const unpaidCount = monthlyReport.filter(r => !r.isPaid).length;
+  const paidCount = monthlyReport.filter(r => r.status === "paid").length;
+  const toleratedCount = monthlyReport.filter(r => r.status === "tolerated").length;
+  const unpaidCount = monthlyReport.filter(r => r.status === "unpaid" || r.status === "partial").length;
   
+  const monthlyMemberColumnClass = "min-w-[280px] w-[280px]";
+
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         {/* Total Collected */}
         <div className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all">
           <div className="flex items-center justify-between mb-1">
@@ -711,6 +819,15 @@ export function ContributionManagement() {
             <p className="text-xl font-bold text-red-400">{formatCurrency(stats?.totalOutstanding ?? stats?.outstandingDues ?? 0)}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">Outstanding (Dues + Fines)</p>
+        </div>
+        <div className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-yellow-500" />
+            </div>
+            <p className="text-xl font-bold text-yellow-400">{stats?.toleratedMonthsCount ?? 0}</p>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Tolerated Months</p>
         </div>
         {/* This Month */}
         <div className="card-glass rounded-xl p-3 hover:bg-secondary/50 transition-all">
@@ -919,15 +1036,14 @@ export function ContributionManagement() {
                   </div>
                 );
               }
-              // Show request unlock button for locked months (non-super/main admins)
-              if (isMonthLocked(prevMonth, prevMonthYear) && currentUser?.role !== "super_admin" && currentUser?.role !== "main_admin") {
+              if (isMonthLocked(prevMonth, prevMonthYear)) {
                 return (
                   <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between gap-2">
                     <span className="text-sm text-red-400 flex items-center gap-2">
                       <Lock className="w-4 h-4 flex-shrink-0" />
                       {MONTH_NAMES[prevMonth - 1]} {prevMonthYear} is locked.
                     </span>
-                    <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowUnlockRequest(true)}>
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => openUnlockRequestDialog(prevMonth, prevMonthYear)}>
                       <Unlock className="w-3 h-3 mr-1" /> Request Unlock
                     </Button>
                   </div>
@@ -937,10 +1053,20 @@ export function ContributionManagement() {
             return null;
           })()}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+            <table className="w-full min-w-[1260px] table-fixed">
+              <colgroup>
+                <col className="w-[280px]" />
+                {MONTH_NAMES.map((_, index) => (
+                  <col key={`monthly-col-${index}`} className="w-[72px]" />
+                ))}
+                <col className="w-[96px]" />
+              </colgroup>
               <thead className="bg-secondary/50">
                 <tr>
-                  <th className="text-left p-3 text-sm font-medium text-muted-foreground sticky left-0 bg-secondary/50 z-10">
+                  <th className={cn(
+                    "text-left p-3 text-sm font-medium text-muted-foreground sticky left-0 bg-secondary/50 z-10",
+                    monthlyMemberColumnClass
+                  )}>
                     Member
                   </th>
                   {MONTH_NAMES.map((month, i) => {
@@ -966,6 +1092,7 @@ export function ContributionManagement() {
                     const monthlyType = contributionTypes.find(t => t.category === "monthly" && t.isActive);
                     const expectedAmount = monthlyType?.amount || 0;
                     let paidMonthsCount = 0;
+                    let toleratedMonthsCount = 0;
                     
                     // Determine member's start month based on join date
                     const joinDate = new Date(member.joinedDate);
@@ -982,9 +1109,14 @@ export function ContributionManagement() {
                     
                     return (
                       <tr key={member.id} className="border-t border-primary/10 hover:bg-secondary/30 transition-colors">
-                        <td className="p-3 font-medium text-foreground sticky left-0 bg-background z-10">
+                        <td className={cn(
+                          "p-3 font-medium text-foreground sticky left-0 bg-background z-10",
+                          monthlyMemberColumnClass
+                        )}>
                           <div className="flex items-center gap-2">
-                            <span className="truncate max-w-[150px]">{member.name}</span>
+                            <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={member.name}>
+                              {member.name}
+                            </span>
                           </div>
                         </td>
                         {MONTH_NAMES.map((_, monthIndex) => {
@@ -1011,23 +1143,32 @@ export function ContributionManagement() {
                           const effectiveExpected = paymentDetails.hasHistoricalRate 
                             ? paymentDetails.expectedAmount 
                             : expectedAmount;
+                          const isTolerated = paymentDetails.isTolerated && amountPaid <= 0;
                           const isFullyPaid = amountPaid >= effectiveExpected && effectiveExpected > 0;
                           const isPartiallyPaid = amountPaid > 0 && amountPaid < effectiveExpected;
                           const percentPaid = effectiveExpected > 0 ? Math.round((amountPaid / effectiveExpected) * 100) : 0;
                           const locked = isMonthLocked(month, bulkYear);
-                          const canEdit = !locked || currentUser?.role === "super_admin";
+                          const canEdit = !locked;
                           
                           if (isFullyPaid) paidMonthsCount++;
+                          if (isTolerated) toleratedMonthsCount++;
                           
                           return (
                             <td key={month} className="p-1 text-center">
                               <button
                                 onClick={() => handleCellClick(member, month, bulkYear)}
-                                title={locked ? (canEdit ? `Locked (super admin override)` : `${MONTH_NAMES[monthIndex]} ${bulkYear} is locked`) : undefined}
+                                title={
+                                  isTolerated
+                                    ? `Tolerated: ${paymentDetails.toleratedReason || "Grace period granted"}`
+                                    : locked
+                                      ? `${MONTH_NAMES[monthIndex]} ${bulkYear} is locked`
+                                      : undefined
+                                }
                                 className={cn(
                                   "w-full h-10 rounded-lg transition-all flex items-center justify-center relative",
                                   isFullyPaid && "bg-green-500/20 hover:bg-green-500/30",
                                   isPartiallyPaid && "bg-yellow-500/20 hover:bg-yellow-500/30",
+                                  isTolerated && "bg-amber-500/20 hover:bg-amber-500/30",
                                   !amountPaid && !locked && "bg-secondary/50 hover:bg-secondary",
                                   !amountPaid && locked && "bg-secondary/30",
                                   locked && !canEdit && "cursor-not-allowed opacity-60"
@@ -1035,6 +1176,8 @@ export function ContributionManagement() {
                               >
                                 {isFullyPaid ? (
                                   <CheckCircle className="w-5 h-5 text-green-500" />
+                                ) : isTolerated ? (
+                                  <Clock className="w-5 h-5 text-amber-400" />
                                 ) : isPartiallyPaid ? (
                                   <span className="text-xs font-bold text-yellow-500">
                                     {percentPaid}%
@@ -1053,7 +1196,7 @@ export function ContributionManagement() {
                             paidMonthsCount >= applicableMonths / 2 ? "text-yellow-500" :
                             "text-muted-foreground"
                           )}>
-                            {paidMonthsCount}/{applicableMonths}
+                            {paidMonthsCount}P/{toleratedMonthsCount}T/{applicableMonths}
                           </span>
                         </td>
                       </tr>
@@ -1063,7 +1206,10 @@ export function ContributionManagement() {
               {/* Summary Row */}
               <tfoot className="bg-secondary/30 border-t-2 border-primary/20">
                 <tr>
-                  <td className="p-3 font-semibold text-foreground sticky left-0 bg-secondary/30 z-10">
+                  <td className={cn(
+                    "p-3 font-semibold text-foreground sticky left-0 bg-secondary/30 z-10",
+                    monthlyMemberColumnClass
+                  )}>
                     Total Paid
                   </td>
                   {MONTH_NAMES.map((_, monthIndex) => {
@@ -1076,6 +1222,10 @@ export function ContributionManagement() {
                       const effectiveExpected = details.hasHistoricalRate ? details.expectedAmount : currentExpected;
                       return details.amountPaid >= effectiveExpected && effectiveExpected > 0;
                     }).length;
+                    const toleratedMonthCount = members.filter(m => {
+                      const details = paymentDetailsMap[`${m.id}-${month}-${bulkYear}`] ?? { isTolerated: false };
+                      return details.isTolerated;
+                    }).length;
                     
                     return (
                       <td key={month} className="p-2 text-center">
@@ -1085,7 +1235,7 @@ export function ContributionManagement() {
                           paidCount > 0 ? "text-yellow-500" :
                           "text-muted-foreground"
                         )}>
-                          {paidCount}/{members.length}
+                          {paidCount}P/{toleratedMonthCount}T
                         </span>
                       </td>
                     );
@@ -1104,7 +1254,15 @@ export function ContributionManagement() {
                         return sum + count;
                       }, 0);
                       const maxPayments = members.length * 12;
-                      return `${totalPayments}/${maxPayments}`;
+                      const totalTolerated = members.reduce((sum, m) => {
+                        let count = 0;
+                        for (let month = 1; month <= 12; month++) {
+                          const details = paymentDetailsMap[`${m.id}-${month}-${bulkYear}`] ?? { isTolerated: false };
+                          if (details.isTolerated) count++;
+                        }
+                        return sum + count;
+                      }, 0);
+                      return `${totalPayments}P/${totalTolerated}T/${maxPayments}`;
                     })()}
                   </td>
                 </tr>
@@ -1132,13 +1290,19 @@ export function ContributionManagement() {
               <span>Not Paid</span>
             </div>
             <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-amber-500/20 flex items-center justify-center">
+                <Clock className="w-4 h-4 text-amber-400" />
+              </div>
+              <span>Tolerated / grace</span>
+            </div>
+            <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-secondary/20 flex items-center justify-center">
                 <span className="text-[10px] text-muted-foreground/40">N/A</span>
               </div>
               <span>Not a member yet</span>
             </div>
             <div className="ml-auto text-foreground font-medium">
-              💡 Click any cell to record/edit payment
+              Click any cell to record payment or manage tolerance
             </div>
           </div>
         </div>
@@ -1176,9 +1340,9 @@ export function ContributionManagement() {
               
               // Calculate member column width based on number of columns
               // Starts narrow, grows to match Monthly Dues width (180px) when 6+ columns
-              const memberColWidth = yearTypes.length <= 2 ? "min-w-[100px]" :
-                                     yearTypes.length <= 4 ? "min-w-[130px]" :
-                                     yearTypes.length <= 6 ? "min-w-[150px]" : "min-w-[180px]";
+              const memberColWidth = yearTypes.length <= 2 ? "min-w-[220px] w-[220px]" :
+                                     yearTypes.length <= 4 ? "min-w-[240px] w-[240px]" :
+                                     yearTypes.length <= 6 ? "min-w-[260px] w-[260px]" : "min-w-[280px] w-[280px]";
               
               // Enable scrolling when more than 6 columns
               const enableScroll = yearTypes.length > 6;
@@ -1213,7 +1377,14 @@ export function ContributionManagement() {
                         </div>
                       )}
                       <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
-                        <table className="w-full">
+                        <table className="w-full min-w-max table-fixed">
+                          <colgroup>
+                            <col className={memberColWidth} />
+                            {yearTypes.map(type => (
+                              <col key={`special-col-${type.id}`} className="w-[72px]" />
+                            ))}
+                            <col className="w-[96px]" />
+                          </colgroup>
                           <thead className="bg-secondary/50">
                             <tr>
                               <th className={cn(
@@ -1256,7 +1427,9 @@ export function ContributionManagement() {
                                       "p-3 font-medium text-foreground sticky left-0 bg-background z-10",
                                       memberColWidth
                                     )}>
-                                      <span className="truncate block">{member.name}</span>
+                                      <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={member.name}>
+                                        {member.name}
+                                      </span>
                                     </td>
                                     {yearTypes.map(type => {
                                       const amountPaid = getMemberSpecialPayment(member.id, type.id);
@@ -1812,7 +1985,7 @@ export function ContributionManagement() {
             {reportType === "monthly" ? (
               <>
                 {/* Monthly Summary */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
                     <div className="flex items-center gap-2 mb-1">
                       <CheckCircle className="w-4 h-4 text-green-500" />
@@ -1826,6 +1999,13 @@ export function ContributionManagement() {
                       <span className="text-sm text-red-400">Unpaid</span>
                     </div>
                     <p className="text-2xl font-bold text-red-500">{unpaidCount}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="w-4 h-4 text-yellow-500" />
+                      <span className="text-sm text-yellow-400">Tolerated</span>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-500">{toleratedCount}</p>
                   </div>
                   <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                     <div className="flex items-center gap-2 mb-1">
@@ -1843,16 +2023,26 @@ export function ContributionManagement() {
                   {monthlyReport.map(report => (
                     <div key={report.memberId} className="p-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {report.isPaid ? (
+                        {report.status === "paid" ? (
                           <CheckCircle className="w-5 h-5 text-green-500" />
+                        ) : report.status === "tolerated" ? (
+                          <Clock className="w-5 h-5 text-yellow-500" />
+                        ) : report.status === "not_applicable" ? (
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-secondary/40 text-[10px] text-muted-foreground">N/A</span>
                         ) : (
                           <XCircle className="w-5 h-5 text-red-500" />
                         )}
                         <span className="text-foreground">{report.memberName}</span>
                       </div>
                       <div className="text-right">
-                        {report.isPaid ? (
+                        {report.status === "paid" ? (
                           <span className="text-green-500 font-medium">{formatCurrency(report.paidAmount)}</span>
+                        ) : report.status === "tolerated" ? (
+                          <span className="text-yellow-400 text-sm">Tolerated</span>
+                        ) : report.status === "not_applicable" ? (
+                          <span className="text-muted-foreground text-sm">N/A</span>
+                        ) : report.status === "partial" ? (
+                          <span className="text-yellow-400 text-sm">{formatCurrency(report.paidAmount)} partial</span>
                         ) : (
                           <span className="text-red-400 text-sm">Unpaid</span>
                         )}
@@ -2408,6 +2598,43 @@ export function ContributionManagement() {
                   Monthly dues: <span className="font-medium text-foreground">{formatCurrency(cellPayment.expectedAmount)}</span>
                 </p>
               </div>
+
+              {canManageTolerance && (
+                <div className="space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <p className="text-sm font-medium text-amber-300">Tolerance / Grace</p>
+                  </div>
+                  <Textarea
+                    value={cellPayment.toleratedReason}
+                    onChange={(e) => setCellPayment({ ...cellPayment, toleratedReason: e.target.value })}
+                    placeholder="Why is this month tolerated for now?"
+                    className="bg-secondary border-primary/20"
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                      onClick={handleMarkTolerance}
+                      disabled={savingTolerance || savingCellPayment || !cellPayment.toleratedReason.trim()}
+                    >
+                      {savingTolerance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Clock className="w-4 h-4 mr-2" />}
+                      {cellPayment.isTolerated ? "Update Tolerance" : "Mark Tolerated"}
+                    </Button>
+                    {cellPayment.isTolerated && (
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-red-500/30 text-red-300 hover:bg-red-500/10"
+                        onClick={handleClearTolerance}
+                        disabled={savingTolerance || savingCellPayment}
+                      >
+                        Remove Tolerance
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {/* Quick amount buttons */}
               <div className="space-y-2">
@@ -2468,9 +2695,11 @@ export function ContributionManagement() {
                     "p-3 rounded-xl border flex items-center gap-3",
                     amountNum >= cellPayment.expectedAmount 
                       ? "bg-green-500/10 border-green-500/30" 
-                      : amountNum > 0 
+                    : amountNum > 0 
                         ? "bg-yellow-500/10 border-yellow-500/30"
-                        : "bg-secondary/50 border-primary/10"
+                        : cellPayment.isTolerated
+                          ? "bg-amber-500/10 border-amber-500/30"
+                          : "bg-secondary/50 border-primary/10"
                   )}>
                     {amountNum >= cellPayment.expectedAmount ? (
                       <>
@@ -2483,6 +2712,11 @@ export function ContributionManagement() {
                         <span className="text-yellow-500 font-medium">
                           {percent}% Paid ({formatCurrency(amountNum)} of {formatCurrency(cellPayment.expectedAmount)})
                         </span>
+                      </>
+                    ) : cellPayment.isTolerated ? (
+                      <>
+                        <Clock className="w-6 h-6 text-amber-400" />
+                        <span className="text-amber-300 font-medium">Currently tolerated for this month</span>
                       </>
                     ) : (
                       <>
@@ -2692,8 +2926,8 @@ export function ContributionManagement() {
               <div>
                 <Label>Month</Label>
                 <Select
-                  value={(new Date().getMonth() === 0 ? 12 : new Date().getMonth()).toString()}
-                  onValueChange={() => {}}
+                  value={unlockForm.month.toString()}
+                  onValueChange={(value) => setUnlockForm((prev) => ({ ...prev, month: parseInt(value, 10) }))}
                 >
                   <SelectTrigger className="bg-secondary border-primary/20">
                     <SelectValue />
@@ -2709,8 +2943,8 @@ export function ContributionManagement() {
                 <Label>Year</Label>
                 <Input
                   type="number"
-                  value={new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear()}
-                  readOnly
+                  value={unlockForm.year}
+                  onChange={(e) => setUnlockForm((prev) => ({ ...prev, year: parseInt(e.target.value, 10) || new Date().getFullYear() }))}
                   className="bg-secondary border-primary/20"
                 />
               </div>
@@ -2718,8 +2952,8 @@ export function ContributionManagement() {
             <div>
               <Label>Reason for unlock request</Label>
               <Textarea
-                value={unlockReason}
-                onChange={(e) => setUnlockReason(e.target.value)}
+                value={unlockForm.reason}
+                onChange={(e) => setUnlockForm((prev) => ({ ...prev, reason: e.target.value }))}
                 placeholder="e.g., Need to add late contribution records for January..."
                 className="mt-1 bg-secondary border-primary/20"
                 rows={3}
@@ -2728,30 +2962,28 @@ export function ContributionManagement() {
             <Button
               variant="gold"
               className="w-full"
-              disabled={!unlockReason.trim()}
+              disabled={!unlockForm.reason.trim()}
               onClick={async () => {
                 try {
-                  const prevMonth = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
-                  const prevYear = new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
                   await createUnlockRequest({
                     requestedBy: currentUser?.name || "Admin",
                     requestedByRole: currentUser?.role || "finance",
                     requestedById: currentUser?.id || "",
                     type: "both",
-                    month: prevMonth,
-                    year: prevYear,
-                    reason: unlockReason.trim(),
+                    month: unlockForm.month,
+                    year: unlockForm.year,
+                    reason: unlockForm.reason.trim(),
                   });
                   // Notify main_admin and super_admin via email
                   notifyUnlockRequestCreated(
                     currentUser?.name || "Admin",
                     currentUser?.role || "finance",
-                    prevMonth, prevYear, "both",
-                    unlockReason.trim()
+                    unlockForm.month, unlockForm.year, "both",
+                    unlockForm.reason.trim()
                   );
                   toast({ title: "Request Sent", description: "Your unlock request has been sent to the admin for approval." });
                   setShowUnlockRequest(false);
-                  setUnlockReason("");
+                  setUnlockForm((prev) => ({ ...prev, reason: "" }));
                 } catch (err: any) {
                   toast({ title: "Error", description: err.message || "Failed to send request", variant: "destructive" });
                 }
@@ -2765,4 +2997,3 @@ export function ContributionManagement() {
     </div>
   );
 }
-
