@@ -58,6 +58,7 @@ import {
   CheckSquare,
   MessageSquare,
   Camera,
+  Trash2,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
@@ -106,6 +107,7 @@ import {
   type SurveyQuestion,
 } from "@/lib/surveyService";
 import { exportMemberStatement } from "@/lib/exportUtils";
+import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
@@ -192,6 +194,7 @@ export default function MemberPortal() {
   const [surveyAnswers, setSurveyAnswers] = useState<Record<string, string | number | string[]>>({});
   const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
 
   // Load announcements when PIN is verified
   useEffect(() => {
@@ -724,6 +727,53 @@ export default function MemberPortal() {
     }
   };
 
+    const handleDeleteLeaveRequest = async (request: LeaveRequest) => {
+      if (request.status !== "pending" && request.status !== "partial") {
+        toast({
+          title: "Cannot remove request",
+          description: "Only pending or in-progress requests can be removed.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const confirmed = confirmDestructiveAction({
+        action: "remove",
+        subject: "this leave request",
+        warning: "This will permanently remove your request so admins can no longer review it.",
+        confirmWord: "REMOVE",
+      });
+
+      if (!confirmed) return;
+
+      setDeletingRequestId(request.id);
+      try {
+        const success = await deleteLeaveRequest(request.id);
+        if (!success) {
+          toast({
+            title: "Error",
+            description: "Failed to remove leave request. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        setMyRequests((prev) => prev.filter((r) => r.id !== request.id));
+        toast({
+          title: "Leave request removed",
+          description: "Your leave request has been removed successfully.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to remove leave request. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setDeletingRequestId(null);
+      }
+    };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -1232,7 +1282,26 @@ export default function MemberPortal() {
                             </p>
                             <p className="text-xs text-muted-foreground truncate max-w-[200px]">{request.reason}</p>
                           </div>
-                          {getStatusBadge(request.status, request)}
+                          <div className="flex flex-col items-end gap-1">
+                            {getStatusBadge(request.status, request)}
+                            {(request.status === "pending" || request.status === "partial") && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-[11px] mt-1"
+                                  disabled={deletingRequestId === request.id}
+                                  onClick={() => handleDeleteLeaveRequest(request)}
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  {deletingRequestId === request.id ? "Removing..." : "Cancel"}
+                                </Button>
+                                <span className="text-[10px] text-muted-foreground text-right max-w-[220px]">
+                                  Only pending or in-progress requests can be removed.
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1399,7 +1468,26 @@ export default function MemberPortal() {
                               </p>
                               <p className="text-sm text-muted-foreground">{request.reason}</p>
                             </div>
-                            {getStatusBadge(request.status, request)}
+                            <div className="flex flex-col items-end gap-1">
+                              {getStatusBadge(request.status, request)}
+                              {(request.status === "pending" || request.status === "partial") && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-[11px] mt-1"
+                                    disabled={deletingRequestId === request.id}
+                                    onClick={() => handleDeleteLeaveRequest(request)}
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-1" />
+                                    {deletingRequestId === request.id ? "Removing..." : "Cancel"}
+                                  </Button>
+                                  <span className="text-[10px] text-muted-foreground text-right max-w-[260px]">
+                                    Only pending or in-progress requests can be removed.
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
                           {request.adminNotes && (
                             <p className="text-xs text-muted-foreground mt-2 p-2 rounded bg-secondary">

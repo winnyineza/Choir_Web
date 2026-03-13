@@ -2,7 +2,7 @@
 
 import { getAllMembers } from "./dataService";
 import { createReceipt } from "./receiptService";
-import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, generateId } from './supabaseDB';
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 import { isMonthTemporarilyUnlocked } from './unlockRequestService';
 import { getOutstandingFineBalanceByMember, getOutstandingFineBalanceTotal } from './disciplinaryService';
 
@@ -255,8 +255,7 @@ export async function getContributionById(id: string): Promise<Contribution | un
 }
 
 export async function getContributionsByMember(memberId: string): Promise<Contribution[]> {
-  const all = await getAllContributions();
-  return all.filter(c => c.memberId === memberId);
+  return dbQuery<Contribution>(CONTRIBUTIONS_KEY, 'member_id', memberId);
 }
 
 export async function getContributionsByMemberEmail(email: string): Promise<Contribution[]> {
@@ -265,17 +264,16 @@ export async function getContributionsByMemberEmail(email: string): Promise<Cont
 }
 
 export async function getContributionsByType(typeId: string): Promise<Contribution[]> {
-  const all = await getAllContributions();
-  return all.filter(c => c.typeId === typeId);
+  return dbQuery<Contribution>(CONTRIBUTIONS_KEY, 'type_id', typeId);
 }
 
 export async function getContributionsByMonth(month: number, year: number): Promise<Contribution[]> {
-  const all = await getAllContributions();
-  return all.filter(c => c.month === month && c.year === year);
+  const byMonth = await dbQuery<Contribution>(CONTRIBUTIONS_KEY, 'month', month);
+  return byMonth.filter(c => c.year === year);
 }
 
 export async function getMemberMonthlyPayment(memberId: string, month: number, year: number): Promise<number> {
-  const contributions = await getAllContributions();
+  const contributions = await getContributionsByMember(memberId);
   return contributions
     .filter(c => c.memberId === memberId && c.month === month && c.year === year && c.category === "monthly")
     .reduce((sum, c) => sum + c.amount, 0);
@@ -286,7 +284,7 @@ export async function getMemberMonthlyPaymentDetails(memberId: string, month: nu
   expectedAmount: number;
   hasHistoricalRate: boolean;
 }> {
-  const contributions = await getAllContributions();
+  const contributions = await getContributionsByMember(memberId);
   const monthlyContribs = contributions.filter(
     c => c.memberId === memberId && c.month === month && c.year === year && c.category === "monthly"
   );
@@ -320,8 +318,10 @@ export async function setMemberMonthlyPayment(
       throw new Error(`Month ${month}/${year} is locked. Contributions cannot be modified after the ${_cachedLockDay}th of the following month.`);
     }
   }
-  const contributions = await getAllContributions();
-  const types = await getAllContributionTypes();
+  const [contributions, types] = await Promise.all([
+    getContributionsByMember(memberId),
+    getAllContributionTypes(),
+  ]);
   const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
 
   if (!monthlyType) return null;
@@ -542,8 +542,10 @@ export interface ContributionStats {
 }
 
 export async function getContributionStats(): Promise<ContributionStats> {
-  const contributions = await getAllContributions();
-  const members = await getAllMembers();
+  const [contributions, members] = await Promise.all([
+    getAllContributions(),
+    getAllMembers(),
+  ]);
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
@@ -619,8 +621,10 @@ export async function getContributionStats(): Promise<ContributionStats> {
 }
 
 export async function getMonthlyDuesReport(month: number, year: number, members: { id: string; name: string; email: string }[]) {
-  const contributions = await getAllContributions();
-  const types = await getAllContributionTypes();
+  const [contributions, types] = await Promise.all([
+    getAllContributions(),
+    getAllContributionTypes(),
+  ]);
   const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
   const expectedAmount = monthlyType?.amount || 0;
 

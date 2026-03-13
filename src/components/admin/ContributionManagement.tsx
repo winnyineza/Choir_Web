@@ -38,6 +38,7 @@ import {
   DollarSign,
   Clock,
   Target,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -140,6 +141,8 @@ export function ContributionManagement() {
     expectedAmount: number;
     currentPaid: number;
   } | null>(null);
+  const [savingCellPayment, setSavingCellPayment] = useState(false);
+  const [savingSpecialPayment, setSavingSpecialPayment] = useState(false);
   
   
   // Forms
@@ -413,39 +416,44 @@ export function ContributionManagement() {
       return;
     }
     
-    await createContribution({
-      memberId: specialCellPayment.memberId,
-      memberName: specialCellPayment.memberName,
-      memberEmail: specialCellPayment.memberEmail,
-      typeId: specialCellPayment.typeId,
-      typeName: specialCellPayment.typeName,
-      category: contributionTypes.find(t => t.id === specialCellPayment.typeId)?.category || "special",
-      amount,
-      paymentMethod: "cash",
-      recordedBy: currentUser?.name || "Admin",
-    });
-    
-    toast({
-      title: "Payment Recorded",
-      description: `${formatCurrency(amount)} for ${specialCellPayment.memberName} - ${specialCellPayment.typeName}`,
-    });
-    // Send contribution receipt email for special payment
-    if (specialCellPayment.memberEmail) {
-      const type = contributionTypes.find(t => t.id === specialCellPayment.typeId);
-      notifyContributionRecorded(
-        specialCellPayment.memberEmail,
-        specialCellPayment.memberName,
+    setSavingSpecialPayment(true);
+    try {
+      await createContribution({
+        memberId: specialCellPayment.memberId,
+        memberName: specialCellPayment.memberName,
+        memberEmail: specialCellPayment.memberEmail,
+        typeId: specialCellPayment.typeId,
+        typeName: specialCellPayment.typeName,
+        category: contributionTypes.find(t => t.id === specialCellPayment.typeId)?.category || "special",
         amount,
-        specialCellPayment.expectedAmount || type?.targetAmount || 0,
-        new Date().getMonth() + 1,
-        new Date().getFullYear(),
-        "special",
-        specialCellPayment.typeName
-      );
+        paymentMethod: "cash",
+        recordedBy: currentUser?.name || "Admin",
+      });
+      
+      toast({
+        title: "Payment Recorded",
+        description: `${formatCurrency(amount)} for ${specialCellPayment.memberName} - ${specialCellPayment.typeName}`,
+      });
+      // Send contribution receipt email for special payment
+      if (specialCellPayment.memberEmail) {
+        const type = contributionTypes.find(t => t.id === specialCellPayment.typeId);
+        notifyContributionRecorded(
+          specialCellPayment.memberEmail,
+          specialCellPayment.memberName,
+          amount,
+          specialCellPayment.expectedAmount || type?.targetAmount || 0,
+          new Date().getMonth() + 1,
+          new Date().getFullYear(),
+          "special",
+          specialCellPayment.typeName
+        );
+      }
+      
+      setSpecialCellPayment(null);
+      await loadData();
+    } finally {
+      setSavingSpecialPayment(false);
     }
-    
-    setSpecialCellPayment(null);
-    await loadData();
   };
 
   // Save cell payment
@@ -455,6 +463,7 @@ export function ContributionManagement() {
     const amount = parseFloat(cellPayment.amount) || 0;
     const isSuperAdmin = currentUser?.role === "super_admin";
     
+    setSavingCellPayment(true);
     try {
       // Pass the expected amount to store the historical rate
       await setMemberMonthlyPayment(
@@ -498,6 +507,7 @@ export function ContributionManagement() {
     
     setCellPayment(null);
     loadData();
+    setSavingCellPayment(false);
   };
   
   // Handle add contribution
@@ -2488,9 +2498,23 @@ export function ContributionManagement() {
                 <Button variant="outline" className="flex-1" onClick={() => setCellPayment(null)}>
                   Cancel
                 </Button>
-                <Button variant="gold" className="flex-1" onClick={handleSaveCellPayment}>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Save
+                <Button
+                  variant="gold"
+                  className="flex-1"
+                  onClick={handleSaveCellPayment}
+                  disabled={savingCellPayment}
+                >
+                  {savingCellPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Save
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -2628,10 +2652,23 @@ export function ContributionManagement() {
                   variant="gold" 
                   className="flex-1" 
                   onClick={handleSaveSpecialPayment}
-                  disabled={!specialCellPayment.amount || parseFloat(specialCellPayment.amount) <= 0}
+                  disabled={
+                    savingSpecialPayment ||
+                    !specialCellPayment.amount ||
+                    parseFloat(specialCellPayment.amount) <= 0
+                  }
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Payment
+                  {savingSpecialPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Payment
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
