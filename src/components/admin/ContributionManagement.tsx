@@ -64,6 +64,7 @@ import {
   markMemberMonthlyTolerance,
   clearMemberMonthlyTolerance,
   getMonthlyRateForPeriod,
+  getMemberDuesStartMonth,
   isMonthLocked,
   setLockDay,
   getLockDay,
@@ -1094,7 +1095,8 @@ export function ContributionManagement() {
                     const expectedAmount = monthlyType?.amount || 0;
                     let paidMonthsCount = 0;
                     let toleratedMonthsCount = 0;
-                    const applicableMonths = 12;
+                    const startMonth = getMemberDuesStartMonth(member, bulkYear);
+                    const applicableMonths = startMonth === null ? 0 : 12 - startMonth + 1;
                     
                     return (
                       <tr key={member.id} className="border-t border-primary/10 hover:bg-secondary/30 transition-colors">
@@ -1110,6 +1112,18 @@ export function ContributionManagement() {
                         </td>
                         {MONTH_NAMES.map((_, monthIndex) => {
                           const month = monthIndex + 1;
+                          const wasNotMemberYet = startMonth === null || month < startMonth;
+
+                          if (wasNotMemberYet) {
+                            return (
+                              <td key={month} className="p-1 text-center">
+                                <div className="w-full h-10 rounded-lg bg-secondary/20 flex items-center justify-center" title="Not a member yet">
+                                  <span className="text-[10px] text-muted-foreground/40">N/A</span>
+                                </div>
+                              </td>
+                            );
+                          }
+
                           // Use historical rate tracking - compare against rate at time of payment
                           const paymentDetails = paymentDetailsMap[`${member.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: expectedAmount, hasHistoricalRate: false };
                           const amountPaid = paymentDetails.amountPaid;
@@ -1262,6 +1276,12 @@ export function ContributionManagement() {
                 <span className="text-muted-foreground/40">—</span>
               </div>
               <span>Not Paid</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-secondary/20 flex items-center justify-center">
+                <span className="text-[10px] text-muted-foreground/40">N/A</span>
+              </div>
+              <span>Not a member yet</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-amber-500/20 flex items-center justify-center">

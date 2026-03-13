@@ -1,6 +1,6 @@
 // Contribution Service - Track member dues and special contributions (Supabase-direct)
 
-import { getAllMembers } from "./dataService";
+import { getAllMembers, type Member } from "./dataService";
 import { createReceipt } from "./receiptService";
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 import { isMonthTemporarilyUnlocked } from './unlockRequestService';
@@ -9,6 +9,7 @@ import { getOutstandingFineBalanceByMember, getOutstandingFineBalanceTotal } fro
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
 const MONTHLY_DUES_EXCEPTIONS_KEY = "choir_monthly_dues_exceptions";
+const LEGACY_DUES_BASELINE_DATE = new Date("2026-03-13T23:59:59.999Z");
 
 export type ContributionCategory = "monthly" | "special";
 
@@ -81,6 +82,18 @@ export interface MonthlyDuesStatusDetails {
 
 export async function getAllMonthlyDuesExceptions(): Promise<MonthlyDuesException[]> {
   return dbGetAll<MonthlyDuesException>(MONTHLY_DUES_EXCEPTIONS_KEY);
+}
+
+export function getMemberDuesStartMonth(member: Pick<Member, "joinedDate">, year: number): number | null {
+  const joinDate = new Date(member.joinedDate);
+  const joinYear = joinDate.getFullYear();
+  const joinMonth = joinDate.getMonth() + 1;
+  const isLegacyMember = joinDate <= LEGACY_DUES_BASELINE_DATE;
+
+  if (year < joinYear) return null;
+  if (isLegacyMember && year >= LEGACY_DUES_BASELINE_DATE.getFullYear()) return 1;
+  if (year === joinYear) return joinMonth;
+  return 1;
 }
 
 function getActiveToleranceRecord(
@@ -651,9 +664,12 @@ export async function getMemberContributionStatus(
   memberName: string,
   memberEmail: string
 ): Promise<MemberContributionStatus> {
-  const contributions = await getContributionsByMember(memberId);
-  const exceptions = await getAllMonthlyDuesExceptions();
-  const types = await getAllContributionTypes();
+  const [contributions, exceptions, types, members] = await Promise.all([
+    getContributionsByMember(memberId),
+    getAllMonthlyDuesExceptions(),
+    getAllContributionTypes(),
+    getAllMembers(),
+  ]);
 
   const totalPaid = contributions.reduce((sum, c) => sum + c.amount, 0);
   const monthlyDuesPaid = contributions
@@ -669,10 +685,13 @@ export async function getMemberContributionStatus(
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
+  const memberRecord = members.find((entry) => entry.id === memberId);
+  const startMonth = memberRecord ? getMemberDuesStartMonth(memberRecord, currentYear) : 1;
 
   const unpaidMonths: { month: number; year: number; expectedAmount: number }[] = [];
   const toleratedMonths: { month: number; year: number; expectedAmount: number; reason: string }[] = [];
   for (let month = 1; month <= currentMonth; month++) {
+    if (startMonth === null || month < startMonth) continue;
     const rateForMonth = await getMonthlyRateForPeriod(month, currentYear);
     const details = buildMonthlyDuesStatusDetails({
       memberId,
@@ -776,7 +795,10 @@ export async function getContributionStats(): Promise<ContributionStats> {
   let toleratedMonthsCount = 0;
   const activeMembers = members.filter(m => m.status === "Active");
   for (const member of activeMembers) {
-    for (let month = 1; month <= currentMonth; month++) {
+    const startMonth = getMemberDuesStartMonth(member, currentYear);
+    if (startMonth === null) continue;
+
+    for (let month = startMonth; month <= currentMonth; month++) {
       const rateForMonth = await getMonthlyRateForPeriod(month, currentYear);
       const details = buildMonthlyDuesStatusDetails({
         memberId: member.id,
@@ -818,13 +840,16 @@ export async function getContributionStats(): Promise<ContributionStats> {
 }
 
 export async function getMonthlyDuesReport(month: number, year: number, members: { id: string; name: string; email: string }[]) {
-  const [contributions, exceptions] = await Promise.all([
+  const [contributions, exceptions, allMembers] = await Promise.all([
     getAllContributions(),
     getAllMonthlyDuesExceptions(),
+    getAllMembers(),
   ]);
   const rateForMonth = await getMonthlyRateForPeriod(month, year);
 
   return members.map(member => {
+    const memberRecord = allMembers.find((entry) => entry.id === member.id);
+    const startMonth = memberRecord ? getMemberDuesStartMonth(memberRecord, year) : 1;
     const details = buildMonthlyDuesStatusDetails({
       memberId: member.id,
       month,
@@ -832,6 +857,7 @@ export async function getMonthlyDuesReport(month: number, year: number, members:
       contributions,
       rateForMonth,
       exceptions,
+      applicable: startMonth !== null && month >= startMonth,
     });
     const memberContributions = contributions.filter(
       c => c.memberId === member.id &&
