@@ -23,6 +23,19 @@ export function confirmDestructiveAction({
     .filter(Boolean)
     .join("\n\n");
 
-  const response = window.prompt(message, "");
-  return response?.trim().toUpperCase() === confirmWord;
+  try {
+    const response = window.prompt(message, "");
+    return response?.trim().toUpperCase() === confirmWord;
+  } catch {
+    const fallbackMessage = [
+      `You are about to ${action} ${subject}.`,
+      warning,
+      `Your browser/app does not support typed confirmation prompts.`,
+      `Press OK to continue.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return window.confirm(fallbackMessage);
+  }
 }

@@ -787,10 +787,19 @@ export default function Admin() {
       return;
     }
 
-    const reason = window.prompt(
-      `Why do you need to unlock attendance for ${new Date(`${date}T00:00:00`).toLocaleDateString()}?`,
-      "Need to correct attendance records.",
-    )?.trim();
+    let reason = "";
+    try {
+      reason = window.prompt(
+        `Why do you need to unlock attendance for ${new Date(`${date}T00:00:00`).toLocaleDateString()}?`,
+        "Need to correct attendance records.",
+      )?.trim() || "";
+    } catch {
+      const confirmed = window.confirm(
+        `Unlock attendance for ${new Date(`${date}T00:00:00`).toLocaleDateString()}?\n\nYour browser/app does not support text prompts, so the default reason will be used.`
+      );
+      if (!confirmed) return;
+      reason = "Need to correct attendance records.";
+    }
 
     if (!reason) return;
 
@@ -3635,7 +3644,15 @@ export default function Admin() {
                                         size="sm"
                                         className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                                         onClick={async () => {
-                                          const notes = prompt("Reason for denial (optional):");
+                                          let notes = "";
+                                          try {
+                                            notes = window.prompt("Reason for denial (optional):") || "";
+                                          } catch {
+                                            const confirmed = window.confirm(
+                                              "Deny this leave request?\n\nYour browser/app does not support text prompts, so no denial note will be added."
+                                            );
+                                            if (!confirmed) return;
+                                          }
                                           const result = await denyLeaveRequest(
                                             request.id, 
                                             currentUser?.id || "admin",
