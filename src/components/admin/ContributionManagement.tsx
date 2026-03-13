@@ -1239,7 +1239,7 @@ export function ContributionManagement() {
             }
             return null;
           })()}
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto">
             <table className="w-full min-w-[1260px] table-fixed">
               <colgroup>
                 <col className="w-[280px]" />
@@ -1248,7 +1248,7 @@ export function ContributionManagement() {
                 ))}
                 <col className="w-[96px]" />
               </colgroup>
-              <thead className="bg-secondary/50">
+              <thead className="sticky top-0 z-20 bg-secondary/95 backdrop-blur-sm">
                 <tr>
                   <th className={cn(
                     "text-left p-3 text-sm font-medium text-muted-foreground sticky left-0 bg-secondary/50 z-10",

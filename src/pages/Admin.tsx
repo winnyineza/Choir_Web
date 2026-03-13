@@ -2246,8 +2246,9 @@ export default function Admin() {
               {/* Full-width Member Table */}
               <div className="card-glass rounded-2xl overflow-hidden">
                 {filteredMembers.length > 0 ? (
+                  <div className="max-h-[34rem] overflow-auto">
                   <table className="w-full">
-                    <thead className="bg-secondary/50">
+                    <thead className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm">
                       <tr>
                         {canManageMembers && (
                           <th className="w-12 p-4">
@@ -2366,6 +2367,7 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 ) : (
                   <div className="p-8 text-center text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
@@ -2809,9 +2811,9 @@ export default function Admin() {
               {/* Orders Table */}
               <div className="card-glass rounded-2xl overflow-hidden">
                 {filteredOrders.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[34rem] overflow-auto">
                     <table className="w-full">
-                      <thead className="bg-secondary/50">
+                      <thead className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm">
                         <tr>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground">Order</th>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">Customer</th>
@@ -3298,9 +3300,9 @@ export default function Admin() {
                 </div>
                 
                 {attendanceSessions.length > 0 ? (
-                  <div className="max-h-[28rem] overflow-y-auto">
+                  <div className="max-h-[34rem] overflow-auto">
                   <table className="w-full">
-                    <thead className="bg-secondary/50">
+                    <thead className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm">
                       <tr>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
                         <th className="text-left p-4 text-sm font-medium text-muted-foreground">Session</th>
@@ -3502,9 +3504,9 @@ export default function Admin() {
               {/* Leave Requests Table */}
               <div className="card-glass rounded-2xl overflow-hidden">
                 {leaveRequests.filter(r => leaveFilter === "all" || r.status === leaveFilter).length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[34rem] overflow-auto">
                     <table className="w-full">
-                      <thead className="bg-secondary/50">
+                      <thead className="sticky top-0 z-10 bg-secondary/95 backdrop-blur-sm">
                         <tr>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground">Member</th>
                           <th className="text-left p-4 text-sm font-medium text-muted-foreground">Dates</th>

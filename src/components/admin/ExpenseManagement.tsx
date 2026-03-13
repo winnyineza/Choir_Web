@@ -393,7 +393,7 @@ export function ExpenseManagement() {
         </div>
         
         {filteredExpenses.length > 0 ? (
-          <div className="divide-y divide-primary/10">
+          <div className="max-h-[34rem] overflow-y-auto divide-y divide-primary/10">
             {filteredExpenses.map(expense => (
               <div key={expense.id} className="p-4 flex items-center justify-between hover:bg-secondary/30 transition-colors">
                 <div className="flex items-center gap-4">
@@ -553,4 +553,3 @@ export function ExpenseManagement() {
     </div>
   );
 }
-

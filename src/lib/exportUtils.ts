@@ -108,6 +108,14 @@ function toTitleCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
+function normalizeStatusLabel(status: string): string {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (normalized === "n/a" || normalized === "na" || normalized === "not_applicable") return "N/A";
+  if (normalized === "no contribution") return "No contribution";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function getPdfStatusColors(status: string): {
   fill: [number, number, number];
   text: [number, number, number];
@@ -647,7 +655,7 @@ export function downloadBrandedTableReport({
     const bodyRows = rows.length > 0
       ? rows.map((row) => row.map((cell, cellIndex) => {
         const stringValue = String(cell ?? "");
-        return cellIndex === statusColumnIndex ? toTitleCase(stringValue) : stringValue;
+        return cellIndex === statusColumnIndex ? normalizeStatusLabel(stringValue) : stringValue;
       }))
       : [[emptyMessage, ...Array(Math.max(headers.length - 1, 0)).fill("")]];
 
@@ -1442,6 +1450,7 @@ async function buildMemberStatementReport(memberId: string, memberName: string, 
     "Description",
     "Category",
     "Amount (RWF)",
+    "Status",
     "Payment Method",
     "Reference",
   ];
@@ -1453,15 +1462,24 @@ async function buildMemberStatementReport(memberId: string, memberName: string, 
       c.typeName + (c.month && c.year ? ` - ${getMonthName(c.month)} ${c.year}` : ""),
       toTitleCase(c.category),
       c.amount,
+      "Paid",
       c.paymentMethod || "cash",
       c.reference || "",
     ]);
 
   if (status.unpaidMonths.length > 0) {
     rows.push([]);
-    rows.push(["Outstanding Dues", "", "", "", "", ""]);
+    rows.push(["Outstanding Dues", "", "", "", "", "", ""]);
     status.unpaidMonths.forEach((item) => {
-      rows.push([`${getMonthName(item.month)} ${item.year}`, "Monthly Dues", "Monthly", item.expectedAmount, "UNPAID", ""]);
+      rows.push([
+        `${getMonthName(item.month)} ${item.year}`,
+        "Monthly Dues",
+        "Monthly",
+        item.expectedAmount,
+        "Unpaid",
+        "",
+        "",
+      ]);
     });
   }
 
@@ -1510,7 +1528,7 @@ async function buildMonthlyDuesReportData(month: number, year: number) {
     row.memberEmail,
     row.expectedAmount,
     row.paidAmount,
-    row.status === "not_applicable" ? "N/A" : row.status === "tolerated" ? "Tolerated" : toTitleCase(row.status),
+    normalizeStatusLabel(row.status),
   ]);
 
   return {
@@ -1656,7 +1674,7 @@ export async function buildContributionStatusReport(filters: ContributionStatusR
           : paidAmount > 0
             ? "Partial"
             : "Unpaid")
-      : (paidAmount > 0 ? "Contributed" : "No Contribution");
+      : (paidAmount > 0 ? "Contributed" : "No contribution");
 
     return usesTargetStatus
       ? [member.name, expectedAmount, paidAmount, status]
@@ -1687,7 +1705,7 @@ export async function buildContributionStatusReport(filters: ContributionStatusR
         ]
       : [
           { label: "Contributed", value: rows.filter((row) => row[row.length - 1] === "Contributed").length },
-          { label: "No Contribution", value: rows.filter((row) => row[row.length - 1] === "No Contribution").length },
+          { label: "No contribution", value: rows.filter((row) => row[row.length - 1] === "No contribution").length },
           { label: "Collected", value: formatCurrency(totalCollected) },
         ],
     emptyMessage: `No member statuses found for ${type.name}.`,

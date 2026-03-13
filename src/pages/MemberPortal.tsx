@@ -1324,30 +1324,6 @@ export default function MemberPortal() {
                       if (!memberInfo) {
                         toast({
                           title: "Enter your email first",
-                          description: "We need your email to edit your profile.",
-                        });
-                        return;
-                      }
-                      setShowProfileEdit(true);
-                    }}
-                    className="card-glass rounded-2xl p-6 text-left hover:border-primary/30 transition-all group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                        <User className="w-6 h-6 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">My Profile</h3>
-                        <p className="text-sm text-muted-foreground">Edit your profile information</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (!memberInfo) {
-                        toast({
-                          title: "Enter your email first",
                           description: "We need your email to submit a leave request.",
                         });
                         return;
@@ -1414,6 +1390,30 @@ export default function MemberPortal() {
                       </div>
                     </div>
                   </button>
+
+                  <button
+                    onClick={() => {
+                      if (!memberInfo) {
+                        toast({
+                          title: "Enter your email first",
+                          description: "We need your email to edit your profile.",
+                        });
+                        return;
+                      }
+                      setShowProfileEdit(true);
+                    }}
+                    className="card-glass rounded-2xl p-6 text-left hover:border-primary/30 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                        <User className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">My Profile</h3>
+                        <p className="text-sm text-muted-foreground">Edit your profile information</p>
+                      </div>
+                    </div>
+                  </button>
                 </div>
 
                 {/* Upcoming Meetings */}
@@ -1446,54 +1446,6 @@ export default function MemberPortal() {
                     ) : (
                       <p className="text-sm text-muted-foreground">No upcoming meetings available right now.</p>
                     )}
-                  </div>
-                )}
-
-                {/* Profile & Settings (if logged in but no emergency contact) */}
-                {memberInfo && !memberInfo.emergencyContact && (
-                  <div className="card-glass rounded-2xl p-6">
-                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
-                      <User className="w-5 h-5 text-primary" />
-                      My Profile
-                    </h2>
-                    <div className="bg-secondary/30 rounded-xl p-4 mb-4">
-                      <div className="flex items-center gap-4">
-                        {memberInfo.photo ? (
-                          <img src={memberInfo.photo} alt={memberInfo.name} className="w-12 h-12 rounded-full object-cover border border-primary/30" />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                            <User className="w-6 h-6 text-primary" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-foreground">{memberInfo.name}</p>
-                          <p className="text-sm text-muted-foreground">{memberInfo.voice} • {memberInfo.status}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{memberInfo.phone || "No phone added"}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-yellow-500/80 mb-3 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      Please add your emergency contact information.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="gold"
-                        size="sm"
-                        onClick={() => setShowProfileEdit(true)}
-                      >
-                        <Pencil className="w-3 h-3 mr-1" />
-                        Edit Profile
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowSettings(true)}
-                      >
-                        <Settings className="w-3 h-3 mr-1" />
-                        Settings
-                      </Button>
-                    </div>
                   </div>
                 )}
 
@@ -1530,6 +1482,56 @@ export default function MemberPortal() {
                     <div className="flex gap-2 mt-3">
                       <Button
                         variant="outline"
+                        size="sm"
+                        onClick={() => setShowProfileEdit(true)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSettings(true)}
+                      >
+                        <Settings className="w-3 h-3 mr-1" />
+                        Settings
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Profile & Settings */}
+                {memberInfo && (
+                  <div className="card-glass rounded-2xl p-6">
+                    <h2 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5 text-primary" />
+                      My Profile
+                    </h2>
+                    <div className="bg-secondary/30 rounded-xl p-4 mb-4">
+                      <div className="flex items-center gap-4">
+                        {memberInfo.photo ? (
+                          <img src={memberInfo.photo} alt={memberInfo.name} className="w-12 h-12 rounded-full object-cover border border-primary/30" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                            <User className="w-6 h-6 text-primary" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-foreground">{memberInfo.name}</p>
+                          <p className="text-sm text-muted-foreground">{memberInfo.voice} • {memberInfo.status}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{memberInfo.phone || "No phone added"}</p>
+                        </div>
+                      </div>
+                    </div>
+                    {!memberInfo.emergencyContact && (
+                      <p className="text-sm text-yellow-500/80 mb-3 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        Please add your emergency contact information.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="gold"
                         size="sm"
                         onClick={() => setShowProfileEdit(true)}
                       >
@@ -2359,7 +2361,10 @@ export default function MemberPortal() {
                     
                     {selectedReceiptDisplay && (
                       <div className="space-y-6 px-6 pb-6" id="receipt-content">
-                        <div className="overflow-hidden rounded-3xl border border-primary/20 bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.22)]">
+                        <div
+                          className="overflow-hidden rounded-3xl border border-primary/20 bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.22)]"
+                          style={{ fontFamily: '"Montserrat", "Segoe UI", sans-serif' }}
+                        >
                           <div className="relative overflow-hidden border-b border-primary/20 bg-[linear-gradient(135deg,#080808_0%,#17120a_58%,#23190a_100%)] px-5 py-6 md:px-8 md:py-7">
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.22),transparent_32%)]" />
                             <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
