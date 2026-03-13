@@ -276,6 +276,7 @@ export function ContributionManagement() {
   }, [contributions, contributionTypes, members, bulkYear, monthlyExceptions]);
 
   const canManageTolerance = currentUser?.role === "finance" || currentUser?.role === "main_admin" || currentUser?.role === "super_admin";
+  const canBypassContributionLock = currentUser?.role === "main_admin" || currentUser?.role === "super_admin";
 
   const openUnlockRequestDialog = (month: number, year: number) => {
     setUnlockForm({
@@ -395,7 +396,7 @@ export function ContributionManagement() {
 
   // Handle cell click in the overview table
   const handleCellClick = async (member: Member, month: number, year: number) => {
-    if (isMonthLocked(month, year)) {
+    if (isMonthLocked(month, year) && !canBypassContributionLock) {
       const tempUnlocked = await isMonthTemporarilyUnlocked(month, year, "contributions");
       if (!tempUnlocked) {
         toast({
@@ -523,7 +524,7 @@ export function ContributionManagement() {
         currentUser?.name || "Admin",
         currentUser?.role,
         cellPayment.expectedAmount, // Historical rate tracking
-        false
+        canBypassContributionLock
       );
     
       if (amount > 0) {
@@ -1036,7 +1037,7 @@ export function ContributionManagement() {
                   </div>
                 );
               }
-              if (isMonthLocked(prevMonth, prevMonthYear)) {
+              if (isMonthLocked(prevMonth, prevMonthYear) && !canBypassContributionLock) {
                 return (
                   <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-between gap-2">
                     <span className="text-sm text-red-400 flex items-center gap-2">
@@ -1148,7 +1149,7 @@ export function ContributionManagement() {
                           const isPartiallyPaid = amountPaid > 0 && amountPaid < effectiveExpected;
                           const percentPaid = effectiveExpected > 0 ? Math.round((amountPaid / effectiveExpected) * 100) : 0;
                           const locked = isMonthLocked(month, bulkYear);
-                          const canEdit = !locked;
+                          const canEdit = !locked || canBypassContributionLock;
                           
                           if (isFullyPaid) paidMonthsCount++;
                           if (isTolerated) toleratedMonthsCount++;
@@ -1161,7 +1162,7 @@ export function ContributionManagement() {
                                   isTolerated
                                     ? `Tolerated: ${paymentDetails.toleratedReason || "Grace period granted"}`
                                     : locked
-                                      ? `${MONTH_NAMES[monthIndex]} ${bulkYear} is locked`
+                                      ? (canBypassContributionLock ? `Locked month editable by admin override` : `${MONTH_NAMES[monthIndex]} ${bulkYear} is locked`)
                                       : undefined
                                 }
                                 className={cn(
