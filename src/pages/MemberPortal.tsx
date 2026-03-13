@@ -287,15 +287,22 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
         color: var(--muted);
       }
       .detail {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
         gap: 16px;
+        align-items: start;
         padding: 8px 0;
         border-bottom: 1px solid #f2f4f7;
       }
       .detail:last-child { border-bottom: none; padding-bottom: 0; }
       .detail span:first-child { color: var(--muted); }
-      .detail span:last-child { font-weight: 600; text-align: right; }
+      .detail span:last-child {
+        font-weight: 600;
+        text-align: right;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
       .amount-box {
         margin-top: 24px;
         border-radius: 24px;
@@ -342,6 +349,27 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
       @media print {
         body { padding: 0; background: white; }
         .receipt { box-shadow: none; border-radius: 0; border: none; max-width: none; }
+      }
+      @media (max-width: 720px) {
+        .hero-inner {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .receipt-no {
+          text-align: left;
+        }
+        .meta-grid,
+        .footer {
+          grid-template-columns: 1fr;
+          display: grid;
+        }
+        .detail {
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+        .detail span:last-child {
+          text-align: left;
+        }
       }
     </style>
   </head>
