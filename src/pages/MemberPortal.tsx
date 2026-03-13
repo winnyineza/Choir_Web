@@ -2346,37 +2346,37 @@ export default function MemberPortal() {
 
                 {/* Receipt Modal */}
                 <Dialog open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
-                  <DialogContent className="max-w-md bg-background border-primary/20">
+                  <DialogContent className="w-[min(92vw,880px)] max-w-4xl bg-background border-primary/20 max-h-[92vh] overflow-y-auto p-0">
                     <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
+                      <DialogTitle className="flex items-center gap-2 px-6 pt-6">
                         <FileText className="w-5 h-5 text-primary" />
                         Payment Receipt
                       </DialogTitle>
-                      <DialogDescription className="text-muted-foreground text-sm">
+                      <DialogDescription className="px-6 text-muted-foreground text-sm">
                         View and download your payment receipt
                       </DialogDescription>
                     </DialogHeader>
                     
                     {selectedReceiptDisplay && (
-                      <div className="space-y-6" id="receipt-content">
+                      <div className="space-y-6 px-6 pb-6" id="receipt-content">
                         <div className="overflow-hidden rounded-3xl border border-primary/20 bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.22)]">
-                          <div className="relative overflow-hidden border-b border-primary/20 bg-[linear-gradient(135deg,#080808_0%,#17120a_58%,#23190a_100%)] px-6 py-6">
+                          <div className="relative overflow-hidden border-b border-primary/20 bg-[linear-gradient(135deg,#080808_0%,#17120a_58%,#23190a_100%)] px-5 py-6 md:px-8 md:py-7">
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.22),transparent_32%)]" />
-                            <div className="relative flex items-start justify-between gap-4">
-                              <div className="flex items-center gap-4">
+                            <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+                              <div className="flex items-start gap-4">
                                 <img
                                   src={logo}
                                   alt={`${selectedReceiptDisplay.choirName} logo`}
-                                  className="h-16 w-16 rounded-full border-2 border-primary/40 object-cover shadow-lg"
+                                  className="mt-1 h-16 w-16 shrink-0 rounded-full border-2 border-primary/40 object-cover shadow-lg"
                                 />
-                                <div>
+                                <div className="min-w-0">
                                   <p className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/90">
                                     Official Contribution Receipt
                                   </p>
-                                  <h3 className="mt-3 font-display text-2xl font-bold text-white">
+                                  <h3 className="mt-3 max-w-[18ch] text-balance font-display text-2xl font-bold leading-tight text-white md:max-w-none md:text-4xl">
                                     {selectedReceiptDisplay.choirName}
                                   </h3>
-                                  <div className="mt-2 space-y-1 text-xs text-white/70">
+                                  <div className="mt-3 grid gap-1 text-sm text-white/70">
                                     {selectedReceiptDisplay.choirAddress && <p>{selectedReceiptDisplay.choirAddress}</p>}
                                     <p>
                                       {selectedReceiptDisplay.choirEmail}
@@ -2385,7 +2385,7 @@ export default function MemberPortal() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-right backdrop-blur-sm">
+                              <div className="self-start rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left backdrop-blur-sm md:min-w-[210px] md:text-right">
                                 <p className="text-[10px] uppercase tracking-[0.22em] text-white/50">Receipt No</p>
                                 <p className="mt-2 font-mono text-lg font-semibold text-white">
                                   {selectedReceiptDisplay.receiptNumber}
@@ -2395,29 +2395,29 @@ export default function MemberPortal() {
                             </div>
                           </div>
 
-                          <div className="space-y-5 p-6">
-                            <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-5 p-5 md:p-8">
+                            <div className="grid gap-4 lg:grid-cols-2">
                               <div className="rounded-2xl border border-border/80 bg-secondary/25 p-4">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                                   Receipt Details
                                 </p>
-                                <div className="mt-4 space-y-3 text-sm">
-                                  <div className="flex items-start justify-between gap-4">
+                                <div className="mt-4 space-y-4 text-sm">
+                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Member</span>
-                                    <span className="text-right font-medium text-foreground">
+                                    <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.memberName}
                                     </span>
                                   </div>
-                                  <div className="flex items-start justify-between gap-4">
+                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Description</span>
-                                    <span className="text-right font-medium text-foreground">
+                                    <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.description}
                                     </span>
                                   </div>
                                   {selectedReceiptDisplay.period && (
-                                    <div className="flex items-start justify-between gap-4">
+                                    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
                                       <span className="text-muted-foreground">Period</span>
-                                      <span className="text-right font-medium text-foreground">
+                                      <span className="font-medium text-foreground">
                                         {selectedReceiptDisplay.period}
                                       </span>
                                     </div>
@@ -2429,24 +2429,24 @@ export default function MemberPortal() {
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                                   Payment Details
                                 </p>
-                                <div className="mt-4 space-y-3 text-sm">
-                                  <div className="flex items-start justify-between gap-4">
+                                <div className="mt-4 space-y-4 text-sm">
+                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Method</span>
-                                    <span className="text-right font-medium text-foreground">
+                                    <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.paymentMethod}
                                     </span>
                                   </div>
                                   {selectedReceiptDisplay.reference && (
-                                    <div className="flex items-start justify-between gap-4">
+                                    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
                                       <span className="text-muted-foreground">Reference</span>
-                                      <span className="text-right font-mono font-medium text-foreground">
+                                      <span className="break-all font-mono font-medium text-foreground">
                                         {selectedReceiptDisplay.reference}
                                       </span>
                                     </div>
                                   )}
-                                  <div className="flex items-start justify-between gap-4">
+                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Recorded By</span>
-                                    <span className="text-right font-medium text-foreground">
+                                    <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.recordedBy}
                                     </span>
                                   </div>
@@ -2454,21 +2454,21 @@ export default function MemberPortal() {
                               </div>
                             </div>
 
-                            <div className="rounded-[1.75rem] border border-sky-500/20 bg-[linear-gradient(135deg,rgba(14,165,233,0.12)_0%,rgba(59,130,246,0.08)_100%)] p-6 text-center">
+                            <div className="rounded-[1.75rem] border border-sky-500/20 bg-[linear-gradient(135deg,rgba(14,165,233,0.12)_0%,rgba(59,130,246,0.08)_100%)] p-6 text-center md:p-8">
                               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
                                 Amount Paid
                               </p>
-                              <p className="mt-3 text-4xl font-bold text-sky-400">
+                              <p className="mt-3 text-4xl font-bold text-sky-400 md:text-5xl">
                                 {selectedReceiptDisplay.amountLabel}
                               </p>
                             </div>
 
-                            <div className="flex flex-col gap-2 border-t border-primary/15 pt-4 text-xs text-muted-foreground md:flex-row md:items-end md:justify-between">
-                              <div className="space-y-1">
+                            <div className="grid gap-4 border-t border-primary/15 pt-4 text-xs text-muted-foreground md:grid-cols-2">
+                              <div className="space-y-1 rounded-2xl bg-secondary/20 p-4">
                                 <p>Issued by {selectedReceiptDisplay.choirName}</p>
                                 {selectedReceiptDisplay.choirAddress && <p>{selectedReceiptDisplay.choirAddress}</p>}
                               </div>
-                              <div className="text-left md:text-right">
+                              <div className="space-y-1 rounded-2xl bg-secondary/20 p-4 text-left md:text-right">
                                 <p>Recorded by {selectedReceiptDisplay.recordedBy}</p>
                                 <p>Thank you for supporting the ministry.</p>
                               </div>
