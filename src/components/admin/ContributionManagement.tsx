@@ -87,6 +87,7 @@ import {
   exportAnnualFinancialSummary,
   type ContributionReportFormat,
   type ContributionCategoryFilter,
+  type ContributionReportScope,
 } from "@/lib/exportUtils";
 import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { getExpenseStats, getExpensesByYear } from "@/lib/expenseService";
@@ -94,6 +95,7 @@ import { getExpenseStats, getExpensesByYear } from "@/lib/expenseService";
 export function ContributionManagement() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const todayIso = new Date().toISOString().split("T")[0];
   
   // Data
   const [contributions, setContributions] = useState<Contribution[]>([]);
@@ -115,10 +117,13 @@ export function ContributionManagement() {
   const [showAddType, setShowAddType] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportKind, setReportKind] = useState<"full_history" | "contribution_type" | "status_report" | "annual_summary">("full_history");
+  const [reportScope, setReportScope] = useState<ContributionReportScope>("year");
   const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
   const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth() + 1);
   const [reportTypeId, setReportTypeId] = useState<string>("all");
   const [reportCategoryFilter, setReportCategoryFilter] = useState<ContributionCategoryFilter>("all");
+  const [reportStartDate, setReportStartDate] = useState<string>(`${new Date().getFullYear()}-01-01`);
+  const [reportEndDate, setReportEndDate] = useState<string>(todayIso);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showFinancialSummary, setShowFinancialSummary] = useState(false);
   const [showUnlockRequest, setShowUnlockRequest] = useState(false);
@@ -214,13 +219,68 @@ export function ContributionManagement() {
       setReportStatusPreview([]);
       return;
     }
+    const monthsToPreview = reportScope === "period" && reportStartDate && reportEndDate
+      ? (() => {
+          const start = new Date(reportStartDate);
+          const end = new Date(reportEndDate);
+          const months: Array<{ month: number; year: number }> = [];
+          const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+          const boundary = new Date(end.getFullYear(), end.getMonth(), 1);
+          while (cursor <= boundary) {
+            months.push({ month: cursor.getMonth() + 1, year: cursor.getFullYear() });
+            cursor.setMonth(cursor.getMonth() + 1);
+          }
+          return months;
+        })()
+      : reportScope === "month"
+        ? [{ month: reportMonth, year: reportYear }]
+        : Array.from({ length: 12 }, (_, index) => ({ month: index + 1, year: reportYear }));
 
-    getMonthlyDuesReport(
-      reportMonth,
-      reportYear,
-      members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
-    ).then(setReportStatusPreview);
-  }, [showReport, reportKind, reportTypeId, reportMonth, reportYear, members, contributionTypes]);
+    Promise.all(
+      monthsToPreview.map(({ month, year }) =>
+        getMonthlyDuesReport(
+          month,
+          year,
+          members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+        )
+      )
+    ).then((results) => {
+      const flattened = results.flat();
+      const combined = members.map((member) => {
+        const memberRows = flattened.filter((row) => row.memberId === member.id);
+        const applicableRows = memberRows.filter((row) => row.status !== "not_applicable");
+        const expectedAmount = applicableRows.reduce((sum, row) => sum + row.expectedAmount, 0);
+        const paidAmount = applicableRows.reduce((sum, row) => sum + row.paidAmount, 0);
+        const toleratedCount = applicableRows.filter((row) => row.status === "tolerated").length;
+        const unpaidCount = applicableRows.filter((row) => row.status === "unpaid").length;
+        const status =
+          applicableRows.length === 0
+            ? "not_applicable"
+            : paidAmount >= expectedAmount && expectedAmount > 0
+              ? "paid"
+              : paidAmount > 0
+                ? "partial"
+                : toleratedCount === applicableRows.length
+                  ? "tolerated"
+                  : toleratedCount > 0 && unpaidCount > 0
+                    ? "partial"
+                    : "unpaid";
+
+        return {
+          memberId: member.id,
+          memberName: member.name,
+          memberEmail: member.email,
+          expectedAmount,
+          paidAmount,
+          isPaid: status === "paid",
+          status,
+          isTolerated: status === "tolerated",
+          contributions: [],
+        };
+      });
+      setReportStatusPreview(combined as Awaited<ReturnType<typeof getMonthlyDuesReport>>);
+    });
+  }, [showReport, reportKind, reportTypeId, reportMonth, reportYear, reportScope, reportStartDate, reportEndDate, members, contributionTypes]);
   
   const loadData = async () => {
     const [contribs, types, memb, settings, exceptions] = await Promise.all([
@@ -313,20 +373,37 @@ export function ContributionManagement() {
     if (kind === "annual_summary") {
       setReportTypeId("all");
       setReportCategoryFilter("all");
+      setReportScope("year");
     } else if (kind === "full_history") {
       setReportTypeId("all");
+      setReportScope("year");
     } else if (kind === "contribution_type" || kind === "status_report") {
       const firstActiveType = contributionTypes.find((type) => type.isActive);
       setReportTypeId(firstActiveType?.id || "all");
+      setReportScope(kind === "status_report" ? "month" : "year");
     }
     setShowReport(true);
   };
 
   const handleExportReport = async (format: ContributionReportFormat) => {
+    if (reportScope === "period") {
+      if (!reportStartDate || !reportEndDate) {
+        toast({ title: "Choose dates", description: "Select both a start date and end date.", variant: "destructive" });
+        return;
+      }
+      if (new Date(reportStartDate) > new Date(reportEndDate)) {
+        toast({ title: "Invalid period", description: "The start date must be before the end date.", variant: "destructive" });
+        return;
+      }
+    }
+
     if (reportKind === "full_history") {
       await exportFullContributionHistory(
         {
-          year: reportYear,
+          year: reportScope === "year" || reportScope === "month" ? reportYear : undefined,
+          month: reportScope === "month" ? reportMonth : undefined,
+          startDate: reportScope === "period" ? reportStartDate : undefined,
+          endDate: reportScope === "period" ? reportEndDate : undefined,
           typeId: reportTypeId === "all" ? undefined : reportTypeId,
           category: reportCategoryFilter,
         },
@@ -345,8 +422,10 @@ export function ContributionManagement() {
       await exportContributionTypeTransactionReport(
         {
           typeId: reportTypeId,
-          year: reportYear,
-          month: selectedType?.category === "monthly" ? reportMonth : undefined,
+          year: reportScope === "year" || reportScope === "month" ? reportYear : undefined,
+          month: selectedType?.category === "monthly" && reportScope === "month" ? reportMonth : undefined,
+          startDate: reportScope === "period" ? reportStartDate : undefined,
+          endDate: reportScope === "period" ? reportEndDate : undefined,
         },
         format
       );
@@ -364,7 +443,9 @@ export function ContributionManagement() {
         {
           typeId: reportTypeId,
           year: reportYear,
-          month: selectedType?.category === "monthly" ? reportMonth : undefined,
+          month: selectedType?.category === "monthly" && reportScope === "month" ? reportMonth : undefined,
+          startDate: reportScope === "period" ? reportStartDate : undefined,
+          endDate: reportScope === "period" ? reportEndDate : undefined,
         },
         format
       );
@@ -2066,6 +2147,22 @@ export function ContributionManagement() {
             </div>
             
             <div className="grid gap-4 md:grid-cols-2">
+              {reportKind !== "annual_summary" && (
+                <Select
+                  value={reportScope}
+                  onValueChange={(value) => setReportScope(value as ContributionReportScope)}
+                >
+                  <SelectTrigger className="bg-secondary border-primary/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="year">Whole year</SelectItem>
+                    <SelectItem value="month">Specific month</SelectItem>
+                    <SelectItem value="period">Specific period</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+
               <Select
                 value={reportYear.toString()}
                 onValueChange={(v) => setReportYear(parseInt(v))}
@@ -2119,21 +2216,50 @@ export function ContributionManagement() {
                 </Select>
               )}
 
-              {(reportKind === "contribution_type" || reportKind === "status_report") &&
+              {reportScope === "month" && reportKind !== "annual_summary" && (
+                <Select
+                  value={reportMonth.toString()}
+                  onValueChange={(v) => setReportMonth(parseInt(v))}
+                >
+                  <SelectTrigger className="bg-secondary border-primary/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES.map((name, i) => (
+                      <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {reportScope === "period" && reportKind !== "annual_summary" && (
+                <div className="grid grid-cols-2 gap-3 md:col-span-2">
+                  <div>
+                    <Label className="mb-2 block text-xs text-muted-foreground">Start date</Label>
+                    <Input
+                      type="date"
+                      value={reportStartDate}
+                      onChange={(e) => setReportStartDate(e.target.value)}
+                      className="bg-secondary border-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-2 block text-xs text-muted-foreground">End date</Label>
+                    <Input
+                      type="date"
+                      value={reportEndDate}
+                      onChange={(e) => setReportEndDate(e.target.value)}
+                      className="bg-secondary border-primary/20"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {reportScope !== "month" && (reportKind === "contribution_type" || reportKind === "status_report") &&
                 contributionTypes.find((type) => type.id === reportTypeId)?.category === "monthly" && (
-                  <Select
-                    value={reportMonth.toString()}
-                    onValueChange={(v) => setReportMonth(parseInt(v))}
-                  >
-                    <SelectTrigger className="bg-secondary border-primary/20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTH_NAMES.map((name, i) => (
-                        <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="md:col-span-2 rounded-xl border border-primary/10 bg-secondary/20 p-3 text-sm text-muted-foreground">
+                    Monthly dues reports will aggregate all months inside the selected scope.
+                  </div>
                 )}
             </div>
 

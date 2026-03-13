@@ -57,9 +57,13 @@ interface SpreadsheetReportOptions extends DownloadReportOptions {
 
 export type ContributionReportFormat = "pdf" | "excel";
 export type ContributionCategoryFilter = "all" | "monthly" | "special";
+export type ContributionReportScope = "year" | "month" | "period";
 
 export interface ContributionHistoryReportFilters {
   year?: number;
+  month?: number;
+  startDate?: string;
+  endDate?: string;
   typeId?: string;
   category?: ContributionCategoryFilter;
 }
@@ -68,12 +72,16 @@ export interface ContributionTypeTransactionReportFilters {
   typeId: string;
   year?: number;
   month?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface ContributionStatusReportFilters {
   typeId: string;
   year: number;
   month?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 function escapeHtml(value: ReportCell): string {
@@ -105,17 +113,106 @@ function getPdfStatusColors(status: string): {
   text: [number, number, number];
 } {
   switch (status.toLowerCase()) {
+    case "paid":
+    case "contributed":
     case "present":
-      return { fill: [220, 252, 231], text: [0, 0, 0] };
+      return { fill: [220, 252, 231], text: [22, 101, 52] };
+    case "partial":
+      return { fill: [254, 243, 199], text: [146, 64, 14] };
+    case "tolerated":
+      return { fill: [254, 249, 195], text: [133, 77, 14] };
+    case "unpaid":
+    case "no contribution":
     case "absent":
-      return { fill: [254, 226, 226], text: [0, 0, 0] };
+      return { fill: [254, 226, 226], text: [153, 27, 27] };
+    case "n/a":
     case "excused":
-      return { fill: [254, 243, 199], text: [0, 0, 0] };
+      return { fill: [226, 232, 240], text: [71, 85, 105] };
     case "late":
       return { fill: [255, 237, 213], text: [0, 0, 0] };
     default:
       return { fill: [241, 245, 249], text: [0, 0, 0] };
   }
+}
+
+function getFinancialRowColors(label: string): {
+  fill: [number, number, number];
+  text: [number, number, number];
+} | null {
+  const normalized = label.trim().toUpperCase();
+
+  if (
+    normalized.includes("INCOME") ||
+    normalized.includes("CONTRIBUTIONS") ||
+    normalized.includes("MONTHLY DUES") ||
+    normalized.includes("TICKET SALES") ||
+    normalized.includes("DONATIONS")
+  ) {
+    return { fill: [220, 252, 231], text: [22, 101, 52] };
+  }
+
+  if (normalized.includes("EXPENSE")) {
+    return { fill: [254, 226, 226], text: [153, 27, 27] };
+  }
+
+  if (normalized.includes("NET SURPLUS")) {
+    return { fill: [209, 250, 229], text: [6, 95, 70] };
+  }
+
+  if (normalized.includes("NET DEFICIT")) {
+    return { fill: [254, 226, 226], text: [153, 27, 27] };
+  }
+
+  if (normalized.startsWith("TOTAL")) {
+    return { fill: [254, 249, 195], text: [133, 77, 14] };
+  }
+
+  return null;
+}
+
+function getContributionAnchorDate(contribution: Awaited<ReturnType<typeof getAllContributions>>[number]): Date {
+  if (contribution.category === "monthly" && contribution.year && contribution.month) {
+    return new Date(contribution.year, contribution.month - 1, 1);
+  }
+  return new Date(contribution.createdAt);
+}
+
+function isContributionInDateRange(
+  contribution: Awaited<ReturnType<typeof getAllContributions>>[number],
+  startDate?: string,
+  endDate?: string
+): boolean {
+  if (!startDate && !endDate) return true;
+
+  const anchor = getContributionAnchorDate(contribution);
+  if (startDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    if (anchor < start) return false;
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    if (anchor > end) return false;
+  }
+  return true;
+}
+
+function listMonthsInRange(startDate: string, endDate: string): Array<{ month: number; year: number }> {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  end.setDate(1);
+  end.setHours(0, 0, 0, 0);
+
+  const months: Array<{ month: number; year: number }> = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    months.push({ month: cursor.getMonth() + 1, year: cursor.getFullYear() });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
 }
 
 const fontBinaryCache = new Map<string, Promise<string | null>>();
@@ -588,7 +685,17 @@ export function downloadBrandedTableReport({
         cell: { styles: { fillColor?: [number, number, number]; textColor?: [number, number, number]; fontStyle?: string; halign?: string } };
         row: { raw: string[] };
       }) => {
-        if (data.section !== "body" || statusColumnIndex === -1 || data.column.index !== statusColumnIndex) {
+        if (data.section !== "body") return;
+
+        const firstCell = String(data.row.raw[0] ?? "");
+        const financialColors = getFinancialRowColors(firstCell);
+        if (financialColors) {
+          data.cell.styles.fillColor = financialColors.fill;
+          data.cell.styles.textColor = financialColors.text;
+          data.cell.styles.fontStyle = "normal";
+        }
+
+        if (statusColumnIndex === -1 || data.column.index !== statusColumnIndex) {
           return;
         }
 
@@ -1187,10 +1294,18 @@ function filterContributionsForReport(
   filters: ContributionHistoryReportFilters = {}
 ) {
   return contributions.filter((contribution) => {
-    if (filters.year) {
+    if (filters.month && filters.year) {
+      if (contribution.category === "monthly" && contribution.month && contribution.year) {
+        if (contribution.month !== filters.month || contribution.year !== filters.year) return false;
+      } else {
+        const anchorDate = new Date(contribution.createdAt);
+        if (anchorDate.getMonth() + 1 !== filters.month || anchorDate.getFullYear() !== filters.year) return false;
+      }
+    } else if (filters.year) {
       const contributionYear = contribution.year || new Date(contribution.createdAt).getFullYear();
       if (contributionYear !== filters.year) return false;
     }
+    if (!isContributionInDateRange(contribution, filters.startDate, filters.endDate)) return false;
     if (filters.typeId && filters.typeId !== "all" && contribution.typeId !== filters.typeId) return false;
     if (filters.category && filters.category !== "all" && contribution.category !== filters.category) return false;
     return true;
@@ -1214,6 +1329,7 @@ export async function buildFullContributionHistoryReport(filters: ContributionHi
   const specialTotal = contributions.filter((c) => c.category === "special").reduce((sum, c) => sum + c.amount, 0);
   const titleParts = ["Contribution History Report"];
   if (filters.year) titleParts.push(String(filters.year));
+  if (filters.month && filters.year) titleParts.push(getMonthName(filters.month));
   if (filters.category && filters.category !== "all") titleParts.push(toTitleCase(filters.category));
   if (selectedType) titleParts.push(selectedType.name);
 
@@ -1221,7 +1337,11 @@ export async function buildFullContributionHistoryReport(filters: ContributionHi
     title: titleParts.join(" - "),
     filename: [
       "contributions",
-      filters.year || "all-years",
+      filters.startDate && filters.endDate
+        ? `${filters.startDate}-to-${filters.endDate}`
+        : filters.month && filters.year
+          ? `${filters.year}-${String(filters.month).padStart(2, "0")}`
+          : filters.year || "all-years",
       filters.category && filters.category !== "all" ? filters.category : "all-categories",
       selectedType ? selectedType.name.replace(/\s+/g, "-").toLowerCase() : "all-types",
     ].join("-"),
@@ -1230,6 +1350,8 @@ export async function buildFullContributionHistoryReport(filters: ContributionHi
     rows,
     meta: [
       { label: "Year", value: filters.year || "All" },
+      { label: "Month", value: filters.month ? getMonthName(filters.month) : "All" },
+      { label: "Period", value: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : "Default scope" },
       { label: "Category", value: filters.category && filters.category !== "all" ? toTitleCase(filters.category) : "All" },
       { label: "Contribution Type", value: selectedType?.name || "All" },
     ],
@@ -1261,12 +1383,12 @@ export async function buildContributionTypeTransactionReport(
 
   const contributions = filterContributionsForReport(await getAllContributions(), {
     year: filters.year,
+    month: filters.month,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
     typeId: filters.typeId,
     category: type.category,
   }).filter((contribution) => {
-    if (type.category === "monthly" && filters.month) {
-      return contribution.month === filters.month;
-    }
     return true;
   });
 
@@ -1277,8 +1399,11 @@ export async function buildContributionTypeTransactionReport(
     filename: [
       "contribution-type",
       type.name.replace(/\s+/g, "-").toLowerCase(),
-      filters.year || "all-years",
-      type.category === "monthly" && filters.month ? String(filters.month).padStart(2, "0") : "all-months",
+      filters.startDate && filters.endDate
+        ? `${filters.startDate}-to-${filters.endDate}`
+        : filters.month && filters.year
+          ? `${filters.year}-${String(filters.month).padStart(2, "0")}`
+          : filters.year || "all-years",
     ].join("-"),
     sheetName: type.name.slice(0, 31),
     headers: getTrimmedContributionHeaders(),
@@ -1288,6 +1413,7 @@ export async function buildContributionTypeTransactionReport(
       { label: "Category", value: toTitleCase(type.category) },
       { label: "Year", value: filters.year || "All" },
       { label: "Month", value: type.category === "monthly" ? (filters.month ? getMonthName(filters.month) : "All") : "N/A" },
+      { label: "Period", value: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : "Default scope" },
     ],
     summary: [
       { label: "Records", value: contributions.length },
@@ -1422,62 +1548,119 @@ export async function buildContributionStatusReport(filters: ContributionStatusR
   }
 
   if (type.category === "monthly") {
-    const month = filters.month ?? new Date().getMonth() + 1;
-    const report = await getMonthlyDuesReport(
-      month,
-      filters.year,
-      members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+    const monthsToEvaluate =
+      filters.startDate && filters.endDate
+        ? listMonthsInRange(filters.startDate, filters.endDate)
+        : filters.month
+          ? [{ month: filters.month, year: filters.year }]
+          : Array.from({ length: 12 }, (_, index) => ({ month: index + 1, year: filters.year }));
+
+    const monthlyReports = await Promise.all(
+      monthsToEvaluate.map(({ month, year }) =>
+        getMonthlyDuesReport(
+          month,
+          year,
+          members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+        )
+      )
     );
+
+    const aggregated = members.map((member) => {
+      const memberRows = monthlyReports
+        .flat()
+        .filter((row) => row.memberId === member.id);
+
+      const applicableRows = memberRows.filter((row) => row.status !== "not_applicable");
+      const expectedAmount = applicableRows.reduce((sum, row) => sum + row.expectedAmount, 0);
+      const paidAmount = applicableRows.reduce((sum, row) => sum + row.paidAmount, 0);
+      const toleratedCount = applicableRows.filter((row) => row.status === "tolerated").length;
+      const unpaidCount = applicableRows.filter((row) => row.status === "unpaid").length;
+
+      let status = "N/A";
+      if (applicableRows.length === 0) {
+        status = "N/A";
+      } else if (paidAmount >= expectedAmount && expectedAmount > 0) {
+        status = "Paid";
+      } else if (paidAmount > 0) {
+        status = "Partial";
+      } else if (toleratedCount === applicableRows.length) {
+        status = "Tolerated";
+      } else if (toleratedCount > 0 && unpaidCount > 0) {
+        status = "Partial";
+      } else {
+        status = "Unpaid";
+      }
+
+      return {
+        memberName: member.name,
+        expectedAmount,
+        paidAmount,
+        status,
+      };
+    });
+
+    const subtitle = filters.startDate && filters.endDate
+      ? `${filters.startDate} to ${filters.endDate}`
+      : filters.month
+        ? `${getMonthName(filters.month)} ${filters.year}`
+        : `Year ${filters.year}`;
 
     return {
       title: `${type.name} Status Report`,
-      filename: `status-${type.name.replace(/\s+/g, "-").toLowerCase()}-${filters.year}-${String(month).padStart(2, "0")}`,
+      filename: `status-${type.name.replace(/\s+/g, "-").toLowerCase()}-${filters.startDate && filters.endDate ? `${filters.startDate}-to-${filters.endDate}` : filters.month ? `${filters.year}-${String(filters.month).padStart(2, "0")}` : filters.year}`,
       sheetName: `${type.name.slice(0, 18)} Status`,
       headers: ["Member Name", "Expected Amount", "Paid Amount", "Status"],
-      rows: report.map((row) => [
+      rows: aggregated.map((row) => [
         row.memberName,
         row.expectedAmount,
         row.paidAmount,
-        row.status === "not_applicable" ? "N/A" : row.status === "tolerated" ? "Tolerated" : toTitleCase(row.status),
+        row.status,
       ]),
-      subtitle: `${getMonthName(month)} ${filters.year}`,
+      subtitle,
       meta: [
         { label: "Contribution Type", value: type.name },
-        { label: "Period", value: `${getMonthName(month)} ${filters.year}` },
+        { label: "Period", value: subtitle },
       ],
       summary: [
-        { label: "Paid", value: report.filter((row) => row.status === "paid").length },
-        { label: "Partial", value: report.filter((row) => row.status === "partial").length },
-        { label: "Tolerated", value: report.filter((row) => row.status === "tolerated").length },
-        { label: "Unpaid", value: report.filter((row) => row.status === "unpaid").length },
-        { label: "N/A", value: report.filter((row) => row.status === "not_applicable").length },
+        { label: "Paid", value: aggregated.filter((row) => row.status === "Paid").length },
+        { label: "Partial", value: aggregated.filter((row) => row.status === "Partial").length },
+        { label: "Tolerated", value: aggregated.filter((row) => row.status === "Tolerated").length },
+        { label: "Unpaid", value: aggregated.filter((row) => row.status === "Unpaid").length },
+        { label: "N/A", value: aggregated.filter((row) => row.status === "N/A").length },
       ],
       emptyMessage: "No member statuses found for this monthly dues period.",
     };
   }
 
-  const progress = await getSpecialContributionProgress(
-    type.id,
-    members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
-  );
+  const typeContributions = filterContributionsForReport(await getAllContributions(), {
+    year: filters.month ? filters.year : filters.year,
+    month: filters.month,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    typeId: type.id,
+    category: type.category,
+  });
 
-  if (!progress) {
-    throw new Error("Could not build status report.");
-  }
+  const totalCollected = typeContributions.reduce((sum, c) => sum + c.amount, 0);
 
   const usesTargetStatus = !!type.targetAmount;
-  const rows = progress.memberStatus.map((memberRow) => {
+  const rows = members.map((member) => {
+    const paidAmount = typeContributions
+      .filter((contribution) => contribution.memberId === member.id)
+      .reduce((sum, contribution) => sum + contribution.amount, 0);
+
+    const expectedAmount = type.amount;
     const status = usesTargetStatus
-      ? (memberRow.paidAmount >= memberRow.expectedAmount
+      ? (paidAmount >= expectedAmount
           ? "Paid"
-          : memberRow.paidAmount > 0
+          : paidAmount > 0
             ? "Partial"
             : "Unpaid")
-      : (memberRow.paidAmount > 0 ? "Contributed" : "No Contribution");
+      : (paidAmount > 0 ? "Contributed" : "No Contribution");
 
     return usesTargetStatus
-      ? [memberRow.memberName, memberRow.expectedAmount, memberRow.paidAmount, status]
-      : [memberRow.memberName, memberRow.paidAmount, status];
+      ? [member.name, expectedAmount, paidAmount, status]
+      : [member.name, paidAmount, status];
   });
 
   return {
@@ -1492,6 +1675,7 @@ export async function buildContributionStatusReport(filters: ContributionStatusR
     meta: [
       { label: "Contribution Type", value: type.name },
       { label: "Year", value: filters.year },
+      { label: "Period", value: filters.startDate && filters.endDate ? `${filters.startDate} to ${filters.endDate}` : filters.month ? `${getMonthName(filters.month)} ${filters.year}` : `Year ${filters.year}` },
       { label: "Status Mode", value: usesTargetStatus ? "Target-based" : "Optional / freewill" },
     ],
     summary: usesTargetStatus
@@ -1499,12 +1683,12 @@ export async function buildContributionStatusReport(filters: ContributionStatusR
           { label: "Paid", value: rows.filter((row) => row[row.length - 1] === "Paid").length },
           { label: "Partial", value: rows.filter((row) => row[row.length - 1] === "Partial").length },
           { label: "Unpaid", value: rows.filter((row) => row[row.length - 1] === "Unpaid").length },
-          { label: "Collected", value: formatCurrency(progress.totalCollected) },
+          { label: "Collected", value: formatCurrency(totalCollected) },
         ]
       : [
           { label: "Contributed", value: rows.filter((row) => row[row.length - 1] === "Contributed").length },
           { label: "No Contribution", value: rows.filter((row) => row[row.length - 1] === "No Contribution").length },
-          { label: "Collected", value: formatCurrency(progress.totalCollected) },
+          { label: "Collected", value: formatCurrency(totalCollected) },
         ],
     emptyMessage: `No member statuses found for ${type.name}.`,
   };
