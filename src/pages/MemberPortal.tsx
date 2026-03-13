@@ -13,6 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -1840,17 +1846,32 @@ export default function MemberPortal() {
                       </div>
                     </div>
                     {memberInfo && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          exportMemberStatement(memberInfo.id, memberInfo.name, memberInfo.email);
-                          toast({ title: "Statement Downloaded", description: "Your contribution statement has been exported to CSV" });
-                        }}
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Statement
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Statement
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              await exportMemberStatement(memberInfo.id, memberInfo.name, memberInfo.email, "pdf");
+                              toast({ title: "Statement Downloaded", description: "Your contribution statement has been exported to PDF" });
+                            }}
+                          >
+                            PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              await exportMemberStatement(memberInfo.id, memberInfo.name, memberInfo.email, "excel");
+                              toast({ title: "Statement Downloaded", description: "Your contribution statement has been exported to Excel" });
+                            }}
+                          >
+                            Excel
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </div>

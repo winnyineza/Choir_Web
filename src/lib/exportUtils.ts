@@ -9,13 +9,14 @@ import { getAllSessions, getAllAttendanceRecords, getAttendanceByMember, getMemb
 import { getAllAlbums, getAllMusicVideos, getAllPlatforms } from "./releaseService";
 import { getAllPromoCodes } from "./promoService";
 import { getAllAdminUsers, getAuditLog } from "./adminService";
-import { 
-  getAllContributions, 
+import {
+  getAllContributions,
   getAllContributionTypes,
   getContributionsByMember,
   getMemberContributionStatus,
   getMonthName,
   MONTH_NAMES,
+  getMonthlyDuesReport,
 } from "./contributionService";
 import { getAllExpenses, getCategoryLabel } from "./expenseService";
 import { getAllDonations, Donation } from "./donationService";
@@ -53,6 +54,8 @@ interface DownloadReportOptions {
 interface SpreadsheetReportOptions extends DownloadReportOptions {
   sheetName?: string;
 }
+
+export type ContributionReportFormat = "pdf" | "excel";
 
 function escapeHtml(value: ReportCell): string {
   return String(value ?? "")
@@ -1120,10 +1123,21 @@ export async function exportLeaveRequestsToCSV(): Promise<void> {
 }
 
 // Export all contributions to CSV
-export function exportContributionsToCSV(): void {
-  const contributions = getAllContributions();
-  const types = getAllContributionTypes();
-  
+async function downloadContributionReport(
+  report: BrandedTableReportOptions & { sheetName?: string },
+  format: ContributionReportFormat
+): Promise<void> {
+  if (format === "pdf") {
+    downloadBrandedTableReport(report);
+    return;
+  }
+
+  downloadSpreadsheetReport(report);
+}
+
+async function buildAllContributionsReport() {
+  const contributions = await getAllContributions();
+
   const headers = [
     "Date",
     "Member Name",
@@ -1138,44 +1152,54 @@ export function exportContributionsToCSV(): void {
     "Recorded By",
     "Notes",
   ];
-  
-  const rows = contributions
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map((c) => [
-      new Date(c.createdAt).toLocaleDateString(),
-      c.memberName,
-      c.memberEmail,
-      c.typeName,
-      c.category,
-      c.amount,
-      c.month ? getMonthName(c.month) : "",
-      c.year || "",
-      c.paymentMethod || "cash",
-      c.reference || "",
-      c.recordedBy || "",
-      c.notes || "",
-    ]);
 
-  // Add summary
+  const sorted = [...contributions].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const rows = sorted.map((c) => [
+    new Date(c.createdAt).toLocaleDateString(),
+    c.memberName,
+    c.memberEmail,
+    c.typeName,
+    toTitleCase(c.category),
+    c.amount,
+    c.month ? getMonthName(c.month) : "",
+    c.year || "",
+    c.paymentMethod || "cash",
+    c.reference || "",
+    c.recordedBy || "",
+    c.notes || "",
+  ]);
+
   const totalAmount = contributions.reduce((sum, c) => sum + c.amount, 0);
-  const monthlyTotal = contributions.filter(c => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
-  const specialTotal = contributions.filter(c => c.category === "special" || c.category === "event").reduce((sum, c) => sum + c.amount, 0);
-  
-  rows.push([]);
-  rows.push(["SUMMARY", "", "", "", "", "", "", "", "", "", "", ""]);
-  rows.push(["Total Contributions", "", "", "", "", totalAmount, "", "", "", "", "", ""]);
-  rows.push(["Monthly Dues Total", "", "", "", "", monthlyTotal, "", "", "", "", "", ""]);
-  rows.push(["Special/Event Total", "", "", "", "", specialTotal, "", "", "", "", "", ""]);
-  rows.push(["Total Records", "", "", "", "", contributions.length, "", "", "", "", "", ""]);
+  const monthlyTotal = contributions.filter((c) => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
+  const specialTotal = contributions.filter((c) => c.category === "special").reduce((sum, c) => sum + c.amount, 0);
 
-  downloadCSV(headers, rows, "contributions");
+  return {
+    title: "Contribution History Report",
+    filename: "contributions",
+    sheetName: "Contributions",
+    headers,
+    rows,
+    summary: [
+      { label: "Records", value: contributions.length },
+      { label: "Total Contributions", value: formatCurrency(totalAmount) },
+      { label: "Monthly Dues", value: formatCurrency(monthlyTotal) },
+      { label: "Special Contributions", value: formatCurrency(specialTotal) },
+    ],
+    emptyMessage: "No contribution records available.",
+  };
 }
 
-// Export contributions by member (for member statement)
-export function exportMemberStatement(memberId: string, memberName: string, memberEmail: string): void {
-  const contributions = getContributionsByMember(memberId);
-  const status = getMemberContributionStatus(memberId, memberName, memberEmail);
-  
+export async function exportContributionsToCSV(format: ContributionReportFormat = "excel"): Promise<void> {
+  const report = await buildAllContributionsReport();
+  await downloadContributionReport(report, format);
+}
+
+async function buildMemberStatementReport(memberId: string, memberName: string, memberEmail: string) {
+  const [contributions, status] = await Promise.all([
+    getContributionsByMember(memberId),
+    getMemberContributionStatus(memberId, memberName, memberEmail),
+  ]);
+
   const headers = [
     "Date",
     "Description",
@@ -1184,83 +1208,107 @@ export function exportMemberStatement(memberId: string, memberName: string, memb
     "Payment Method",
     "Reference",
   ];
-  
-  const rows = contributions
+
+  const rows = [...contributions]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .map((c) => [
       new Date(c.createdAt).toLocaleDateString(),
       c.typeName + (c.month && c.year ? ` - ${getMonthName(c.month)} ${c.year}` : ""),
-      c.category,
+      toTitleCase(c.category),
       c.amount,
       c.paymentMethod || "cash",
       c.reference || "",
     ]);
 
-  // Add summary
-  rows.push([]);
-  rows.push(["MEMBER STATEMENT SUMMARY", "", "", "", "", ""]);
-  rows.push(["Member Name", memberName, "", "", "", ""]);
-  rows.push(["Email", memberEmail, "", "", "", ""]);
-  rows.push(["Generated", new Date().toLocaleString(), "", "", "", ""]);
-  rows.push([]);
-  rows.push(["Total Paid", "", "", status?.totalPaid || 0, "", ""]);
-  rows.push(["Monthly Dues Paid", "", "", status?.monthlyDuesPaid || 0, "", ""]);
-  rows.push(["Special Contributions", "", "", status?.specialContributions || 0, "", ""]);
-  
-  if (status?.unpaidMonths && status.unpaidMonths.length > 0) {
+  if (status.unpaidMonths.length > 0) {
     rows.push([]);
-    rows.push(["OUTSTANDING DUES", "", "", "", "", ""]);
-    status.unpaidMonths.forEach(item => {
-      rows.push([`${getMonthName(item.month)} ${item.year}`, "Monthly Dues", "monthly", item.expectedAmount, "UNPAID", ""]);
+    rows.push(["Outstanding Dues", "", "", "", "", ""]);
+    status.unpaidMonths.forEach((item) => {
+      rows.push([`${getMonthName(item.month)} ${item.year}`, "Monthly Dues", "Monthly", item.expectedAmount, "UNPAID", ""]);
     });
   }
 
-  downloadCSV(headers, rows, `member-statement-${memberName.replace(/\s+/g, "-").toLowerCase()}`);
+  return {
+    title: "Member Contribution Statement",
+    filename: `member-statement-${memberName.replace(/\s+/g, "-").toLowerCase()}`,
+    sheetName: "Member Statement",
+    headers,
+    rows,
+    subtitle: memberName,
+    meta: [
+      { label: "Member", value: memberName },
+      { label: "Email", value: memberEmail },
+    ],
+    summary: [
+      { label: "Total Paid", value: formatCurrency(status.totalPaid) },
+      { label: "Monthly Dues Paid", value: formatCurrency(status.monthlyDuesPaid) },
+      { label: "Special Contributions", value: formatCurrency(status.specialContributions) },
+      { label: "Outstanding Months", value: status.unpaidMonths.length },
+    ],
+    emptyMessage: "No contributions found for this member.",
+  };
 }
 
-// Export monthly dues report
-export function exportMonthlyDuesReport(year: number): void {
-  const members = getAllMembers();
-  const types = getAllContributionTypes();
-  const monthlyType = types.find(t => t.category === "monthly" && t.isActive);
-  const expectedAmount = monthlyType?.amount || 0;
-  
-  const headers = ["Member Name", "Email", ...MONTH_NAMES, "Total Paid", "Months Paid"];
-  
-  const rows = members.map(member => {
-    const status = getMemberContributionStatus(member.id, member.name, member.email);
-    const contributions = getContributionsByMember(member.id).filter(c => c.category === "monthly" && c.year === year);
-    
-    const monthlyPayments = MONTH_NAMES.map((_, index) => {
-      const monthContrib = contributions.find(c => c.month === index + 1);
-      return monthContrib ? monthContrib.amount : 0;
-    });
-    
-    const totalPaid = monthlyPayments.reduce((sum, p) => sum + p, 0);
-    const monthsPaid = monthlyPayments.filter(p => p >= expectedAmount).length;
-    
-    return [member.name, member.email, ...monthlyPayments, totalPaid, `${monthsPaid}/12`];
-  });
-  
-  // Add totals row
-  const monthTotals = MONTH_NAMES.map((_, index) => {
-    return rows.reduce((sum, row) => sum + (row[index + 2] as number), 0);
-  });
-  const grandTotal = monthTotals.reduce((sum, t) => sum + t, 0);
-  
-  rows.push([]);
-  rows.push(["TOTALS", "", ...monthTotals, grandTotal, ""]);
-
-  downloadCSV(headers, rows, `monthly-dues-${year}`);
+export async function exportMemberStatement(
+  memberId: string,
+  memberName: string,
+  memberEmail: string,
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildMemberStatementReport(memberId, memberName, memberEmail);
+  await downloadContributionReport(report, format);
 }
 
-// Export annual financial summary
-export async function exportAnnualFinancialSummary(year: number): Promise<void> {
-  const allContributions = getAllContributions();
-  const [allOrders, allExpenses, allDonations] = await Promise.all([
+async function buildMonthlyDuesReportData(month: number, year: number) {
+  const members = await getAllMembers();
+  const reportRows = await getMonthlyDuesReport(
+    month,
+    year,
+    members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+  );
+
+  const headers = ["Member Name", "Email", "Expected", "Paid", "Status"];
+  const rows = reportRows.map((row) => [
+    row.memberName,
+    row.memberEmail,
+    row.expectedAmount,
+    row.paidAmount,
+    row.status === "not_applicable" ? "N/A" : row.status === "tolerated" ? "Tolerated" : toTitleCase(row.status),
+  ]);
+
+  return {
+    title: "Monthly Dues Report",
+    filename: `monthly-dues-${year}-${String(month).padStart(2, "0")}`,
+    sheetName: `${getMonthName(month).slice(0, 3)} ${year}`,
+    headers,
+    rows,
+    subtitle: `${getMonthName(month)} ${year}`,
+    summary: [
+      { label: "Paid Members", value: reportRows.filter((row) => row.status === "paid").length },
+      { label: "Unpaid Members", value: reportRows.filter((row) => row.status === "unpaid" || row.status === "partial").length },
+      { label: "Tolerated Members", value: reportRows.filter((row) => row.status === "tolerated").length },
+      { label: "Collected", value: formatCurrency(reportRows.reduce((sum, row) => sum + row.paidAmount, 0)) },
+    ],
+    emptyMessage: "No monthly dues data available for this period.",
+  };
+}
+
+export async function exportMonthlyDuesReport(
+  month: number,
+  year: number,
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildMonthlyDuesReportData(month, year);
+  await downloadContributionReport(report, format);
+}
+
+async function buildAnnualFinancialSummaryReport(year: number) {
+  const [allContributions, allOrders, allExpenses, allDonations, types] = await Promise.all([
+    getAllContributions(),
     getAllOrders(),
     getAllExpenses(),
     getAllDonations(),
+    getAllContributionTypes(),
   ]);
   const contributions = allContributions.filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
   const orders = allOrders.filter(o => new Date(o.createdAt).getFullYear() === year && (o.status === "confirmed" || o.status === "used"));
@@ -1270,8 +1318,7 @@ export async function exportAnnualFinancialSummary(year: number): Promise<void> 
   const headers = ["Category", "Description", "Amount (RWF)"];
   
   // Contribution totals by type
-  const types = getAllContributionTypes();
-  const rows: any[][] = [];
+  const rows: ReportCell[][] = [];
   
   // INCOME SECTION
   rows.push(["=== INCOME ===", "", ""]);
@@ -1339,7 +1386,29 @@ export async function exportAnnualFinancialSummary(year: number): Promise<void> 
   const netBalance = totalIncome - totalExpenses;
   rows.push([netBalance >= 0 ? "NET SURPLUS" : "NET DEFICIT", `Year ${year}`, Math.abs(netBalance)]);
 
-  downloadCSV(headers, rows, `annual-financial-summary-${year}`);
+  return {
+    title: "Annual Financial Summary",
+    filename: `annual-financial-summary-${year}`,
+    sheetName: `Summary ${year}`,
+    headers,
+    rows,
+    subtitle: `Year ${year}`,
+    summary: [
+      { label: "Total Income", value: formatCurrency(totalIncome) },
+      { label: "Total Expenses", value: formatCurrency(totalExpenses) },
+      { label: netBalance >= 0 ? "Net Surplus" : "Net Deficit", value: formatCurrency(Math.abs(netBalance)) },
+      { label: "Contribution Records", value: contributions.length },
+    ],
+    emptyMessage: `No financial activity recorded for ${year}.`,
+  };
+}
+
+export async function exportAnnualFinancialSummary(
+  year: number,
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildAnnualFinancialSummaryReport(year);
+  await downloadContributionReport(report, format);
 }
 
 // Year-over-year comparison (finance + attendance + membership)
@@ -1347,14 +1416,14 @@ export async function exportYearOverYearReport(years: number[]): Promise<void> {
   const headers = ["Year", "Contributions", "Donations", "Ticket Revenue", "Expenses", "Net", "Attendance Sessions", "Members (end of year)"];
   const rows: any[][] = [];
 
-  const [allExpenses, allMembers, allDonations, allOrders, allSessions] = await Promise.all([
+  const [allExpenses, allMembers, allDonations, allOrders, allSessions, allContributions] = await Promise.all([
     getAllExpenses(),
     getAllMembers(),
     getAllDonations(),
     getAllOrders(),
     getAllSessions(),
+    getAllContributions(),
   ]);
-  const allContributions = getAllContributions();
 
   years.forEach((year) => {
     const contributions = allContributions.filter(c => c.year === year || new Date(c.createdAt).getFullYear() === year);
@@ -1506,4 +1575,3 @@ export async function getBackupStats(): Promise<{
     donations: (donations || []).length,
   };
 }
-

@@ -59,7 +59,6 @@ export interface MonthlyDuesException {
   month: number;
   year: number;
   status: MonthlyDuesExceptionStatus;
-  reason: string;
   createdBy: string;
   createdByRole: string;
   createdAt: string;
@@ -76,7 +75,6 @@ export interface MonthlyDuesStatusDetails {
   expectedAmount: number;
   hasHistoricalRate: boolean;
   isTolerated: boolean;
-  toleratedReason?: string;
   toleratedRecordId?: string;
 }
 
@@ -166,7 +164,6 @@ function buildMonthlyDuesStatusDetails(params: {
       expectedAmount,
       hasHistoricalRate: !!storedExpected || params.rateForMonth > 0,
       isTolerated: true,
-      toleratedReason: toleratedRecord.reason,
       toleratedRecordId: toleratedRecord.id,
     };
   }
@@ -193,7 +190,6 @@ export async function markMemberMonthlyTolerance(data: {
   memberId: string;
   month: number;
   year: number;
-  reason: string;
   createdBy: string;
   createdByRole: string;
 }): Promise<MonthlyDuesException> {
@@ -203,7 +199,6 @@ export async function markMemberMonthlyTolerance(data: {
   if (existing) {
     return dbUpdate<MonthlyDuesException>(MONTHLY_DUES_EXCEPTIONS_KEY, existing.id, {
       ...existing,
-      reason: data.reason,
       createdBy: data.createdBy,
       createdByRole: data.createdByRole,
       createdAt: new Date().toISOString(),
@@ -219,7 +214,6 @@ export async function markMemberMonthlyTolerance(data: {
     month: data.month,
     year: data.year,
     status: "tolerated",
-    reason: data.reason,
     createdBy: data.createdBy,
     createdByRole: data.createdByRole,
     createdAt: new Date().toISOString(),
@@ -647,7 +641,7 @@ export interface MemberContributionStatus {
   specialContributions: number;
   paidMonths: { month: number; year: number; amount: number }[];
   unpaidMonths: { month: number; year: number; expectedAmount: number }[];
-  toleratedMonths: { month: number; year: number; expectedAmount: number; reason: string }[];
+  toleratedMonths: { month: number; year: number; expectedAmount: number }[];
   specialStatus: {
     typeId: string;
     typeName: string;
@@ -689,7 +683,7 @@ export async function getMemberContributionStatus(
   const startMonth = memberRecord ? getMemberDuesStartMonth(memberRecord, currentYear) : 1;
 
   const unpaidMonths: { month: number; year: number; expectedAmount: number }[] = [];
-  const toleratedMonths: { month: number; year: number; expectedAmount: number; reason: string }[] = [];
+  const toleratedMonths: { month: number; year: number; expectedAmount: number }[] = [];
   for (let month = 1; month <= currentMonth; month++) {
     if (startMonth === null || month < startMonth) continue;
     const rateForMonth = await getMonthlyRateForPeriod(month, currentYear);
@@ -702,7 +696,7 @@ export async function getMemberContributionStatus(
       exceptions,
     });
     if (details.status === "tolerated") {
-      toleratedMonths.push({ month, year: currentYear, expectedAmount: details.expectedAmount, reason: details.toleratedReason || "" });
+      toleratedMonths.push({ month, year: currentYear, expectedAmount: details.expectedAmount });
     } else if (details.status === "unpaid" && details.expectedAmount > 0) {
       unpaidMonths.push({ month, year: currentYear, expectedAmount: details.expectedAmount });
     }
@@ -875,7 +869,6 @@ export async function getMonthlyDuesReport(month: number, year: number, members:
       isPaid: details.status === "paid",
       status: details.status,
       isTolerated: details.isTolerated,
-      toleratedReason: details.toleratedReason,
       contributions: memberContributions,
     };
   });

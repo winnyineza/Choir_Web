@@ -65,6 +65,7 @@ import {
   clearMemberMonthlyTolerance,
   getMonthlyRateForPeriod,
   getMemberDuesStartMonth,
+  getMonthName,
   isMonthLocked,
   setLockDay,
   getLockDay,
@@ -79,10 +80,11 @@ import { isMonthTemporarilyUnlocked, createUnlockRequest, type UnlockRequestType
 import { notifyUnlockRequestCreated, notifyContributionRecorded } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
 import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock, Unlock } from "lucide-react";
-import { 
+import {
   exportContributionsToCSV, 
   exportMonthlyDuesReport,
   exportAnnualFinancialSummary,
+  type ContributionReportFormat,
 } from "@/lib/exportUtils";
 import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { getExpenseStats, getExpensesByYear } from "@/lib/expenseService";
@@ -142,7 +144,6 @@ export function ContributionManagement() {
     amount: string;
     expectedAmount: number;
     isTolerated: boolean;
-    toleratedReason: string;
     toleratedRecordId?: string;
   } | null>(null);
   
@@ -248,7 +249,6 @@ export function ContributionManagement() {
       expectedAmount: number;
       hasHistoricalRate: boolean;
       isTolerated: boolean;
-      toleratedReason?: string;
       toleratedRecordId?: string;
     }> = {};
     for (const m of members) {
@@ -268,7 +268,6 @@ export function ContributionManagement() {
           expectedAmount: storedExpected ?? rateForMonth,
           hasHistoricalRate: !!storedExpected || rateForMonth > 0,
           isTolerated: !!toleratedRecord && amountPaid <= 0,
-          toleratedReason: toleratedRecord?.reason,
           toleratedRecordId: toleratedRecord?.id,
         };
       }
@@ -286,6 +285,27 @@ export function ContributionManagement() {
       reason: "",
     });
     setShowUnlockRequest(true);
+  };
+
+  const handleExportAllContributions = async (format: ContributionReportFormat) => {
+    await exportContributionsToCSV(format);
+    toast({ title: "Exported", description: `Contribution history exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+  };
+
+  const handleExportReport = async (format: ContributionReportFormat) => {
+    if (reportType === "monthly") {
+      await exportMonthlyDuesReport(filterMonth, filterYear, format);
+      toast({ title: "Exported", description: `${getMonthName(filterMonth)} ${filterYear} report exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+      return;
+    }
+
+    await exportAnnualFinancialSummary(filterYear, format);
+    toast({ title: "Exported", description: `${filterYear} annual summary exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+  };
+
+  const handleExportAnnualSummary = async (format: ContributionReportFormat) => {
+    await exportAnnualFinancialSummary(summaryYear, format);
+    toast({ title: "Exported", description: `${summaryYear} financial summary exported to ${format === "pdf" ? "PDF" : "Excel"}` });
   };
   
   // Filter contributions
@@ -427,7 +447,6 @@ export function ContributionManagement() {
       amount: paymentDetails.amountPaid > 0 ? paymentDetails.amountPaid.toString() : "",
       expectedAmount: effectiveExpected,
       isTolerated: paymentDetails.isTolerated,
-      toleratedReason: paymentDetails.toleratedReason || "",
       toleratedRecordId: paymentDetails.toleratedRecordId,
     });
   };
@@ -562,10 +581,6 @@ export function ContributionManagement() {
 
   const handleMarkTolerance = async () => {
     if (!cellPayment || !canManageTolerance) return;
-    if (!cellPayment.toleratedReason.trim()) {
-      toast({ title: "Reason Required", description: "Add a reason before marking this month as tolerated.", variant: "destructive" });
-      return;
-    }
 
     setSavingTolerance(true);
     try {
@@ -573,7 +588,6 @@ export function ContributionManagement() {
         memberId: cellPayment.memberId,
         month: cellPayment.month,
         year: cellPayment.year,
-        reason: cellPayment.toleratedReason.trim(),
         createdBy: currentUser?.name || "Admin",
         createdByRole: currentUser?.role || "finance",
       });
@@ -892,12 +906,13 @@ export function ContributionManagement() {
                   Annual Summary
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { 
-                  exportContributionsToCSV(); 
-                  toast({ title: "Exported", description: "Contributions exported to CSV" }); 
-                }}>
+                <DropdownMenuItem onClick={() => { void handleExportAllContributions("pdf"); }}>
                   <Download className="w-4 h-4 mr-2" />
-                  Export to CSV
+                  Export PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { void handleExportAllContributions("excel"); }}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Excel
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1147,7 +1162,7 @@ export function ContributionManagement() {
                                 onClick={() => handleCellClick(member, month, bulkYear)}
                                 title={
                                   isTolerated
-                                    ? `Tolerated: ${paymentDetails.toleratedReason || "Grace period granted"}`
+                                    ? "Tolerated / grace month"
                                     : locked
                                       ? (canBypassContributionLock ? `Locked month editable by admin override` : `${MONTH_NAMES[monthIndex]} ${bulkYear} is locked`)
                                       : undefined
@@ -1953,21 +1968,22 @@ export function ContributionManagement() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={async () => {
-                  if (reportType === "monthly") {
-                    exportMonthlyDuesReport(filterYear);
-                  } else {
-                    await exportAnnualFinancialSummary(filterYear);
-                  }
-                  toast({ title: "Exported", description: "Report exported to CSV" });
-                }}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => { void handleExportReport("pdf"); }}>
+                    Export PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void handleExportReport("excel"); }}>
+                    Export Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
             {reportType === "monthly" ? (
@@ -2192,23 +2208,29 @@ export function ContributionManagement() {
               )}
               {contributions.length > 100 && (
                 <div className="p-3 text-center text-xs text-muted-foreground bg-secondary/30 border-t border-primary/10">
-                  Showing most recent 100 records. Export to CSV for full history.
+                  Showing most recent 100 records. Export for full history.
                 </div>
               )}
             </div>
           </div>
           
           <div className="flex justify-end gap-2 pt-4 border-t border-primary/10">
-            <Button 
-              variant="outline" 
-              onClick={() => { 
-                exportContributionsToCSV(); 
-                toast({ title: "Exported", description: "Full audit trail exported to CSV" }); 
-              }}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export Full History
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Full History
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={() => { void handleExportAllContributions("pdf"); }}>
+                  Export PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { void handleExportAllContributions("excel"); }}>
+                  Export Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={() => setShowAuditTrail(false)}>
               Close
             </Button>
@@ -2365,16 +2387,22 @@ export function ContributionManagement() {
           </div>
           
           <div className="flex justify-end gap-2 pt-4 border-t border-primary/10">
-            <Button 
-              variant="outline" 
-              onClick={async () => { 
-                await exportAnnualFinancialSummary(summaryYear); 
-                toast({ title: "Exported", description: `${summaryYear} financial summary exported to CSV` }); 
-              }}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export to CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Summary
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={() => { void handleExportAnnualSummary("pdf"); }}>
+                  Export PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { void handleExportAnnualSummary("excel"); }}>
+                  Export Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={() => setShowFinancialSummary(false)}>
               Close
             </Button>
@@ -2593,19 +2621,12 @@ export function ContributionManagement() {
                     <Clock className="w-4 h-4 text-amber-400" />
                     <p className="text-sm font-medium text-amber-300">Tolerance / Grace</p>
                   </div>
-                  <Textarea
-                    value={cellPayment.toleratedReason}
-                    onChange={(e) => setCellPayment({ ...cellPayment, toleratedReason: e.target.value })}
-                    placeholder="Why is this month tolerated for now?"
-                    className="bg-secondary border-primary/20"
-                    rows={3}
-                  />
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       className="flex-1 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
                       onClick={handleMarkTolerance}
-                      disabled={savingTolerance || savingCellPayment || !cellPayment.toleratedReason.trim()}
+                      disabled={savingTolerance || savingCellPayment}
                     >
                       {savingTolerance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Clock className="w-4 h-4 mr-2" />}
                       {cellPayment.isTolerated ? "Update Tolerance" : "Mark Tolerated"}
