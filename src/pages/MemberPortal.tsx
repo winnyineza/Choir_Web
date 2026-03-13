@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import logo from "@/assets/LogoTSC.jpg";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ import {
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
-import { getAllMembers, updateMember, type Member, type EmergencyContact } from "@/lib/dataService";
+import { getAllMembers, getSettings, updateMember, type Member, type EmergencyContact, type Settings } from "@/lib/dataService";
 import { BirthdayAlert } from "@/components/BirthdayAlert";
 import {
   verifyPortalPin,
@@ -118,6 +119,273 @@ import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
 const RESEND_COOLDOWN_SECONDS = 60;
+
+interface ReceiptDisplayData {
+  choirName: string;
+  choirEmail: string;
+  choirPhone: string;
+  choirAddress: string;
+  receiptNumber: string;
+  issuedDate: string;
+  memberName: string;
+  description: string;
+  period?: string;
+  paymentMethod: string;
+  reference?: string;
+  amountLabel: string;
+  recordedBy: string;
+}
+
+function getReceiptDisplayData(receipt: Contribution, settings: Settings): ReceiptDisplayData {
+  const fallbackDescription = receipt.category === "monthly" ? "Monthly Dues" : receipt.category === "special" ? "Special Contribution" : "Contribution";
+  return {
+    choirName: settings.choirName || "Serenades of Praise Choir",
+    choirEmail: settings.email || "theserenadeschoir@gmail.com",
+    choirPhone: settings.phone || "+250 780 623 144",
+    choirAddress: settings.address || "Kacyiru SDA Church, Kigali, Rwanda",
+    receiptNumber: receipt.id.slice(0, 8).toUpperCase(),
+    issuedDate: new Date(receipt.createdAt).toLocaleDateString(),
+    memberName: receipt.memberName,
+    description: receipt.typeName || fallbackDescription,
+    period: receipt.month && receipt.year ? `${getMonthName(receipt.month)} ${receipt.year}` : undefined,
+    paymentMethod: (receipt.paymentMethod || "cash").replace(/^./, (value) => value.toUpperCase()),
+    reference: receipt.reference || undefined,
+    amountLabel: formatCurrency(receipt.amount),
+    recordedBy: receipt.recordedBy || "System",
+  };
+}
+
+function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${receipt.choirName} Receipt ${receipt.receiptNumber}</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #101828;
+        --muted: #667085;
+        --line: #e4e7ec;
+        --gold: #d4af37;
+        --blue: #1d4ed8;
+        --blue-soft: #dbeafe;
+        --surface: #ffffff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: "Montserrat", "Segoe UI", sans-serif;
+        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        color: var(--ink);
+      }
+      .receipt {
+        max-width: 760px;
+        margin: 0 auto;
+        background: var(--surface);
+        border: 1px solid rgba(212, 175, 55, 0.22);
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: 0 24px 80px rgba(16, 24, 40, 0.08);
+      }
+      .hero {
+        background:
+          radial-gradient(circle at top right, rgba(212, 175, 55, 0.28), transparent 32%),
+          linear-gradient(135deg, #0b0b0b 0%, #16120a 100%);
+        color: white;
+        padding: 28px 32px;
+      }
+      .hero-inner {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: center;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .brand img {
+        width: 72px;
+        height: 72px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 3px solid rgba(212, 175, 55, 0.38);
+        background: rgba(255,255,255,0.08);
+      }
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(212, 175, 55, 0.14);
+        color: #f3d67a;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .brand h1 {
+        margin: 10px 0 4px;
+        font-size: 28px;
+        line-height: 1.1;
+      }
+      .brand p {
+        margin: 0;
+        color: rgba(255,255,255,0.72);
+        font-size: 14px;
+      }
+      .receipt-no {
+        text-align: right;
+      }
+      .receipt-no .label {
+        color: rgba(255,255,255,0.64);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .receipt-no .value {
+        display: block;
+        margin-top: 8px;
+        font-size: 26px;
+        font-weight: 700;
+      }
+      .body {
+        padding: 30px 32px 24px;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 20px;
+        background: #fff;
+      }
+      .panel h2 {
+        margin: 0 0 16px;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .detail {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 8px 0;
+        border-bottom: 1px solid #f2f4f7;
+      }
+      .detail:last-child { border-bottom: none; padding-bottom: 0; }
+      .detail span:first-child { color: var(--muted); }
+      .detail span:last-child { font-weight: 600; text-align: right; }
+      .amount-box {
+        margin-top: 24px;
+        border-radius: 24px;
+        padding: 26px;
+        background: linear-gradient(135deg, var(--blue-soft) 0%, #eff6ff 100%);
+        border: 1px solid rgba(29, 78, 216, 0.18);
+        text-align: center;
+      }
+      .amount-box p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .amount-box strong {
+        display: block;
+        margin-top: 12px;
+        color: var(--blue);
+        font-size: 40px;
+        line-height: 1;
+      }
+      .footer {
+        margin-top: 24px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: flex-end;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+      }
+      .footer small {
+        display: block;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .signature {
+        text-align: right;
+      }
+      .signature .name {
+        margin-top: 10px;
+        font-weight: 700;
+      }
+      @media print {
+        body { padding: 0; background: white; }
+        .receipt { box-shadow: none; border-radius: 0; border: none; max-width: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="receipt">
+      <div class="hero">
+        <div class="hero-inner">
+          <div class="brand">
+            <img src="${logo}" alt="${receipt.choirName} logo" />
+            <div>
+              <span class="eyebrow">Official Contribution Receipt</span>
+              <h1>${receipt.choirName}</h1>
+              <p>${receipt.choirAddress}</p>
+            </div>
+          </div>
+          <div class="receipt-no">
+            <span class="label">Receipt No</span>
+            <span class="value">${receipt.receiptNumber}</span>
+          </div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="meta-grid">
+          <div class="panel">
+            <h2>Receipt Details</h2>
+            <div class="detail"><span>Issued Date</span><span>${receipt.issuedDate}</span></div>
+            <div class="detail"><span>Member</span><span>${receipt.memberName}</span></div>
+            <div class="detail"><span>Description</span><span>${receipt.description}</span></div>
+            ${receipt.period ? `<div class="detail"><span>Period</span><span>${receipt.period}</span></div>` : ""}
+          </div>
+          <div class="panel">
+            <h2>Payment Details</h2>
+            <div class="detail"><span>Method</span><span>${receipt.paymentMethod}</span></div>
+            ${receipt.reference ? `<div class="detail"><span>Reference</span><span>${receipt.reference}</span></div>` : ""}
+            <div class="detail"><span>Recorded By</span><span>${receipt.recordedBy}</span></div>
+            <div class="detail"><span>Contact</span><span>${receipt.choirEmail}<br />${receipt.choirPhone}</span></div>
+          </div>
+        </div>
+        <div class="amount-box">
+          <p>Amount Paid</p>
+          <strong>${receipt.amountLabel}</strong>
+        </div>
+        <div class="footer">
+          <div>
+            <small>Issued by ${receipt.choirName}</small>
+            <small>${receipt.choirAddress}</small>
+            <small>${receipt.choirEmail} • ${receipt.choirPhone}</small>
+          </div>
+          <div class="signature">
+            <small>Recorded by</small>
+            <div class="name">${receipt.recordedBy}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
 
 const getLastVerificationSendAt = (email: string): number | null => {
   if (typeof window === "undefined" || !email) return null;
@@ -191,6 +459,27 @@ export default function MemberPortal() {
   const [myContributions, setMyContributions] = useState<Contribution[]>([]);
   const [contributionStatus, setContributionStatus] = useState<MemberContributionStatus | null>(null);
   const [upcomingMeetings, setUpcomingMeetings] = useState<MeetingMinutes[]>([]);
+  const [choirSettings, setChoirSettings] = useState<Settings>({
+    choirName: "Serenades of Praise Choir",
+    choirDescription: "",
+    foundedYear: "2024",
+    address: "Kacyiru SDA Church, Kigali, Rwanda",
+    phone: "+250 780 623 144",
+    email: "theserenadeschoir@gmail.com",
+    facebook: "",
+    instagram: "",
+    twitter: "",
+    youtube: "",
+    tiktok: "",
+    whatsapp: "",
+    welcomeTitle: "",
+    welcomeMessage: "",
+    backgroundImage: "",
+    joinHeroImage: "",
+    choirImage1: "",
+    choirImage2: "",
+    choirImage3: "",
+  });
 
   // Profile editing
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -216,6 +505,13 @@ export default function MemberPortal() {
   const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
+  const selectedReceiptDisplay = selectedReceipt ? getReceiptDisplayData(selectedReceipt, choirSettings) : null;
+
+  useEffect(() => {
+    getSettings().then(setChoirSettings).catch(() => {
+      // Keep the fallback branding if settings fail to load.
+    });
+  }, []);
 
   // Load announcements when PIN is verified
   useEffect(() => {
@@ -1891,17 +2187,17 @@ export default function MemberPortal() {
                       </p>
                       <p className="text-xs text-red-400">Total Outstanding</p>
                     </div>
-                    <div className="card-glass rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold text-primary">
+                    <div className="card-glass rounded-xl p-4 text-center border border-sky-500/20 bg-sky-500/5">
+                      <p className="text-2xl font-bold text-sky-400">
                         {formatCurrency(contributionStatus.monthlyDuesPaid)}
                       </p>
-                      <p className="text-xs text-muted-foreground">Monthly Dues</p>
+                      <p className="text-xs text-sky-200/80">Monthly Dues</p>
                     </div>
-                    <div className="card-glass rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold text-yellow-500">
+                    <div className="card-glass rounded-xl p-4 text-center border border-cyan-500/20 bg-cyan-500/5">
+                      <p className="text-2xl font-bold text-cyan-400">
                         {formatCurrency(contributionStatus.specialContributions)}
                       </p>
-                      <p className="text-xs text-muted-foreground">Special Contributions</p>
+                      <p className="text-xs text-cyan-200/80">Special Contributions</p>
                     </div>
                     <div className="card-glass rounded-xl p-4 text-center border border-orange-500/30 bg-orange-500/5">
                       <p className="text-2xl font-bold text-orange-500">
@@ -2061,120 +2357,136 @@ export default function MemberPortal() {
                       </DialogDescription>
                     </DialogHeader>
                     
-                    {selectedReceipt && (
+                    {selectedReceiptDisplay && (
                       <div className="space-y-6" id="receipt-content">
-                        {/* Receipt Header */}
-                        <div className="text-center border-b border-primary/20 pb-4">
-                          <h3 className="font-display text-xl font-bold">
-                            Chorale de Kigali
-                          </h3>
-                          <p className="text-sm text-muted-foreground">Official Payment Receipt</p>
-                        </div>
-                        
-                        {/* Receipt Details */}
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Receipt No:</span>
-                            <span className="font-mono text-foreground">{selectedReceipt.id.slice(0, 8).toUpperCase()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Date:</span>
-                            <span className="text-foreground">{new Date(selectedReceipt.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Member:</span>
-                            <span className="text-foreground">{selectedReceipt.memberName}</span>
-                          </div>
-                        </div>
-                        
-                        {/* Payment Info */}
-                        <div className="bg-secondary/50 rounded-xl p-4 space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Description:</span>
-                            <span className="text-foreground font-medium">{selectedReceipt.typeName}</span>
-                          </div>
-                          {selectedReceipt.month && selectedReceipt.year && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Period:</span>
-                              <span className="text-foreground">{getMonthName(selectedReceipt.month)} {selectedReceipt.year}</span>
+                        <div className="overflow-hidden rounded-3xl border border-primary/20 bg-card/95 shadow-[0_24px_80px_rgba(0,0,0,0.22)]">
+                          <div className="relative overflow-hidden border-b border-primary/20 bg-[linear-gradient(135deg,#080808_0%,#17120a_58%,#23190a_100%)] px-6 py-6">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.22),transparent_32%)]" />
+                            <div className="relative flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                <img
+                                  src={logo}
+                                  alt={`${selectedReceiptDisplay.choirName} logo`}
+                                  className="h-16 w-16 rounded-full border-2 border-primary/40 object-cover shadow-lg"
+                                />
+                                <div>
+                                  <p className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/90">
+                                    Official Contribution Receipt
+                                  </p>
+                                  <h3 className="mt-3 font-display text-2xl font-bold text-white">
+                                    {selectedReceiptDisplay.choirName}
+                                  </h3>
+                                  <div className="mt-2 space-y-1 text-xs text-white/70">
+                                    {selectedReceiptDisplay.choirAddress && <p>{selectedReceiptDisplay.choirAddress}</p>}
+                                    <p>
+                                      {selectedReceiptDisplay.choirEmail}
+                                      {selectedReceiptDisplay.choirPhone ? ` • ${selectedReceiptDisplay.choirPhone}` : ""}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-right backdrop-blur-sm">
+                                <p className="text-[10px] uppercase tracking-[0.22em] text-white/50">Receipt No</p>
+                                <p className="mt-2 font-mono text-lg font-semibold text-white">
+                                  {selectedReceiptDisplay.receiptNumber}
+                                </p>
+                                <p className="mt-2 text-xs text-white/65">{selectedReceiptDisplay.issuedDate}</p>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Payment Method:</span>
-                            <span className="text-foreground capitalize">{selectedReceipt.paymentMethod || "Cash"}</span>
                           </div>
-                          {selectedReceipt.reference && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Reference:</span>
-                              <span className="font-mono text-foreground">{selectedReceipt.reference}</span>
+
+                          <div className="space-y-5 p-6">
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="rounded-2xl border border-border/80 bg-secondary/25 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                                  Receipt Details
+                                </p>
+                                <div className="mt-4 space-y-3 text-sm">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <span className="text-muted-foreground">Member</span>
+                                    <span className="text-right font-medium text-foreground">
+                                      {selectedReceiptDisplay.memberName}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-start justify-between gap-4">
+                                    <span className="text-muted-foreground">Description</span>
+                                    <span className="text-right font-medium text-foreground">
+                                      {selectedReceiptDisplay.description}
+                                    </span>
+                                  </div>
+                                  {selectedReceiptDisplay.period && (
+                                    <div className="flex items-start justify-between gap-4">
+                                      <span className="text-muted-foreground">Period</span>
+                                      <span className="text-right font-medium text-foreground">
+                                        {selectedReceiptDisplay.period}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl border border-border/80 bg-secondary/25 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                                  Payment Details
+                                </p>
+                                <div className="mt-4 space-y-3 text-sm">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <span className="text-muted-foreground">Method</span>
+                                    <span className="text-right font-medium text-foreground">
+                                      {selectedReceiptDisplay.paymentMethod}
+                                    </span>
+                                  </div>
+                                  {selectedReceiptDisplay.reference && (
+                                    <div className="flex items-start justify-between gap-4">
+                                      <span className="text-muted-foreground">Reference</span>
+                                      <span className="text-right font-mono font-medium text-foreground">
+                                        {selectedReceiptDisplay.reference}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-start justify-between gap-4">
+                                    <span className="text-muted-foreground">Recorded By</span>
+                                    <span className="text-right font-medium text-foreground">
+                                      {selectedReceiptDisplay.recordedBy}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          )}
+
+                            <div className="rounded-[1.75rem] border border-sky-500/20 bg-[linear-gradient(135deg,rgba(14,165,233,0.12)_0%,rgba(59,130,246,0.08)_100%)] p-6 text-center">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+                                Amount Paid
+                              </p>
+                              <p className="mt-3 text-4xl font-bold text-sky-400">
+                                {selectedReceiptDisplay.amountLabel}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col gap-2 border-t border-primary/15 pt-4 text-xs text-muted-foreground md:flex-row md:items-end md:justify-between">
+                              <div className="space-y-1">
+                                <p>Issued by {selectedReceiptDisplay.choirName}</p>
+                                {selectedReceiptDisplay.choirAddress && <p>{selectedReceiptDisplay.choirAddress}</p>}
+                              </div>
+                              <div className="text-left md:text-right">
+                                <p>Recorded by {selectedReceiptDisplay.recordedBy}</p>
+                                <p>Thank you for supporting the ministry.</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        
-                        {/* Amount */}
-                        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
-                          <p className="text-sm text-muted-foreground mb-1">Amount Paid</p>
-                          <p className="text-3xl font-bold text-green-500">{formatCurrency(selectedReceipt.amount)}</p>
-                        </div>
-                        
-                        {/* Footer */}
-                        <div className="text-center text-xs text-muted-foreground border-t border-primary/20 pt-4">
-                          <p>Recorded by: {selectedReceipt.recordedBy || "System"}</p>
-                          <p className="mt-1">Thank you for your contribution!</p>
-                        </div>
-                        
-                        {/* Print Button */}
+
                         <Button 
                           variant="outline" 
                           className="w-full"
                           onClick={() => {
-                            const content = document.getElementById('receipt-content');
-                            if (content) {
-                              const printWindow = window.open('', '_blank');
-                              if (printWindow) {
-                                printWindow.document.write(`
-                                  <html>
-                                    <head>
-                                      <title>Receipt - ${selectedReceipt.id.slice(0, 8).toUpperCase()}</title>
-                                      <style>
-                                        body { font-family: system-ui, sans-serif; padding: 40px; max-width: 400px; margin: 0 auto; }
-                                        .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
-                                        .header h3 { font-size: 20px; margin: 0; }
-                                        .header p { color: #666; font-size: 12px; }
-                                        .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                                        .label { color: #666; }
-                                        .value { font-weight: 500; }
-                                        .amount-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
-                                        .amount { font-size: 28px; font-weight: bold; color: #22c55e; }
-                                        .footer { text-align: center; font-size: 11px; color: #666; border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
-                                      </style>
-                                    </head>
-                                    <body>
-                                      <div class="header">
-                                        <h3>Chorale de Kigali</h3>
-                                        <p>Official Payment Receipt</p>
-                                      </div>
-                                      <div class="row"><span class="label">Receipt No:</span><span class="value">${selectedReceipt.id.slice(0, 8).toUpperCase()}</span></div>
-                                      <div class="row"><span class="label">Date:</span><span class="value">${new Date(selectedReceipt.createdAt).toLocaleDateString()}</span></div>
-                                      <div class="row"><span class="label">Member:</span><span class="value">${selectedReceipt.memberName}</span></div>
-                                      <div class="row"><span class="label">Description:</span><span class="value">${selectedReceipt.typeName}</span></div>
-                                      ${selectedReceipt.month && selectedReceipt.year ? `<div class="row"><span class="label">Period:</span><span class="value">${getMonthName(selectedReceipt.month)} ${selectedReceipt.year}</span></div>` : ''}
-                                      <div class="row"><span class="label">Payment Method:</span><span class="value">${(selectedReceipt.paymentMethod || 'Cash').charAt(0).toUpperCase() + (selectedReceipt.paymentMethod || 'cash').slice(1)}</span></div>
-                                      ${selectedReceipt.reference ? `<div class="row"><span class="label">Reference:</span><span class="value">${selectedReceipt.reference}</span></div>` : ''}
-                                      <div class="amount-box">
-                                        <p style="margin:0 0 5px 0;font-size:12px;color:#666;">Amount Paid</p>
-                                        <p class="amount">${selectedReceipt.amount.toLocaleString()} RWF</p>
-                                      </div>
-                                      <div class="footer">
-                                        <p>Recorded by: ${selectedReceipt.recordedBy || 'System'}</p>
-                                        <p>Thank you for your contribution!</p>
-                                      </div>
-                                    </body>
-                                  </html>
-                                `);
-                                printWindow.document.close();
-                                printWindow.print();
-                              }
+                            if (selectedReceiptDisplay) {
+                              const printWindow = window.open("", "_blank");
+                              if (!printWindow) return;
+                              printWindow.document.write(buildReceiptPrintHtml(selectedReceiptDisplay));
+                              printWindow.document.close();
+                              printWindow.focus();
+                              printWindow.print();
                             }
                           }}
                         >
