@@ -944,7 +944,25 @@ COMMENT ON TABLE meeting_minutes IS 'Meeting minutes and records';
 COMMENT ON TABLE documents IS 'Shared choir documents';
 COMMENT ON TABLE payments IS 'Payment transactions';
 COMMENT ON TABLE receipts IS 'Payment receipts';
+COMMENT ON TABLE monthly_dues_exceptions IS 'Per-member monthly dues tolerance records';
 COMMENT ON TABLE unlock_requests IS 'Month unlock requests with approval workflow';
+
+-- ============================================================
+-- MONTHLY DUES EXCEPTIONS (Tolerance / grace state)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monthly_dues_exceptions (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  month INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'tolerated',
+  created_by TEXT,
+  created_by_role TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  cleared_at TIMESTAMPTZ,
+  cleared_by TEXT,
+  cleared_by_role TEXT
+);
 
 -- ============================================================
 -- UNLOCK REQUESTS (Month unlock requests)

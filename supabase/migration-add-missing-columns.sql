@@ -181,6 +181,23 @@ CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- ============================================================
+-- MONTHLY DUES EXCEPTIONS TABLE (new)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monthly_dues_exceptions (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  month INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'tolerated',
+  created_by TEXT,
+  created_by_role TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  cleared_at TIMESTAMPTZ,
+  cleared_by TEXT,
+  cleared_by_role TEXT
+);
+
+-- ============================================================
 -- UNLOCK REQUESTS TABLE (new)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS unlock_requests (
@@ -280,6 +297,14 @@ CREATE POLICY "Allow all access (public) on member_invite_logs"
 ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all access (public) on notification_preferences"
   ON public.notification_preferences
+  FOR ALL
+  TO public
+  USING (true)
+  WITH CHECK (true);
+
+ALTER TABLE public.monthly_dues_exceptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access (public) on monthly_dues_exceptions"
+  ON public.monthly_dues_exceptions
   FOR ALL
   TO public
   USING (true)
