@@ -81,10 +81,12 @@ import { notifyUnlockRequestCreated, notifyContributionRecorded } from "@/lib/no
 import { cn } from "@/lib/utils";
 import { Download, History, MoreHorizontal, FileText, Star, BarChart3, AlertTriangle, Lock, Unlock } from "lucide-react";
 import {
-  exportContributionsToCSV, 
-  exportMonthlyDuesReport,
+  exportFullContributionHistory,
+  exportContributionTypeTransactionReport,
+  exportContributionStatusReport,
   exportAnnualFinancialSummary,
   type ContributionReportFormat,
+  type ContributionCategoryFilter,
 } from "@/lib/exportUtils";
 import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { getExpenseStats, getExpensesByYear } from "@/lib/expenseService";
@@ -100,6 +102,7 @@ export function ContributionManagement() {
   const [monthlyExceptions, setMonthlyExceptions] = useState<MonthlyDuesException[]>([]);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getContributionStats>> | null>(null);
   const [monthlyReport, setMonthlyReport] = useState<Awaited<ReturnType<typeof getMonthlyDuesReport>>>([]);
+  const [reportStatusPreview, setReportStatusPreview] = useState<Awaited<ReturnType<typeof getMonthlyDuesReport>>>([]);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,7 +114,11 @@ export function ContributionManagement() {
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showAddType, setShowAddType] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [reportType, setReportType] = useState<"monthly" | "yearly">("monthly");
+  const [reportKind, setReportKind] = useState<"full_history" | "contribution_type" | "status_report" | "annual_summary">("full_history");
+  const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
+  const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth() + 1);
+  const [reportTypeId, setReportTypeId] = useState<string>("all");
+  const [reportCategoryFilter, setReportCategoryFilter] = useState<ContributionCategoryFilter>("all");
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showFinancialSummary, setShowFinancialSummary] = useState(false);
   const [showUnlockRequest, setShowUnlockRequest] = useState(false);
@@ -200,6 +207,20 @@ export function ContributionManagement() {
     getMonthlyDuesReport(filterMonth, filterYear, members.map(m => ({ id: m.id, name: m.name, email: m.email })))
       .then(setMonthlyReport);
   }, [filterMonth, filterYear, members]);
+
+  useEffect(() => {
+    const selectedType = contributionTypes.find((type) => type.id === reportTypeId);
+    if (!showReport || reportKind !== "status_report" || members.length === 0 || selectedType?.category !== "monthly") {
+      setReportStatusPreview([]);
+      return;
+    }
+
+    getMonthlyDuesReport(
+      reportMonth,
+      reportYear,
+      members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+    ).then(setReportStatusPreview);
+  }, [showReport, reportKind, reportTypeId, reportMonth, reportYear, members, contributionTypes]);
   
   const loadData = async () => {
     const [contribs, types, memb, settings, exceptions] = await Promise.all([
@@ -287,20 +308,72 @@ export function ContributionManagement() {
     setShowUnlockRequest(true);
   };
 
-  const handleExportAllContributions = async (format: ContributionReportFormat) => {
-    await exportContributionsToCSV(format);
-    toast({ title: "Exported", description: `Contribution history exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+  const openReportModal = (kind: "full_history" | "contribution_type" | "status_report" | "annual_summary") => {
+    setReportKind(kind);
+    if (kind === "annual_summary") {
+      setReportTypeId("all");
+      setReportCategoryFilter("all");
+    } else if (kind === "full_history") {
+      setReportTypeId("all");
+    } else if (kind === "contribution_type" || kind === "status_report") {
+      const firstActiveType = contributionTypes.find((type) => type.isActive);
+      setReportTypeId(firstActiveType?.id || "all");
+    }
+    setShowReport(true);
   };
 
   const handleExportReport = async (format: ContributionReportFormat) => {
-    if (reportType === "monthly") {
-      await exportMonthlyDuesReport(filterMonth, filterYear, format);
-      toast({ title: "Exported", description: `${getMonthName(filterMonth)} ${filterYear} report exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+    if (reportKind === "full_history") {
+      await exportFullContributionHistory(
+        {
+          year: reportYear,
+          typeId: reportTypeId === "all" ? undefined : reportTypeId,
+          category: reportCategoryFilter,
+        },
+        format
+      );
+      toast({ title: "Exported", description: `Full contribution history exported to ${format === "pdf" ? "PDF" : "Excel"}` });
       return;
     }
 
-    await exportAnnualFinancialSummary(filterYear, format);
-    toast({ title: "Exported", description: `${filterYear} annual summary exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+    if (reportKind === "contribution_type") {
+      if (reportTypeId === "all") {
+        toast({ title: "Select a type", description: "Choose a contribution type first.", variant: "destructive" });
+        return;
+      }
+      const selectedType = contributionTypes.find((type) => type.id === reportTypeId);
+      await exportContributionTypeTransactionReport(
+        {
+          typeId: reportTypeId,
+          year: reportYear,
+          month: selectedType?.category === "monthly" ? reportMonth : undefined,
+        },
+        format
+      );
+      toast({ title: "Exported", description: `${selectedType?.name || "Contribution"} report exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+      return;
+    }
+
+    if (reportKind === "status_report") {
+      if (reportTypeId === "all") {
+        toast({ title: "Select a type", description: "Choose a contribution type first.", variant: "destructive" });
+        return;
+      }
+      const selectedType = contributionTypes.find((type) => type.id === reportTypeId);
+      await exportContributionStatusReport(
+        {
+          typeId: reportTypeId,
+          year: reportYear,
+          month: selectedType?.category === "monthly" ? reportMonth : undefined,
+        },
+        format
+      );
+      toast({ title: "Exported", description: `${selectedType?.name || "Contribution"} status report exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+      return;
+    }
+
+    await exportAnnualFinancialSummary(reportYear, format);
+    toast({ title: "Exported", description: `${reportYear} annual summary exported to ${format === "pdf" ? "PDF" : "Excel"}` });
   };
 
   const handleExportAnnualSummary = async (format: ContributionReportFormat) => {
@@ -786,9 +859,11 @@ export function ContributionManagement() {
     });
   };
   
-  const paidCount = monthlyReport.filter(r => r.status === "paid").length;
-  const toleratedCount = monthlyReport.filter(r => r.status === "tolerated").length;
-  const unpaidCount = monthlyReport.filter(r => r.status === "unpaid" || r.status === "partial").length;
+  const selectedReportType = contributionTypes.find((type) => type.id === reportTypeId);
+  const statusPreviewRows = selectedReportType?.category === "monthly" ? reportStatusPreview : [];
+  const paidCount = statusPreviewRows.filter(r => r.status === "paid").length;
+  const toleratedCount = statusPreviewRows.filter(r => r.status === "tolerated").length;
+  const unpaidCount = statusPreviewRows.filter(r => r.status === "unpaid" || r.status === "partial").length;
   
   const monthlyMemberColumnClass = "min-w-[280px] w-[280px]";
 
@@ -884,6 +959,33 @@ export function ContributionManagement() {
               <Plus className="w-4 h-4 mr-2" />
               New Type
             </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Reports
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem onClick={() => openReportModal("full_history")}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Full History
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openReportModal("contribution_type")}>
+                  <Target className="w-4 h-4 mr-2" />
+                  Contribution Type Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openReportModal("status_report")}>
+                  <Users className="w-4 h-4 mr-2" />
+                  Status Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openReportModal("annual_summary")}>
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Annual Summary
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* More Actions Dropdown */}
             <DropdownMenu>
@@ -893,10 +995,6 @@ export function ContributionManagement() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setShowReport(true)}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Report
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowAuditTrail(true)}>
                   <History className="w-4 h-4 mr-2" />
                   Audit Trail
@@ -904,15 +1002,6 @@ export function ContributionManagement() {
                 <DropdownMenuItem onClick={() => setShowFinancialSummary(true)}>
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Annual Summary
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { void handleExportAllContributions("pdf"); }}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { void handleExportAllContributions("excel"); }}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Excel
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1904,62 +1993,84 @@ export function ContributionManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" />
-              Contributions Report
+              Export Reports
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
-              View and export contribution reports
+              Choose the report purpose first, then export as PDF or Excel
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* Report Type Toggle */}
+            {/* Report Kind Toggle */}
             <div className="flex gap-2 p-1 bg-secondary rounded-lg">
               <button
-                onClick={() => setReportType("monthly")}
+                onClick={() => {
+                  setReportKind("full_history");
+                  setReportTypeId("all");
+                }}
                 className={cn(
                   "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                  reportType === "monthly"
+                  reportKind === "full_history"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                Monthly
+                Full History
               </button>
               <button
-                onClick={() => setReportType("yearly")}
+                onClick={() => {
+                  setReportKind("contribution_type");
+                  if (reportTypeId === "all") {
+                    setReportTypeId(contributionTypes.find((type) => type.isActive)?.id || "all");
+                  }
+                }}
                 className={cn(
                   "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                  reportType === "yearly"
+                  reportKind === "contribution_type"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                Yearly
+                Type Report
+              </button>
+              <button
+                onClick={() => {
+                  setReportKind("status_report");
+                  if (reportTypeId === "all") {
+                    setReportTypeId(contributionTypes.find((type) => type.isActive)?.id || "all");
+                  }
+                }}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                  reportKind === "status_report"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Status
+              </button>
+              <button
+                onClick={() => {
+                  setReportKind("annual_summary");
+                  setReportTypeId("all");
+                }}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                  reportKind === "annual_summary"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Summary
               </button>
             </div>
             
-            {/* Period Selector */}
-            <div className="flex gap-3">
-              {reportType === "monthly" && (
-                <Select
-                  value={filterMonth.toString()}
-                  onValueChange={(v) => setFilterMonth(parseInt(v))}
-                >
-                  <SelectTrigger className="w-40 bg-secondary border-primary/20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTH_NAMES.map((name, i) => (
-                      <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <div className="grid gap-4 md:grid-cols-2">
               <Select
-                value={filterYear.toString()}
-                onValueChange={(v) => setFilterYear(parseInt(v))}
+                value={reportYear.toString()}
+                onValueChange={(v) => setReportYear(parseInt(v))}
               >
-                <SelectTrigger className="w-28 bg-secondary border-primary/20">
+                <SelectTrigger className="bg-secondary border-primary/20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1968,168 +2079,182 @@ export function ContributionManagement() {
                   ))}
                 </SelectContent>
               </Select>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem onClick={() => { void handleExportReport("pdf"); }}>
-                    Export PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { void handleExportReport("excel"); }}>
-                    Export Excel
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+
+              {(reportKind === "full_history" || reportKind === "contribution_type" || reportKind === "status_report") && (
+                <Select
+                  value={reportTypeId}
+                  onValueChange={setReportTypeId}
+                >
+                  <SelectTrigger className="bg-secondary border-primary/20">
+                    <SelectValue placeholder={reportKind === "full_history" ? "All contribution types" : "Select contribution type"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reportKind === "full_history" && (
+                      <SelectItem value="all">All contribution types</SelectItem>
+                    )}
+                    {contributionTypes
+                      .filter((type) => type.isActive || type.id === reportTypeId)
+                      .map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {reportKind === "full_history" && (
+                <Select
+                  value={reportCategoryFilter}
+                  onValueChange={(value) => setReportCategoryFilter(value as ContributionCategoryFilter)}
+                >
+                  <SelectTrigger className="bg-secondary border-primary/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    <SelectItem value="monthly">Monthly only</SelectItem>
+                    <SelectItem value="special">Special only</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+
+              {(reportKind === "contribution_type" || reportKind === "status_report") &&
+                contributionTypes.find((type) => type.id === reportTypeId)?.category === "monthly" && (
+                  <Select
+                    value={reportMonth.toString()}
+                    onValueChange={(v) => setReportMonth(parseInt(v))}
+                  >
+                    <SelectTrigger className="bg-secondary border-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTH_NAMES.map((name, i) => (
+                        <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
             </div>
-            
-            {reportType === "monthly" ? (
+
+            {reportKind === "status_report" ? (
               <>
-                {/* Monthly Summary */}
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span className="text-sm text-green-400">Paid</span>
+                {selectedReportType?.category === "monthly" ? (
+                  <>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-green-400">Paid</span>
+                        </div>
+                        <p className="text-2xl font-bold text-green-500">{paidCount}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <XCircle className="w-4 h-4 text-red-500" />
+                          <span className="text-sm text-red-400">Unpaid</span>
+                        </div>
+                        <p className="text-2xl font-bold text-red-500">{unpaidCount}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Clock className="w-4 h-4 text-yellow-500" />
+                          <span className="text-sm text-yellow-400">Tolerated</span>
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-500">{toleratedCount}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Wallet className="w-4 h-4 text-primary" />
+                          <span className="text-sm text-primary">Collected</span>
+                        </div>
+                        <p className="text-2xl font-bold text-primary">
+                          {formatCurrency(statusPreviewRows.reduce((sum, r) => sum + r.paidAmount, 0))}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-2xl font-bold text-green-500">{paidCount}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <XCircle className="w-4 h-4 text-red-500" />
-                      <span className="text-sm text-red-400">Unpaid</span>
+
+                    <div className="divide-y divide-primary/10 border border-primary/10 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto">
+                      {statusPreviewRows.map((report) => (
+                        <div key={report.memberId} className="p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {report.status === "paid" ? (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            ) : report.status === "tolerated" ? (
+                              <Clock className="w-5 h-5 text-yellow-500" />
+                            ) : report.status === "not_applicable" ? (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-secondary/40 text-[10px] text-muted-foreground">N/A</span>
+                            ) : (
+                              <XCircle className="w-5 h-5 text-red-500" />
+                            )}
+                            <span className="text-foreground">{report.memberName}</span>
+                          </div>
+                          <div className="text-right">
+                            {report.status === "paid" ? (
+                              <span className="text-green-500 font-medium">{formatCurrency(report.paidAmount)}</span>
+                            ) : report.status === "tolerated" ? (
+                              <span className="text-yellow-400 text-sm">Tolerated</span>
+                            ) : report.status === "not_applicable" ? (
+                              <span className="text-muted-foreground text-sm">N/A</span>
+                            ) : report.status === "partial" ? (
+                              <span className="text-yellow-400 text-sm">{formatCurrency(report.paidAmount)} partial</span>
+                            ) : (
+                              <span className="text-red-400 text-sm">Unpaid</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {statusPreviewRows.length === 0 && (
+                        <div className="p-8 text-center text-muted-foreground">
+                          No members found for this status report.
+                        </div>
+                      )}
                     </div>
-                    <p className="text-2xl font-bold text-red-500">{unpaidCount}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Clock className="w-4 h-4 text-yellow-500" />
-                      <span className="text-sm text-yellow-400">Tolerated</span>
-                    </div>
-                    <p className="text-2xl font-bold text-yellow-500">{toleratedCount}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Wallet className="w-4 h-4 text-primary" />
-                      <span className="text-sm text-primary">Collected</span>
-                    </div>
-                    <p className="text-2xl font-bold text-primary">
-                      {formatCurrency(monthlyReport.reduce((sum, r) => sum + r.paidAmount, 0))}
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-primary/10 bg-secondary/20 p-4 space-y-2">
+                    <p className="font-medium text-foreground">Special Contribution Status</p>
+                    <p className="text-sm text-muted-foreground">
+                      This export will show one row per member for {selectedReportType?.name || "the selected contribution"}.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedReportType?.targetAmount
+                        ? "Because this contribution has a target amount, statuses will be Paid, Partial, or Unpaid."
+                        : "Because this contribution has no target amount, statuses will be Contributed or No Contribution."}
                     </p>
                   </div>
-                </div>
-                
-                {/* Member List */}
-                <div className="divide-y divide-primary/10 border border-primary/10 rounded-xl overflow-hidden max-h-[300px] overflow-y-auto">
-                  {monthlyReport.map(report => (
-                    <div key={report.memberId} className="p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {report.status === "paid" ? (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        ) : report.status === "tolerated" ? (
-                          <Clock className="w-5 h-5 text-yellow-500" />
-                        ) : report.status === "not_applicable" ? (
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-secondary/40 text-[10px] text-muted-foreground">N/A</span>
-                        ) : (
-                          <XCircle className="w-5 h-5 text-red-500" />
-                        )}
-                        <span className="text-foreground">{report.memberName}</span>
-                      </div>
-                      <div className="text-right">
-                        {report.status === "paid" ? (
-                          <span className="text-green-500 font-medium">{formatCurrency(report.paidAmount)}</span>
-                        ) : report.status === "tolerated" ? (
-                          <span className="text-yellow-400 text-sm">Tolerated</span>
-                        ) : report.status === "not_applicable" ? (
-                          <span className="text-muted-foreground text-sm">N/A</span>
-                        ) : report.status === "partial" ? (
-                          <span className="text-yellow-400 text-sm">{formatCurrency(report.paidAmount)} partial</span>
-                        ) : (
-                          <span className="text-red-400 text-sm">Unpaid</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {monthlyReport.length === 0 && (
-                    <div className="p-8 text-center text-muted-foreground">
-                      No members found.
-                    </div>
-                  )}
-                </div>
+                )}
               </>
             ) : (
               <>
-                {/* Yearly Summary */}
-                {(() => {
-                  const yearContribs = contributions.filter(c => 
-                    c.year === filterYear || new Date(c.createdAt).getFullYear() === filterYear
-                  );
-                  const monthlyDuesTotal = yearContribs.filter(c => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
-                  const specialTotal = yearContribs.filter(c => c.category !== "monthly").reduce((sum, c) => sum + c.amount, 0);
-                  const totalCollected = yearContribs.reduce((sum, c) => sum + c.amount, 0);
-                  
-                  // Count unique months with payments
-                  const paidMonths = new Set(
-                    yearContribs.filter(c => c.category === "monthly" && c.month).map(c => c.month)
-                  ).size;
-                  
-                  return (
-                    <>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                          <p className="text-sm text-green-400">Total Collected</p>
-                          <p className="text-xl font-bold text-green-500">{formatCurrency(totalCollected)}</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                          <p className="text-sm text-blue-400">Monthly Dues</p>
-                          <p className="text-xl font-bold text-blue-500">{formatCurrency(monthlyDuesTotal)}</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                          <p className="text-sm text-purple-400">Special</p>
-                          <p className="text-xl font-bold text-purple-500">{formatCurrency(specialTotal)}</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                          <p className="text-sm text-primary">Transactions</p>
-                          <p className="text-xl font-bold text-primary">{yearContribs.length}</p>
-                        </div>
-                      </div>
-                      
-                      {/* Monthly Breakdown */}
-                      <div className="border border-primary/10 rounded-xl overflow-hidden">
-                        <div className="p-3 bg-secondary/50 font-medium text-sm text-foreground">
-                          Monthly Breakdown - {filterYear}
-                        </div>
-                        <div className="divide-y divide-primary/10 max-h-[250px] overflow-y-auto">
-                          {MONTH_NAMES.map((monthName, i) => {
-                            const monthContribs = yearContribs.filter(c => c.category === "monthly" && c.month === i + 1);
-                            const monthTotal = monthContribs.reduce((sum, c) => sum + c.amount, 0);
-                            const membersPaid = new Set(monthContribs.map(c => c.memberId)).size;
-                            
-                            return (
-                              <div key={i} className="p-3 flex items-center justify-between">
-                                <span className="text-foreground">{monthName}</span>
-                                <div className="flex items-center gap-4">
-                                  <span className="text-xs text-muted-foreground">{membersPaid} members</span>
-                                  <span className={cn(
-                                    "font-medium",
-                                    monthTotal > 0 ? "text-green-500" : "text-muted-foreground"
-                                  )}>
-                                    {monthTotal > 0 ? formatCurrency(monthTotal) : "—"}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
+                <div className="rounded-xl border border-primary/10 bg-secondary/20 p-4 space-y-2">
+                  <p className="font-medium text-foreground">
+                    {reportKind === "full_history" && "Full History"}
+                    {reportKind === "contribution_type" && "Contribution Type Report"}
+                    {reportKind === "annual_summary" && "Annual Summary"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {reportKind === "full_history" && "Exports raw contribution transactions using the current year, type, and category filters."}
+                    {reportKind === "contribution_type" && "Exports transaction rows for one selected contribution type."}
+                    {reportKind === "annual_summary" && "Exports yearly totals, contribution breakdowns, expenses, and net balance."}
+                  </p>
+                </div>
               </>
             )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-primary/10">
+              <Button variant="outline" onClick={() => setShowReport(false)}>
+                Cancel
+              </Button>
+              <Button variant="outline" onClick={() => { void handleExportReport("excel"); }}>
+                <Download className="w-4 h-4 mr-2" />
+                Export as Excel
+              </Button>
+              <Button variant="gold" onClick={() => { void handleExportReport("pdf"); }}>
+                <Download className="w-4 h-4 mr-2" />
+                Export as PDF
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -2215,22 +2340,10 @@ export function ContributionManagement() {
           </div>
           
           <div className="flex justify-end gap-2 pt-4 border-t border-primary/10">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Full History
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => { void handleExportAllContributions("pdf"); }}>
-                  Export PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { void handleExportAllContributions("excel"); }}>
-                  Export Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="outline" onClick={() => openReportModal("full_history")}>
+              <Download className="w-4 h-4 mr-2" />
+              Export Reports
+            </Button>
             <Button variant="outline" onClick={() => setShowAuditTrail(false)}>
               Close
             </Button>

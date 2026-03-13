@@ -56,6 +56,25 @@ interface SpreadsheetReportOptions extends DownloadReportOptions {
 }
 
 export type ContributionReportFormat = "pdf" | "excel";
+export type ContributionCategoryFilter = "all" | "monthly" | "special";
+
+export interface ContributionHistoryReportFilters {
+  year?: number;
+  typeId?: string;
+  category?: ContributionCategoryFilter;
+}
+
+export interface ContributionTypeTransactionReportFilters {
+  typeId: string;
+  year?: number;
+  month?: number;
+}
+
+export interface ContributionStatusReportFilters {
+  typeId: string;
+  year: number;
+  month?: number;
+}
 
 function escapeHtml(value: ReportCell): string {
   return String(value ?? "")
@@ -1135,50 +1154,85 @@ async function downloadContributionReport(
   downloadSpreadsheetReport(report);
 }
 
-async function buildAllContributionsReport() {
-  const contributions = await getAllContributions();
-
-  const headers = [
+function getTrimmedContributionHeaders(): string[] {
+  return [
     "Date",
     "Member Name",
-    "Member Email",
     "Contribution Type",
     "Category",
     "Amount (RWF)",
     "Month",
     "Year",
     "Payment Method",
-    "Reference",
     "Recorded By",
-    "Notes",
   ];
+}
 
-  const sorted = [...contributions].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const rows = sorted.map((c) => [
+function mapContributionTransactionRow(c: Awaited<ReturnType<typeof getAllContributions>>[number]): ReportCell[] {
+  return [
     new Date(c.createdAt).toLocaleDateString(),
     c.memberName,
-    c.memberEmail,
     c.typeName,
     toTitleCase(c.category),
     c.amount,
     c.month ? getMonthName(c.month) : "",
     c.year || "",
     c.paymentMethod || "cash",
-    c.reference || "",
     c.recordedBy || "",
-    c.notes || "",
-  ]);
+  ];
+}
+
+function filterContributionsForReport(
+  contributions: Awaited<ReturnType<typeof getAllContributions>>,
+  filters: ContributionHistoryReportFilters = {}
+) {
+  return contributions.filter((contribution) => {
+    if (filters.year) {
+      const contributionYear = contribution.year || new Date(contribution.createdAt).getFullYear();
+      if (contributionYear !== filters.year) return false;
+    }
+    if (filters.typeId && filters.typeId !== "all" && contribution.typeId !== filters.typeId) return false;
+    if (filters.category && filters.category !== "all" && contribution.category !== filters.category) return false;
+    return true;
+  });
+}
+
+export async function buildFullContributionHistoryReport(filters: ContributionHistoryReportFilters = {}) {
+  const contributions = filterContributionsForReport(await getAllContributions(), filters);
+  const types = await getAllContributionTypes();
+  const selectedType = filters.typeId && filters.typeId !== "all"
+    ? types.find((type) => type.id === filters.typeId)
+    : null;
+
+  const headers = getTrimmedContributionHeaders();
+
+  const sorted = [...contributions].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const rows = sorted.map(mapContributionTransactionRow);
 
   const totalAmount = contributions.reduce((sum, c) => sum + c.amount, 0);
   const monthlyTotal = contributions.filter((c) => c.category === "monthly").reduce((sum, c) => sum + c.amount, 0);
   const specialTotal = contributions.filter((c) => c.category === "special").reduce((sum, c) => sum + c.amount, 0);
+  const titleParts = ["Contribution History Report"];
+  if (filters.year) titleParts.push(String(filters.year));
+  if (filters.category && filters.category !== "all") titleParts.push(toTitleCase(filters.category));
+  if (selectedType) titleParts.push(selectedType.name);
 
   return {
-    title: "Contribution History Report",
-    filename: "contributions",
+    title: titleParts.join(" - "),
+    filename: [
+      "contributions",
+      filters.year || "all-years",
+      filters.category && filters.category !== "all" ? filters.category : "all-categories",
+      selectedType ? selectedType.name.replace(/\s+/g, "-").toLowerCase() : "all-types",
+    ].join("-"),
     sheetName: "Contributions",
     headers,
     rows,
+    meta: [
+      { label: "Year", value: filters.year || "All" },
+      { label: "Category", value: filters.category && filters.category !== "all" ? toTitleCase(filters.category) : "All" },
+      { label: "Contribution Type", value: selectedType?.name || "All" },
+    ],
     summary: [
       { label: "Records", value: contributions.length },
       { label: "Total Contributions", value: formatCurrency(totalAmount) },
@@ -1189,8 +1243,65 @@ async function buildAllContributionsReport() {
   };
 }
 
-export async function exportContributionsToCSV(format: ContributionReportFormat = "excel"): Promise<void> {
-  const report = await buildAllContributionsReport();
+export async function exportFullContributionHistory(
+  filters: ContributionHistoryReportFilters = {},
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildFullContributionHistoryReport(filters);
+  await downloadContributionReport(report, format);
+}
+
+export async function buildContributionTypeTransactionReport(
+  filters: ContributionTypeTransactionReportFilters
+) {
+  const type = await getAllContributionTypes().then((types) => types.find((entry) => entry.id === filters.typeId));
+  if (!type) {
+    throw new Error("Contribution type not found.");
+  }
+
+  const contributions = filterContributionsForReport(await getAllContributions(), {
+    year: filters.year,
+    typeId: filters.typeId,
+    category: type.category,
+  }).filter((contribution) => {
+    if (type.category === "monthly" && filters.month) {
+      return contribution.month === filters.month;
+    }
+    return true;
+  });
+
+  const sorted = [...contributions].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return {
+    title: `${type.name} Report`,
+    filename: [
+      "contribution-type",
+      type.name.replace(/\s+/g, "-").toLowerCase(),
+      filters.year || "all-years",
+      type.category === "monthly" && filters.month ? String(filters.month).padStart(2, "0") : "all-months",
+    ].join("-"),
+    sheetName: type.name.slice(0, 31),
+    headers: getTrimmedContributionHeaders(),
+    rows: sorted.map(mapContributionTransactionRow),
+    meta: [
+      { label: "Contribution Type", value: type.name },
+      { label: "Category", value: toTitleCase(type.category) },
+      { label: "Year", value: filters.year || "All" },
+      { label: "Month", value: type.category === "monthly" ? (filters.month ? getMonthName(filters.month) : "All") : "N/A" },
+    ],
+    summary: [
+      { label: "Records", value: contributions.length },
+      { label: "Total Collected", value: formatCurrency(contributions.reduce((sum, c) => sum + c.amount, 0)) },
+    ],
+    emptyMessage: `No transactions found for ${type.name}.`,
+  };
+}
+
+export async function exportContributionTypeTransactionReport(
+  filters: ContributionTypeTransactionReportFilters,
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildContributionTypeTransactionReport(filters);
   await downloadContributionReport(report, format);
 }
 
@@ -1299,6 +1410,111 @@ export async function exportMonthlyDuesReport(
   format: ContributionReportFormat = "excel"
 ): Promise<void> {
   const report = await buildMonthlyDuesReportData(month, year);
+  await downloadContributionReport(report, format);
+}
+
+export async function buildContributionStatusReport(filters: ContributionStatusReportFilters) {
+  const [types, members] = await Promise.all([getAllContributionTypes(), getAllMembers()]);
+  const type = types.find((entry) => entry.id === filters.typeId);
+
+  if (!type) {
+    throw new Error("Contribution type not found.");
+  }
+
+  if (type.category === "monthly") {
+    const month = filters.month ?? new Date().getMonth() + 1;
+    const report = await getMonthlyDuesReport(
+      month,
+      filters.year,
+      members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+    );
+
+    return {
+      title: `${type.name} Status Report`,
+      filename: `status-${type.name.replace(/\s+/g, "-").toLowerCase()}-${filters.year}-${String(month).padStart(2, "0")}`,
+      sheetName: `${type.name.slice(0, 18)} Status`,
+      headers: ["Member Name", "Expected Amount", "Paid Amount", "Status"],
+      rows: report.map((row) => [
+        row.memberName,
+        row.expectedAmount,
+        row.paidAmount,
+        row.status === "not_applicable" ? "N/A" : row.status === "tolerated" ? "Tolerated" : toTitleCase(row.status),
+      ]),
+      subtitle: `${getMonthName(month)} ${filters.year}`,
+      meta: [
+        { label: "Contribution Type", value: type.name },
+        { label: "Period", value: `${getMonthName(month)} ${filters.year}` },
+      ],
+      summary: [
+        { label: "Paid", value: report.filter((row) => row.status === "paid").length },
+        { label: "Partial", value: report.filter((row) => row.status === "partial").length },
+        { label: "Tolerated", value: report.filter((row) => row.status === "tolerated").length },
+        { label: "Unpaid", value: report.filter((row) => row.status === "unpaid").length },
+        { label: "N/A", value: report.filter((row) => row.status === "not_applicable").length },
+      ],
+      emptyMessage: "No member statuses found for this monthly dues period.",
+    };
+  }
+
+  const progress = await getSpecialContributionProgress(
+    type.id,
+    members.map((member) => ({ id: member.id, name: member.name, email: member.email }))
+  );
+
+  if (!progress) {
+    throw new Error("Could not build status report.");
+  }
+
+  const usesTargetStatus = !!type.targetAmount;
+  const rows = progress.memberStatus.map((memberRow) => {
+    const status = usesTargetStatus
+      ? (memberRow.paidAmount >= memberRow.expectedAmount
+          ? "Paid"
+          : memberRow.paidAmount > 0
+            ? "Partial"
+            : "Unpaid")
+      : (memberRow.paidAmount > 0 ? "Contributed" : "No Contribution");
+
+    return usesTargetStatus
+      ? [memberRow.memberName, memberRow.expectedAmount, memberRow.paidAmount, status]
+      : [memberRow.memberName, memberRow.paidAmount, status];
+  });
+
+  return {
+    title: `${type.name} Status Report`,
+    filename: `status-${type.name.replace(/\s+/g, "-").toLowerCase()}-${filters.year}`,
+    sheetName: `${type.name.slice(0, 18)} Status`,
+    headers: usesTargetStatus
+      ? ["Member Name", "Expected Amount", "Paid Amount", "Status"]
+      : ["Member Name", "Paid Amount", "Status"],
+    rows,
+    subtitle: `${type.name} - ${filters.year}`,
+    meta: [
+      { label: "Contribution Type", value: type.name },
+      { label: "Year", value: filters.year },
+      { label: "Status Mode", value: usesTargetStatus ? "Target-based" : "Optional / freewill" },
+    ],
+    summary: usesTargetStatus
+      ? [
+          { label: "Paid", value: rows.filter((row) => row[row.length - 1] === "Paid").length },
+          { label: "Partial", value: rows.filter((row) => row[row.length - 1] === "Partial").length },
+          { label: "Unpaid", value: rows.filter((row) => row[row.length - 1] === "Unpaid").length },
+          { label: "Collected", value: formatCurrency(progress.totalCollected) },
+        ]
+      : [
+          { label: "Contributed", value: rows.filter((row) => row[row.length - 1] === "Contributed").length },
+          { label: "No Contribution", value: rows.filter((row) => row[row.length - 1] === "No Contribution").length },
+          { label: "Collected", value: formatCurrency(progress.totalCollected) },
+        ],
+    emptyMessage: `No member statuses found for ${type.name}.`,
+  };
+}
+
+export async function exportContributionStatusReport(
+  filters: ContributionStatusReportFilters,
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildContributionStatusReport(filters);
   await downloadContributionReport(report, format);
 }
 
