@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import logo from "@/assets/LogoTSC.jpg";
+import montserratRegularTtf from "@/assets/fonts/Montserrat-Regular.ttf";
+import montserratBoldTtf from "@/assets/fonts/Montserrat-Bold.ttf";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -163,14 +165,26 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${receipt.choirName} Receipt ${receipt.receiptNumber}</title>
     <style>
+      @font-face {
+        font-family: "Montserrat";
+        src: url("${montserratRegularTtf}") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Montserrat";
+        src: url("${montserratBoldTtf}") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+      }
       :root {
         color-scheme: light;
         --ink: #101828;
         --muted: #667085;
         --line: #e4e7ec;
         --gold: #d4af37;
-        --blue: #1d4ed8;
-        --blue-soft: #dbeafe;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
         --surface: #ffffff;
       }
       * { box-sizing: border-box; }
@@ -286,8 +300,8 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
         margin-top: 24px;
         border-radius: 24px;
         padding: 26px;
-        background: linear-gradient(135deg, var(--blue-soft) 0%, #eff6ff 100%);
-        border: 1px solid rgba(29, 78, 216, 0.18);
+        background: linear-gradient(135deg, var(--green-soft) 0%, #f0fdf4 100%);
+        border: 1px solid rgba(22, 163, 74, 0.18);
         text-align: center;
       }
       .amount-box p {
@@ -300,7 +314,7 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
       .amount-box strong {
         display: block;
         margin-top: 12px;
-        color: var(--blue);
+        color: var(--green);
         font-size: 40px;
         line-height: 1;
       }
@@ -2459,11 +2473,11 @@ export default function MemberPortal() {
                               </div>
                             </div>
 
-                            <div className="rounded-[1.75rem] border border-sky-500/20 bg-[linear-gradient(135deg,rgba(14,165,233,0.12)_0%,rgba(59,130,246,0.08)_100%)] p-6 text-center md:p-8">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+                            <div className="rounded-[1.75rem] border border-green-500/20 bg-[linear-gradient(135deg,rgba(34,197,94,0.12)_0%,rgba(22,163,74,0.08)_100%)] p-6 text-center md:p-8">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-200/80">
                                 Amount Paid
                               </p>
-                              <p className="mt-3 text-4xl font-bold text-sky-400 md:text-5xl">
+                              <p className="mt-3 text-4xl font-bold text-green-400 md:text-5xl">
                                 {selectedReceiptDisplay.amountLabel}
                               </p>
                             </div>
