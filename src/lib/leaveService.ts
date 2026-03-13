@@ -357,9 +357,13 @@ export async function denyLeaveRequest(
 
 export async function deleteLeaveRequest(id: string): Promise<boolean> {
   try {
+    // Clean up any linked verification codes first so older DB schemas
+    // or stricter foreign-key setups do not block the leave deletion.
+    await dbDeleteWhere(VERIFICATION_CODES_KEY, 'leave_id', id);
     await dbDelete(LEAVE_REQUESTS_KEY, id);
     return true;
-  } catch {
+  } catch (error) {
+    console.error("[Leave] Failed to delete leave request:", error);
     return false;
   }
 }
