@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -529,7 +529,7 @@ export default function Admin() {
   };
 
   // Load tab-specific data on demand
-  const loadTabData = async (tab: Tab, options?: { force?: boolean }) => {
+  const loadTabData = useCallback(async (tab: Tab, options?: { force?: boolean }) => {
     const shouldUseCachedTabData = !options?.force
       && (Date.now() - (tabLoadTimestampsRef.current[tab] ?? 0) < TAB_DATA_TTL_MS);
 
@@ -654,7 +654,7 @@ export default function Admin() {
     } finally {
       setTabLoading(false);
     }
-  };
+  }, []);
 
   // Combined load for full refresh (used after mutations)
   const loadData = async () => {
@@ -746,8 +746,7 @@ export default function Admin() {
     loadCoreData();
     loadTabData(activeTab, { force: true });
     initialTabLoadDoneRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTab, loadTabData]);
 
   // Load tab-specific data when switching tabs
   useEffect(() => {
@@ -756,7 +755,7 @@ export default function Admin() {
     }
 
     loadTabData(activeTab);
-  }, [activeTab]);
+  }, [activeTab, loadTabData]);
 
   useEffect(() => {
     if (activeTab === "settings" && currentUser?.id) {
