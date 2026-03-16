@@ -288,7 +288,7 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
       }
       .detail {
         display: grid;
-        grid-template-columns: 110px minmax(0, 1fr);
+        grid-template-columns: 132px minmax(0, 1fr);
         gap: 16px;
         align-items: start;
         padding: 8px 0;
@@ -2449,20 +2449,20 @@ export default function MemberPortal() {
                                   Receipt Details
                                 </p>
                                 <div className="mt-4 space-y-4 text-sm">
-                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
+                                  <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Member</span>
                                     <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.memberName}
                                     </span>
                                   </div>
-                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
+                                  <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Description</span>
                                     <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.description}
                                     </span>
                                   </div>
                                   {selectedReceiptDisplay.period && (
-                                    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
+                                    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
                                       <span className="text-muted-foreground">Period</span>
                                       <span className="font-medium text-foreground">
                                         {selectedReceiptDisplay.period}
@@ -2477,21 +2477,21 @@ export default function MemberPortal() {
                                   Payment Details
                                 </p>
                                 <div className="mt-4 space-y-4 text-sm">
-                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
+                                  <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Method</span>
                                     <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.paymentMethod}
                                     </span>
                                   </div>
                                   {selectedReceiptDisplay.reference && (
-                                    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
+                                    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
                                       <span className="text-muted-foreground">Reference</span>
                                       <span className="break-all font-mono font-medium text-foreground">
                                         {selectedReceiptDisplay.reference}
                                       </span>
                                     </div>
                                   )}
-                                  <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
+                                  <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3">
                                     <span className="text-muted-foreground">Recorded By</span>
                                     <span className="font-medium text-foreground">
                                       {selectedReceiptDisplay.recordedBy}
