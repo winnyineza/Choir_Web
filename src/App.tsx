@@ -25,6 +25,8 @@ const Terms = lazy(() => import("./pages/Terms"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Scanner = lazy(() => import("./pages/Scanner"));
 const MemberPortal = lazy(() => import("./pages/MemberPortal"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs"));
+const EmailPreviews = lazy(() => import("./pages/EmailPreviews"));
 
 const queryClient = new QueryClient();
 
@@ -71,8 +73,10 @@ const App = () => (
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/email-previews" element={<EmailPreviews />} />
                 <Route path="/scanner" element={<Scanner />} />
                 <Route path="/member-portal" element={<MemberPortal />} />
+                <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

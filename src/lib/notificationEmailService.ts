@@ -53,6 +53,44 @@ function emailWrapper(title: string, body: string, choirName: string): string {
   `;
 }
 
+export function buildLeaveRequestCreatedPreviewEmail(choirName: string): string {
+  return emailWrapper("New Leave Request", `
+    <p style="color: #344054; margin: 0 0 12px 0;"><strong>Aimee Uwase</strong> has submitted a leave request.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">From:</td><td style="color: #172033; padding: 4px 0;">Thu, Mar 19, 2026</td></tr>
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">To:</td><td style="color: #172033; padding: 4px 0;">Sun, Mar 22, 2026</td></tr>
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">Reason:</td><td style="color: #172033; padding: 4px 0;">Family commitment outside Kigali.</td></tr>
+    </table>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 14px;">Please log in to the admin portal to review and vote on this request.</p>
+  `, choirName);
+}
+
+export function buildContributionReceiptPreviewEmail(choirName: string): string {
+  return emailWrapper("Contribution Receipt", `
+    <p style="color: #344054; margin: 0 0 12px 0;">Hi <strong>Alain Iragena</strong>,</p>
+    <p style="color: #344054; margin: 0 0 16px 0;">Your payment has been recorded. Here's your receipt:</p>
+    <div style="text-align: center; margin-bottom: 16px;">
+      <span style="background: rgba(34,197,94,0.2); color: #22c55e; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;">Fully Paid</span>
+    </div>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Month:</td><td style="color: #172033; padding: 6px 0; border-bottom: 1px solid #e4e7ec; text-align: right;">March 2026</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Type:</td><td style="color: #172033; padding: 6px 0; border-bottom: 1px solid #e4e7ec; text-align: right;">Umusanzu</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Amount Paid:</td><td style="color: #22c55e; padding: 6px 0; border-bottom: 1px solid #e4e7ec; text-align: right; font-weight: bold; font-size: 16px;">1,000 RWF</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0;">Expected:</td><td style="color: #172033; padding: 6px 0; text-align: right;">1,000 RWF</td></tr>
+    </table>
+    <p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px; text-align: center;">Thank you for your full payment!</p>
+  `, choirName);
+}
+
+export function buildAnnouncementPreviewEmail(choirName: string): string {
+  return emailWrapper("Announcement", `
+    <div style="margin-bottom: 12px;"><span style="background: rgba(234,179,8,0.2); color: #eab308; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">HIGH PRIORITY</span></div>
+    <h3 style="color: #172033; margin: 0 0 12px 0;">Sabbath Rehearsal Time Update</h3>
+    <div style="color: #344054; line-height: 1.6; white-space: pre-line;">Please note that this week’s rehearsal starts at 2:30 PM instead of 3:00 PM. Kindly arrive early for voice checks and setup.</div>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 13px;">Visit the member portal for more details.</p>
+  `, choirName);
+}
+
 // ============ LEAVE REQUEST NOTIFICATIONS ============
 
 export async function notifyLeaveRequestCreated(

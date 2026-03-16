@@ -50,6 +50,8 @@ import {
   Lock,
   Unlock,
   EyeOff,
+  BookOpen,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "react-router-dom";
@@ -4042,6 +4044,38 @@ export default function Admin() {
                       {accountSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
                       Change Password
                     </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card-glass rounded-2xl p-6 w-full">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-primary" />
+                  Platform Docs & QA
+                </h3>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Open the live API docs and preview the main transactional emails before using them in production.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Link to="/api-docs" target="_blank" className="rounded-xl border border-primary/15 bg-secondary/20 p-4 transition hover:border-primary/30 hover:bg-secondary/30">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <BookOpen className="w-4 h-4 text-primary" />
+                        API Docs
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        Swagger-style documentation for email, push, and Google integration functions.
+                      </p>
+                    </Link>
+                    <Link to="/admin/email-previews" target="_blank" className="rounded-xl border border-primary/15 bg-secondary/20 p-4 transition hover:border-primary/30 hover:bg-secondary/30">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <FlaskConical className="w-4 h-4 text-primary" />
+                        Email Preview Lab
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        Review invite, verification, receipt, and announcement templates with current choir branding.
+                      </p>
+                    </Link>
                   </div>
                 </div>
               </div>

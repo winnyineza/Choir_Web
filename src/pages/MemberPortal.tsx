@@ -2339,7 +2339,7 @@ export default function MemberPortal() {
                     Payment History
                   </h2>
                   {myContributions.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
                       {myContributions
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .map((contribution) => (

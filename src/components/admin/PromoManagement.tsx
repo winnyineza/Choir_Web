@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RecordsTableShell } from "@/components/ui/records-table-shell";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
@@ -275,8 +276,9 @@ export function PromoManagement() {
         </div>
       ) : (
         <div className="card-glass rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-primary/10">
+          <RecordsTableShell maxHeightClassName="max-h-[36rem]">
+          <table className="w-full min-w-[980px]">
+            <thead className="sticky top-0 z-10 bg-primary/10 backdrop-blur-sm">
               <tr>
                 <th className="text-left p-3 text-xs font-medium">Code</th>
                 <th className="text-left p-3 text-xs font-medium">Discount</th>
@@ -378,6 +380,7 @@ export function PromoManagement() {
               })}
             </tbody>
           </table>
+          </RecordsTableShell>
         </div>
       )}
 
@@ -515,4 +518,3 @@ export function PromoManagement() {
     </div>
   );
 }
-

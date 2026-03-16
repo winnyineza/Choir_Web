@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RecordsTableShell } from "@/components/ui/records-table-shell";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -480,8 +481,9 @@ export function InventoryManagement() {
         </div>
       ) : (
         <div className="card-glass rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-primary/10">
+          <RecordsTableShell maxHeightClassName="max-h-[38rem]">
+          <table className="w-full min-w-[880px]">
+            <thead className="sticky top-0 z-10 bg-primary/10 backdrop-blur-sm">
               <tr>
                 <th className="text-left p-3 text-xs font-medium">Item</th>
                 <th className="text-left p-3 text-xs font-medium">Category</th>
@@ -571,6 +573,7 @@ export function InventoryManagement() {
               })}
             </tbody>
           </table>
+          </RecordsTableShell>
         </div>
       )}
 
@@ -788,4 +791,3 @@ export function InventoryManagement() {
     </div>
   );
 }
-

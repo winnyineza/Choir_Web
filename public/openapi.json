@@ -1,0 +1,299 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Serenades of Praise Platform API",
+    "version": "1.0.0",
+    "description": "Operational docs for the Netlify Functions used by the Serenades of Praise admin platform."
+  },
+  "servers": [
+    {
+      "url": "/.netlify/functions",
+      "description": "Netlify Functions"
+    }
+  ],
+  "tags": [
+    { "name": "Email", "description": "Email delivery and notification endpoints." },
+    { "name": "Google Calendar", "description": "Google OAuth and calendar sync operations." },
+    { "name": "Push", "description": "Push notification delivery." },
+    { "name": "Automation", "description": "Scheduled and maintenance jobs." }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Key"
+      },
+      "adminIdHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Admin-Id"
+      }
+    },
+    "schemas": {
+      "EmailRecipient": {
+        "type": "object",
+        "required": ["email", "name"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "name": { "type": "string" }
+        }
+      },
+      "SendEmailRequest": {
+        "type": "object",
+        "required": ["to", "subject", "html"],
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EmailRecipient" }
+          },
+          "subject": { "type": "string" },
+          "html": { "type": "string" }
+        }
+      },
+      "TicketEmailRequest": {
+        "type": "object",
+        "required": ["to", "eventTitle", "eventDate", "eventLocation", "txRef", "customerName", "tickets", "total", "qrCodeData"],
+        "properties": {
+          "to": { "type": "string", "format": "email" },
+          "eventTitle": { "type": "string" },
+          "eventDate": { "type": "string" },
+          "eventTime": { "type": "string" },
+          "eventLocation": { "type": "string" },
+          "txRef": { "type": "string" },
+          "customerName": { "type": "string" },
+          "total": { "type": "number" },
+          "qrCodeData": { "type": "string" },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["tierName", "quantity", "priceEach"],
+              "properties": {
+                "tierName": { "type": "string" },
+                "quantity": { "type": "integer" },
+                "priceEach": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "GoogleMeetingPayload": {
+        "type": "object",
+        "required": ["title", "date"],
+        "properties": {
+          "meetingId": { "type": "string" },
+          "googleEventId": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "location": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "startTime": { "type": "string", "example": "14:00" },
+          "endTime": { "type": "string", "example": "15:30" },
+          "timezone": { "type": "string", "example": "Africa/Kigali" },
+          "includeMeetLink": { "type": "boolean" },
+          "attendeeEmails": {
+            "type": "array",
+            "items": { "type": "string", "format": "email" }
+          }
+        }
+      },
+      "PushNotificationRequest": {
+        "type": "object",
+        "required": ["title", "body"],
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "icon": { "type": "string" },
+          "tag": { "type": "string" },
+          "userId": { "type": "string" },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/send-email": {
+      "post": {
+        "tags": ["Email"],
+        "summary": "Send a transactional email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendEmailRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Email accepted and sent." },
+          "400": { "description": "Validation error." },
+          "429": { "description": "Rate limit exceeded." }
+        }
+      }
+    },
+    "/send-ticket-email": {
+      "post": {
+        "tags": ["Email"],
+        "summary": "Send a ticket confirmation email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TicketEmailRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ticket email sent." },
+          "400": { "description": "Validation error." }
+        }
+      }
+    },
+    "/google-oauth-start": {
+      "get": {
+        "tags": ["Google Calendar"],
+        "summary": "Start Google OAuth consent flow",
+        "security": [{ "adminIdHeader": [] }],
+        "parameters": [
+          {
+            "name": "redirectPath",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "default": "/admin" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Returns Google consent URL." },
+          "400": { "description": "Missing admin context or env config." }
+        }
+      }
+    },
+    "/google-oauth-callback": {
+      "get": {
+        "tags": ["Google Calendar"],
+        "summary": "Complete Google OAuth callback",
+        "parameters": [
+          { "name": "code", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "state", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "302": { "description": "Redirects back to the app." },
+          "400": { "description": "Invalid callback parameters." }
+        }
+      }
+    },
+    "/google-meetings": {
+      "get": {
+        "tags": ["Google Calendar"],
+        "summary": "Get Google Calendar connection status",
+        "security": [{ "adminIdHeader": [] }],
+        "responses": {
+          "200": { "description": "Connection status and calendar metadata." }
+        }
+      },
+      "post": {
+        "tags": ["Google Calendar"],
+        "summary": "Create a Google Calendar event and optional Meet link",
+        "security": [{ "adminIdHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GoogleMeetingPayload" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Meeting created." },
+          "403": { "description": "Missing required Google scope." },
+          "409": { "description": "Google Calendar is not connected." }
+        }
+      },
+      "patch": {
+        "tags": ["Google Calendar"],
+        "summary": "Update an existing Google Calendar event",
+        "security": [{ "adminIdHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GoogleMeetingPayload" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Meeting updated." }
+        }
+      },
+      "delete": {
+        "tags": ["Google Calendar"],
+        "summary": "Delete a Google Calendar event",
+        "security": [{ "adminIdHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["googleEventId"],
+                "properties": {
+                  "googleEventId": { "type": "string" },
+                  "meetingId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Meeting deleted." },
+          "400": { "description": "Missing googleEventId." }
+        }
+      }
+    },
+    "/google-birthday-sync": {
+      "post": {
+        "tags": ["Google Calendar"],
+        "summary": "Sync member birthdays to Google Calendar",
+        "security": [{ "adminIdHeader": [] }],
+        "responses": {
+          "200": { "description": "Sync completed." },
+          "403": { "description": "Insufficient scope or authorization." }
+        }
+      }
+    },
+    "/send-push": {
+      "post": {
+        "tags": ["Push"],
+        "summary": "Send a push notification",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PushNotificationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Push notification batch completed." },
+          "401": { "description": "Missing or invalid bearer token." }
+        }
+      }
+    },
+    "/daily-reminders": {
+      "post": {
+        "tags": ["Automation"],
+        "summary": "Run daily reminders manually",
+        "description": "Used by scheduled jobs or manual triggering to send birthdays, reminders, and finance nudges.",
+        "responses": {
+          "200": { "description": "Job completed." },
+          "500": { "description": "Job failed." }
+        }
+      }
+    }
+  }
+}

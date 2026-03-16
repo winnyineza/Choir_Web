@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { RecordsTableShell } from "@/components/ui/records-table-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -409,8 +410,9 @@ export function GalleryManagement() {
         </div>
       ) : (
         <div className="card-glass rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-primary/10">
+          <RecordsTableShell maxHeightClassName="max-h-[38rem]">
+          <table className="w-full min-w-[920px]">
+            <thead className="sticky top-0 z-10 bg-primary/10 backdrop-blur-sm">
               <tr>
                 <th className="text-left p-3 text-xs font-medium">Preview</th>
                 <th className="text-left p-3 text-xs font-medium">Title</th>
@@ -464,6 +466,7 @@ export function GalleryManagement() {
               ))}
             </tbody>
           </table>
+          </RecordsTableShell>
         </div>
       )}
 
@@ -618,4 +621,3 @@ export function GalleryManagement() {
     </div>
   );
 }
-

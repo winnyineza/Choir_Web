@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { RecordsTableShell } from "@/components/ui/records-table-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -993,7 +994,8 @@ export function Treasury({ onRefresh }: TreasuryProps) {
             <div className="p-4 border-b border-primary/10">
               <h3 className="font-semibold text-foreground">Financial Summary</h3>
             </div>
-            <table className="w-full">
+            <RecordsTableShell maxHeightClassName="max-h-[28rem]">
+            <table className="w-full min-w-[720px]">
               <tbody className="divide-y divide-primary/10">
                 <tr className="hover:bg-secondary/30">
                   <td className="p-4 text-muted-foreground flex items-center gap-2">
@@ -1035,6 +1037,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
                 </tr>
               </tbody>
             </table>
+            </RecordsTableShell>
           </div>
         </div>
       )}

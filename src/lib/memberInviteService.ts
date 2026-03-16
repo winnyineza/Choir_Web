@@ -29,7 +29,7 @@ function getPortalUrl(): string {
 /**
  * Generate the welcome email HTML
  */
-function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, portalUrl: string): string {
+export function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, portalUrl: string): string {
   const firstName = member.name?.split(" ")[0] || "Member";
   
   return `
@@ -330,9 +330,52 @@ export async function sendAdminInviteEmail(
     ? `${window.location.origin}/admin/login?invite=${inviteCode}`
     : `https://serenadesofpraise.netlify.app/admin/login?invite=${inviteCode}`;
 
+  const emailHtml = buildAdminInviteEmailHtml(email, name, role, inviteCode, loginUrl);
+  const isDev = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  if (isDev) {
+    console.info(
+      `[DEV] Admin invite email for ${name} (${email}):\n` +
+      `Login URL: ${loginUrl}\n` +
+      `Invite Code: ${inviteCode}\n` +
+      `Role: ${role}\n` +
+      `(Email not sent in development mode)`
+    );
+    return { success: true, message: `Development mode: Invite logged for ${name}.` };
+  }
+
+  try {
+    const response = await fetch("/.netlify/functions/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: [{ email, name }],
+        subject: "You're Invited to Serenades of Praise Admin Team",
+        html: emailHtml,
+      }),
+    });
+
+    if (response.ok) {
+      return { success: true, message: `Admin invite email sent to ${email}` };
+    } else {
+      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      return { success: false, message: `Failed to send email: ${error.error || "Unknown error"}` };
+    }
+  } catch (err: any) {
+    return { success: false, message: `Error sending email: ${err.message}` };
+  }
+}
+
+export function buildAdminInviteEmailHtml(
+  email: string,
+  name: string,
+  role: string,
+  inviteCode: string,
+  loginUrl: string,
+): string {
   const firstName = name.split(" ")[0] || "Admin";
 
-  const emailHtml = `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -404,40 +447,6 @@ export async function sendAdminInviteEmail(
   </table>
 </body>
 </html>`;
-
-  const isDev = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-  if (isDev) {
-    console.info(
-      `[DEV] Admin invite email for ${name} (${email}):\n` +
-      `Login URL: ${loginUrl}\n` +
-      `Invite Code: ${inviteCode}\n` +
-      `Role: ${role}\n` +
-      `(Email not sent in development mode)`
-    );
-    return { success: true, message: `Development mode: Invite logged for ${name}.` };
-  }
-
-  try {
-    const response = await fetch("/.netlify/functions/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: [{ email, name }],
-        subject: "You're Invited to Serenades of Praise Admin Team",
-        html: emailHtml,
-      }),
-    });
-
-    if (response.ok) {
-      return { success: true, message: `Admin invite email sent to ${email}` };
-    } else {
-      const error = await response.json().catch(() => ({ error: "Unknown error" }));
-      return { success: false, message: `Failed to send email: ${error.error || "Unknown error"}` };
-    }
-  } catch (err: any) {
-    return { success: false, message: `Error sending email: ${err.message}` };
-  }
 }
 
 /**
@@ -452,9 +461,48 @@ export async function sendAdminWelcomeEmail(
     ? `${window.location.origin}/admin`
     : "https://serenadesofpraise.netlify.app/admin";
 
+  const emailHtml = buildAdminWelcomeEmailHtml(email, name, role, portalUrl);
+  const isDev = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  if (isDev) {
+    console.info(
+      `[DEV] Admin welcome email for ${name} (${email}):\n` +
+      `Role: ${role}\n` +
+      `(Email not sent in development mode)`
+    );
+    return { success: true, message: `Development mode: Welcome email logged for ${name}.` };
+  }
+
+  try {
+    const response = await fetch("/.netlify/functions/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: [{ email, name }],
+        subject: "Welcome to Serenades of Praise Admin Team!",
+        html: emailHtml,
+      }),
+    });
+
+    if (response.ok) {
+      return { success: true, message: `Welcome email sent to ${email}` };
+    } else {
+      return { success: false, message: "Failed to send welcome email" };
+    }
+  } catch (err: any) {
+    return { success: false, message: `Error sending welcome email: ${err.message}` };
+  }
+}
+
+export function buildAdminWelcomeEmailHtml(
+  email: string,
+  name: string,
+  role: string,
+  portalUrl: string,
+): string {
   const firstName = name.split(" ")[0] || "Admin";
 
-  const emailHtml = `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -528,35 +576,4 @@ export async function sendAdminWelcomeEmail(
   </table>
 </body>
 </html>`;
-
-  const isDev = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-  if (isDev) {
-    console.info(
-      `[DEV] Admin welcome email for ${name} (${email}):\n` +
-      `Role: ${role}\n` +
-      `(Email not sent in development mode)`
-    );
-    return { success: true, message: `Development mode: Welcome email logged for ${name}.` };
-  }
-
-  try {
-    const response = await fetch("/.netlify/functions/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: [{ email, name }],
-        subject: "Welcome to Serenades of Praise Admin Team!",
-        html: emailHtml,
-      }),
-    });
-
-    if (response.ok) {
-      return { success: true, message: `Welcome email sent to ${email}` };
-    } else {
-      return { success: false, message: "Failed to send welcome email" };
-    }
-  } catch (err: any) {
-    return { success: false, message: `Error sending welcome email: ${err.message}` };
-  }
 }

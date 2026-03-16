@@ -99,7 +99,7 @@ export async function verifyEmailCode(email: string, code: string): Promise<Veri
 }
 
 // Email template
-function generateEmailTemplate(memberName: string, code: string): string {
+export function generateEmailTemplate(memberName: string, code: string): string {
   return `
     <!DOCTYPE html>
     <html>
