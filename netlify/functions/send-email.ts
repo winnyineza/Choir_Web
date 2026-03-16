@@ -46,6 +46,8 @@ function sanitizeHtml(html: string): string {
 function normalizeReadableEmailHtml(html: string): string {
   const tags = ["p", "li", "td", "th", "span", "div", "a"];
   let normalized = html;
+  const defaultTextColor = "#172033";
+  const defaultBodyStyle = `margin: 0; padding: 0; background-color: #f5f7fb; color: ${defaultTextColor}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;`;
 
   for (const tag of tags) {
     const withStyleRegex = new RegExp(`<${tag}([^>]*?)style=\"([^\"]*)\"([^>]*)>`, "gi");
@@ -54,16 +56,51 @@ function normalizeReadableEmailHtml(html: string): string {
         return `<${tag}${before}style="${style}"${after}>`;
       }
       const separator = style.trim().endsWith(";") || style.trim().length === 0 ? "" : ";";
-      return `<${tag}${before}style="${style}${separator} color: #f5f5f5;"${after}>`;
+      return `<${tag}${before}style="${style}${separator} color: ${defaultTextColor};"${after}>`;
     });
 
     const withoutStyleRegex = new RegExp(`<${tag}(?![^>]*style=)([^>]*)>`, "gi");
-    normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #f5f5f5;"$1>`);
+    normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: ${defaultTextColor};"$1>`);
   }
 
   normalized = normalized.replace(
+    /<meta\s+name=["']color-scheme["'][^>]*>/gi,
+    "",
+  );
+  normalized = normalized.replace(
+    /<meta\s+name=["']supported-color-schemes["'][^>]*>/gi,
+    "",
+  );
+  normalized = normalized.replace(
+    /<head([^>]*)>/i,
+    `<head$1><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">`,
+  );
+
+  normalized = normalized.replace(
+    /<body([^>]*?)style="([^"]*)"([^>]*)>/gi,
+    (_match, before, style, after) => {
+      let nextStyle = style
+        .replace(/background-color\s*:\s*#0a0a0a/gi, "background-color: #f5f7fb")
+        .replace(/background-color\s*:\s*#0c0a09/gi, "background-color: #f5f7fb")
+        .replace(/color\s*:\s*#f5f5f5/gi, `color: ${defaultTextColor}`);
+
+      if (!/\bbackground-color\s*:/i.test(nextStyle)) {
+        nextStyle = `${nextStyle}${nextStyle.trim().endsWith(";") || nextStyle.trim().length === 0 ? "" : ";"} background-color: #f5f7fb;`;
+      }
+      if (!/\bcolor\s*:/i.test(nextStyle)) {
+        nextStyle = `${nextStyle}${nextStyle.trim().endsWith(";") || nextStyle.trim().length === 0 ? "" : ";"} color: ${defaultTextColor};`;
+      }
+      if (!/\bfont-family\s*:/i.test(nextStyle)) {
+        nextStyle = `${nextStyle}${nextStyle.trim().endsWith(";") || nextStyle.trim().length === 0 ? "" : ";"} font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;`;
+      }
+
+      return `<body${before}style="${nextStyle}"${after}>`;
+    },
+  );
+
+  normalized = normalized.replace(
     /<body(?![^>]*style=)([^>]*)>/gi,
-    '<body style="margin: 0; padding: 0; background-color: #0a0a0a; color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
+    `<body style="${defaultBodyStyle}"$1>`,
   );
 
   return normalized;

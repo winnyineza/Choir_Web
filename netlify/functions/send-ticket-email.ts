@@ -146,11 +146,11 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Your Ticket Confirmation</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f5f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden;">
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
@@ -166,28 +166,28 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
               <div style="width: 60px; height: 60px; background-color: #22c55e20; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
                 <span style="font-size: 30px;">✓</span>
               </div>
-              <h2 style="margin: 0 0 10px; color: #fff; font-size: 22px;">Payment Successful!</h2>
-              <p style="margin: 0; color: #888; font-size: 14px;">Your tickets have been confirmed</p>
+              <h2 style="margin: 0 0 10px; color: #172033; font-size: 22px;">Payment Successful!</h2>
+              <p style="margin: 0; color: #667085; font-size: 14px;">Your tickets have been confirmed</p>
             </td>
           </tr>
           
           <!-- Event Details -->
           <tr>
             <td style="padding: 0 30px 30px;">
-              <div style="background-color: #252525; border-radius: 12px; padding: 20px; border-left: 4px solid #d4a537;">
+              <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px; border-left: 4px solid #d4a537;">
                 <h3 style="margin: 0 0 15px; color: #d4a537; font-size: 18px;">${safeEventTitle}</h3>
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="padding: 8px 0; color: #888; font-size: 14px;">📅 Date</td>
-                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${safeEventDate}</td>
+                    <td style="padding: 8px 0; color: #667085; font-size: 14px;">📅 Date</td>
+                    <td style="padding: 8px 0; color: #172033; font-size: 14px; text-align: right;">${safeEventDate}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #888; font-size: 14px;">🕐 Time</td>
-                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${safeEventTime || "TBA"}</td>
+                    <td style="padding: 8px 0; color: #667085; font-size: 14px;">🕐 Time</td>
+                    <td style="padding: 8px 0; color: #172033; font-size: 14px; text-align: right;">${safeEventTime || "TBA"}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #888; font-size: 14px;">📍 Location</td>
-                    <td style="padding: 8px 0; color: #fff; font-size: 14px; text-align: right;">${safeEventLocation}</td>
+                    <td style="padding: 8px 0; color: #667085; font-size: 14px;">📍 Location</td>
+                    <td style="padding: 8px 0; color: #172033; font-size: 14px; text-align: right;">${safeEventLocation}</td>
                   </tr>
                 </table>
               </div>
@@ -197,18 +197,18 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           <!-- Ticket Details -->
           <tr>
             <td style="padding: 0 30px 30px;">
-              <div style="background-color: #252525; border-radius: 12px; padding: 20px;">
-                <h4 style="margin: 0 0 15px; color: #fff; font-size: 16px;">Ticket Details</h4>
-                <p style="margin: 0 0 10px; color: #ccc; font-size: 14px;">${ticketsList}</p>
-                <div style="border-top: 1px solid #333; margin-top: 15px; padding-top: 15px;">
+              <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px;">
+                <h4 style="margin: 0 0 15px; color: #172033; font-size: 16px;">Ticket Details</h4>
+                <p style="margin: 0 0 10px; color: #344054; font-size: 14px;">${ticketsList}</p>
+                <div style="border-top: 1px solid #d9e2ec; margin-top: 15px; padding-top: 15px;">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
-                      <td style="color: #888; font-size: 14px;">Reference</td>
+                      <td style="color: #667085; font-size: 14px;">Reference</td>
                       <td style="color: #d4a537; font-size: 14px; text-align: right; font-family: monospace;">${safeTxRef}</td>
                     </tr>
                     <tr>
-                      <td style="padding-top: 10px; color: #fff; font-size: 16px; font-weight: bold;">Total Paid</td>
-                      <td style="padding-top: 10px; color: #d4a537; font-size: 18px; font-weight: bold; text-align: right;">${formatCurrency(data.total)}</td>
+                      <td style="padding-top: 10px; color: #172033; font-size: 16px; font-weight: bold;">Total Paid</td>
+                      <td style="padding-top: 10px; color: #16a34a; font-size: 18px; font-weight: bold; text-align: right;">${formatCurrency(data.total)}</td>
                     </tr>
                   </table>
                 </div>
@@ -229,9 +229,9 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           <!-- Instructions -->
           <tr>
             <td style="padding: 0 30px 30px;">
-              <div style="background-color: #d4a53720; border-radius: 12px; padding: 20px; border: 1px solid #d4a53740;">
+              <div style="background-color: #fff8e8; border-radius: 12px; padding: 20px; border: 1px solid #f2d58a;">
                 <h4 style="margin: 0 0 10px; color: #d4a537; font-size: 14px;">📋 Important Information</h4>
-                <ul style="margin: 0; padding-left: 20px; color: #ccc; font-size: 13px; line-height: 1.8;">
+                <ul style="margin: 0; padding-left: 20px; color: #344054; font-size: 13px; line-height: 1.8;">
                   <li>Present this email or screenshot at the entrance</li>
                   <li>Arrive 30 minutes before the event starts</li>
                   <li>This ticket is non-transferable</li>
@@ -243,11 +243,11 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 30px; background-color: #151515; text-align: center;">
-              <p style="margin: 0 0 10px; color: #888; font-size: 12px;">
+            <td style="padding: 20px 30px; background-color: #eef2f7; text-align: center;">
+              <p style="margin: 0 0 10px; color: #667085; font-size: 12px;">
                 Questions? Contact us at <a href="mailto:theserenadeschoir@gmail.com" style="color: #d4a537;">theserenadeschoir@gmail.com</a>
               </p>
-              <p style="margin: 0; color: #666; font-size: 11px;">
+              <p style="margin: 0; color: #98a2b3; font-size: 11px;">
                 Serenades of Praise Choir • Kacyiru SDA Church, Kigali, Rwanda
               </p>
             </td>
@@ -272,16 +272,16 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
             return `<${tag}${before}style="${style}"${after}>`;
           }
           const separator = style.trim().endsWith(";") || style.trim().length === 0 ? "" : ";";
-          return `<${tag}${before}style="${style}${separator} color: #f5f5f5;"${after}>`;
+          return `<${tag}${before}style="${style}${separator} color: #172033;"${after}>`;
         });
 
         const withoutStyleRegex = new RegExp(`<${tag}(?![^>]*style=)([^>]*)>`, "gi");
-        normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #f5f5f5;"$1>`);
+        normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #172033;"$1>`);
       }
 
       normalized = normalized.replace(
         /<body(?![^>]*style=)([^>]*)>/gi,
-        '<body style="margin: 0; padding: 0; background-color: #0a0a0a; color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
+        '<body style="margin: 0; padding: 0; background-color: #f5f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
       );
 
       return normalized;
@@ -325,5 +325,4 @@ function formatCurrency(amount: number): string {
 }
 
 export { handler };
-
 

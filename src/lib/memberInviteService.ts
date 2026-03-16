@@ -40,11 +40,11 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to Serenades of Praise</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden;">
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
@@ -57,8 +57,8 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <!-- Welcome Message -->
           <tr>
             <td style="padding: 30px; text-align: center;">
-              <h2 style="margin: 0 0 10px; color: #fff; font-size: 22px;">Welcome, ${firstName}!</h2>
-              <p style="margin: 0; color: #aaa; font-size: 15px; line-height: 1.6;">
+              <h2 style="margin: 0 0 10px; color: #172033; font-size: 22px;">Welcome, ${firstName}!</h2>
+              <p style="margin: 0; color: #667085; font-size: 15px; line-height: 1.6;">
                 You've been added to the Serenades of Praise Choir. 
                 You now have access to the Member Portal where you can view your 
                 attendance, contributions, and more.
@@ -69,24 +69,24 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <!-- Portal Access -->
           <tr>
             <td style="padding: 0 30px 30px;">
-              <div style="background-color: #252525; border-radius: 12px; padding: 24px; border-left: 4px solid #d4a537;">
+              <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 24px; border-left: 4px solid #d4a537;">
                 <h3 style="margin: 0 0 20px; color: #d4a537; font-size: 18px;">How to Access the Portal</h3>
                 
                 <div style="margin-bottom: 16px;">
-                  <p style="margin: 0 0 4px; color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Step 1 - Open Portal</p>
-                  <p style="margin: 0; color: #fff; font-size: 15px;">Click the button below or visit the portal link</p>
+                  <p style="margin: 0 0 4px; color: #667085; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Step 1 - Open Portal</p>
+                  <p style="margin: 0; color: #172033; font-size: 15px;">Click the button below or visit the portal link</p>
                 </div>
                 
                 <div style="margin-bottom: 16px;">
-                  <p style="margin: 0 0 4px; color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Step 2 - Enter Portal PIN</p>
-                  <div style="background: #1a1a1a; border-radius: 8px; padding: 12px 16px; display: inline-block; margin-top: 4px;">
+                  <p style="margin: 0 0 4px; color: #667085; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Step 2 - Enter Portal PIN</p>
+                  <div style="background: #eef2f7; border-radius: 8px; padding: 12px 16px; display: inline-block; margin-top: 4px;">
                     <span style="font-family: monospace; font-size: 28px; color: #d4a537; letter-spacing: 12px; font-weight: bold;">${portalPin}</span>
                   </div>
                 </div>
                 
                 <div>
-                  <p style="margin: 0 0 4px; color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Step 3 - Enter Your Email</p>
-                  <p style="margin: 0; color: #fff; font-size: 15px;">Use this email: <strong style="color: #d4a537;">${member.email}</strong></p>
+                  <p style="margin: 0 0 4px; color: #667085; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Step 3 - Enter Your Email</p>
+                  <p style="margin: 0; color: #172033; font-size: 15px;">Use this email: <strong style="color: #d4a537;">${member.email}</strong></p>
                 </div>
               </div>
             </td>
@@ -104,27 +104,27 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <!-- Member Info -->
           <tr>
             <td style="padding: 0 30px 30px;">
-              <div style="background-color: #252525; border-radius: 12px; padding: 20px;">
-                <h4 style="margin: 0 0 15px; color: #fff; font-size: 16px;">Your Details</h4>
+              <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px;">
+                <h4 style="margin: 0 0 15px; color: #172033; font-size: 16px;">Your Details</h4>
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="padding: 6px 0; color: #888; font-size: 14px;">Name</td>
-                    <td style="padding: 6px 0; color: #fff; font-size: 14px; text-align: right;">${member.name}</td>
+                    <td style="padding: 6px 0; color: #667085; font-size: 14px;">Name</td>
+                    <td style="padding: 6px 0; color: #172033; font-size: 14px; text-align: right;">${member.name}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #888; font-size: 14px;">Email</td>
-                    <td style="padding: 6px 0; color: #fff; font-size: 14px; text-align: right;">${member.email}</td>
+                    <td style="padding: 6px 0; color: #667085; font-size: 14px;">Email</td>
+                    <td style="padding: 6px 0; color: #172033; font-size: 14px; text-align: right;">${member.email}</td>
                   </tr>
                   ${member.voice ? `
                   <tr>
-                    <td style="padding: 6px 0; color: #888; font-size: 14px;">Voice Part</td>
+                    <td style="padding: 6px 0; color: #667085; font-size: 14px;">Voice Part</td>
                     <td style="padding: 6px 0; color: #d4a537; font-size: 14px; text-align: right; font-weight: bold;">${member.voice}</td>
                   </tr>
                   ` : ""}
                   ${member.phone ? `
                   <tr>
-                    <td style="padding: 6px 0; color: #888; font-size: 14px;">Phone</td>
-                    <td style="padding: 6px 0; color: #fff; font-size: 14px; text-align: right;">${member.phone}</td>
+                    <td style="padding: 6px 0; color: #667085; font-size: 14px;">Phone</td>
+                    <td style="padding: 6px 0; color: #172033; font-size: 14px; text-align: right;">${member.phone}</td>
                   </tr>
                   ` : ""}
                 </table>
@@ -137,7 +137,7 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
             <td style="padding: 0 30px 30px;">
               <div style="background-color: #d4a53715; border-radius: 12px; padding: 20px; border: 1px solid #d4a53730;">
                 <h4 style="margin: 0 0 10px; color: #d4a537; font-size: 14px;">What You Can Do in the Portal</h4>
-                <ul style="margin: 0; padding-left: 20px; color: #ccc; font-size: 13px; line-height: 2;">
+                <ul style="margin: 0; padding-left: 20px; color: #475467; font-size: 13px; line-height: 2;">
                   <li>View your attendance records</li>
                   <li>Track your contributions</li>
                   <li>Submit leave requests</li>
@@ -151,7 +151,7 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <!-- Security Notice -->
           <tr>
             <td style="padding: 0 20px 20px;">
-              <p style="margin: 0; color: #666; font-size: 12px; text-align: center; line-height: 1.6;">
+              <p style="margin: 0; color: #98a2b3; font-size: 12px; text-align: center; line-height: 1.6;">
                 Keep your Portal PIN private. Do not share it with non-members.<br>
                 If you did not expect this email, please ignore it.
               </p>
@@ -161,18 +161,18 @@ function generateWelcomeEmailHtml(member: Partial<Member>, portalPin: string, po
           <!-- Signature -->
           <tr>
             <td style="padding: 20px 30px 10px; text-align: center;">
-              <p style="margin: 0 0 4px; color: #ccc; font-size: 14px; font-style: italic;">Yours faithfully,</p>
+              <p style="margin: 0 0 4px; color: #475467; font-size: 14px; font-style: italic;">Yours faithfully,</p>
               <p style="margin: 0; color: #d4a537; font-size: 15px; font-weight: 600;">Serenades of Praise Committee</p>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 16px 30px; background-color: #151515; text-align: center;">
-              <p style="margin: 0 0 10px; color: #888; font-size: 12px;">
+            <td style="padding: 16px 30px; background-color: #eef2f7; text-align: center;">
+              <p style="margin: 0 0 10px; color: #667085; font-size: 12px;">
                 Questions? Contact us at <a href="mailto:theserenadeschoir@gmail.com" style="color: #d4a537;">theserenadeschoir@gmail.com</a>
               </p>
-              <p style="margin: 0; color: #666; font-size: 11px;">
+              <p style="margin: 0; color: #98a2b3; font-size: 11px;">
                 Serenades of Praise Choir &bull; Kacyiru SDA Church, Kigali, Rwanda
               </p>
             </td>
@@ -339,11 +339,11 @@ export async function sendAdminInviteEmail(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden;">
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
               <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
@@ -353,24 +353,24 @@ export async function sendAdminInviteEmail(
           </tr>
           <tr>
             <td style="padding: 30px; text-align: center;">
-              <h2 style="margin: 0 0 10px; color: #fff; font-size: 22px;">Welcome, ${firstName}!</h2>
-              <p style="margin: 0; color: #aaa; font-size: 15px; line-height: 1.6;">
+              <h2 style="margin: 0 0 10px; color: #172033; font-size: 22px;">Welcome, ${firstName}!</h2>
+              <p style="margin: 0; color: #667085; font-size: 15px; line-height: 1.6;">
                 You've been invited to join the <strong style="color: #d4a537;">Serenades of Praise</strong> admin team as <strong style="color: #d4a537;">${role}</strong>.
               </p>
             </td>
           </tr>
           <tr>
             <td style="padding: 0 30px 20px;">
-              <div style="background-color: #252525; border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px; color: #aaa; font-size: 13px;">Your Invite Code</p>
+              <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px; text-align: center;">
+                <p style="margin: 0 0 8px; color: #667085; font-size: 13px;">Your Invite Code</p>
                 <p style="margin: 0; color: #d4a537; font-size: 28px; font-weight: bold; letter-spacing: 3px;">${inviteCode}</p>
               </div>
             </td>
           </tr>
           <tr>
             <td style="padding: 0 30px 20px; text-align: center;">
-              <p style="color: #aaa; font-size: 14px; line-height: 1.5;">To get started:</p>
-              <ol style="color: #ccc; font-size: 14px; line-height: 1.8; text-align: left; padding-left: 20px;">
+              <p style="color: #667085; font-size: 14px; line-height: 1.5;">To get started:</p>
+              <ol style="color: #475467; font-size: 14px; line-height: 1.8; text-align: left; padding-left: 20px;">
                 <li>Click the button below to open the admin login page</li>
                 <li>Click <strong style="color: #d4a537;">"Have an invite code?"</strong></li>
                 <li>Enter your invite code</li>
@@ -387,13 +387,13 @@ export async function sendAdminInviteEmail(
           </tr>
           <tr>
             <td style="padding: 20px 30px 10px; text-align: center;">
-              <p style="margin: 0 0 4px; color: #ccc; font-size: 14px; font-style: italic;">Yours faithfully,</p>
+              <p style="margin: 0 0 4px; color: #475467; font-size: 14px; font-style: italic;">Yours faithfully,</p>
               <p style="margin: 0; color: #d4a537; font-size: 15px; font-weight: 600;">Serenades of Praise Committee</p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 16px 30px; border-top: 1px solid #333; text-align: center;">
-              <p style="margin: 0; color: #666; font-size: 12px;">
+            <td style="padding: 16px 30px; border-top: 1px solid #d9e2ec; text-align: center;">
+              <p style="margin: 0; color: #98a2b3; font-size: 12px;">
                 This invite code is for one-time use only. If you did not expect this invitation, please ignore this email.
               </p>
             </td>
@@ -461,11 +461,11 @@ export async function sendAdminWelcomeEmail(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden;">
           <tr>
             <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
               <img src="https://serenadesofpraise.netlify.app/LogoTSC.jpg" alt="Serenades of Praise" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(212, 165, 55, 0.35); margin-bottom: 12px;" />
@@ -478,8 +478,8 @@ export async function sendAdminWelcomeEmail(
               <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #22c55e, #16a34a); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
                 <span style="font-size: 32px; line-height: 64px;">&#10003;</span>
               </div>
-              <h2 style="margin: 0 0 10px; color: #fff; font-size: 22px;">You're All Set, ${firstName}!</h2>
-              <p style="margin: 0; color: #aaa; font-size: 15px; line-height: 1.6;">
+              <h2 style="margin: 0 0 10px; color: #172033; font-size: 22px;">You're All Set, ${firstName}!</h2>
+              <p style="margin: 0; color: #667085; font-size: 15px; line-height: 1.6;">
                 Your admin account has been successfully created. You are now part of the
                 <strong style="color: #d4a537;">Serenades of Praise</strong> admin team.
               </p>
@@ -487,15 +487,15 @@ export async function sendAdminWelcomeEmail(
           </tr>
           <tr>
             <td style="padding: 0 30px 20px;">
-              <div style="background-color: #252525; border-radius: 12px; padding: 20px;">
+              <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 20px;">
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="color: #888; font-size: 13px; padding: 6px 0;">Role:</td>
+                    <td style="color: #667085; font-size: 13px; padding: 6px 0;">Role:</td>
                     <td style="color: #d4a537; font-size: 14px; font-weight: bold; padding: 6px 0; text-align: right;">${role}</td>
                   </tr>
                   <tr>
-                    <td style="color: #888; font-size: 13px; padding: 6px 0;">Email:</td>
-                    <td style="color: #fff; font-size: 14px; padding: 6px 0; text-align: right;">${email}</td>
+                    <td style="color: #667085; font-size: 13px; padding: 6px 0;">Email:</td>
+                    <td style="color: #172033; font-size: 14px; padding: 6px 0; text-align: right;">${email}</td>
                   </tr>
                 </table>
               </div>
@@ -503,7 +503,7 @@ export async function sendAdminWelcomeEmail(
           </tr>
           <tr>
             <td style="padding: 0 30px 30px; text-align: center;">
-              <p style="color: #aaa; font-size: 14px; margin: 0 0 16px;">You can now log in to the Admin Portal anytime:</p>
+              <p style="color: #667085; font-size: 14px; margin: 0 0 16px;">You can now log in to the Admin Portal anytime:</p>
               <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #d4a537, #b8860b); color: #000; font-weight: bold; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px;">
                 Go to Admin Portal
               </a>
@@ -511,13 +511,13 @@ export async function sendAdminWelcomeEmail(
           </tr>
           <tr>
             <td style="padding: 20px 30px 10px; text-align: center;">
-              <p style="margin: 0 0 4px; color: #ccc; font-size: 14px; font-style: italic;">Yours faithfully,</p>
+              <p style="margin: 0 0 4px; color: #475467; font-size: 14px; font-style: italic;">Yours faithfully,</p>
               <p style="margin: 0; color: #d4a537; font-size: 15px; font-weight: 600;">Serenades of Praise Committee</p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 16px 30px; border-top: 1px solid #333; text-align: center;">
-              <p style="margin: 0; color: #666; font-size: 12px;">
+            <td style="padding: 16px 30px; border-top: 1px solid #d9e2ec; text-align: center;">
+              <p style="margin: 0; color: #98a2b3; font-size: 12px;">
                 If you have any questions, contact us at theserenadeschoir@gmail.com
               </p>
             </td>

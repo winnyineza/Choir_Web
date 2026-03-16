@@ -252,9 +252,9 @@ function generateContributionReminderEmail(
     const totalUnpaid = unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0);
     const unpaidItems = unpaidMonths.map(m => `
       <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #333;">Monthly Dues</td>
-        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${MONTH_NAMES[m.month]} ${m.year}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">${formatAmount(m.expectedAmount)}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #d9e2ec;">Monthly Dues</td>
+        <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: center;">${MONTH_NAMES[m.month]} ${m.year}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: right; color: #ff6b6b;">${formatAmount(m.expectedAmount)}</td>
       </tr>
     `).join('');
 
@@ -281,16 +281,16 @@ function generateContributionReminderEmail(
     const items = [
       ...overdueSpecial.map(t => `
         <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #333;">${t.name}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">${formatAmount(t.amount)}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b;">Overdue${t.deadline ? ' (' + new Date(t.deadline).toLocaleDateString() + ')' : ''}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #d9e2ec;">${t.name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: right; color: #ff6b6b;">${formatAmount(t.amount)}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: right; color: #ff6b6b;">Overdue${t.deadline ? ' (' + new Date(t.deadline).toLocaleDateString() + ')' : ''}</td>
         </tr>
       `),
       ...upcomingSpecial.map(t => `
         <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #333;">${t.name}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${formatAmount(t.amount)}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #d4a537;">Due ${t.deadline ? new Date(t.deadline).toLocaleDateString() : 'soon'}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #d9e2ec;">${t.name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: right;">${formatAmount(t.amount)}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: right; color: #d4a537;">Due ${t.deadline ? new Date(t.deadline).toLocaleDateString() : 'soon'}</td>
         </tr>
       `)
     ].join('');
@@ -298,9 +298,9 @@ function generateContributionReminderEmail(
     specialHtml = `
       <div style="margin: 20px 0;">
         <h3 style="color: #d4a537;">📅 Special Contributions</h3>
-        <table style="width: 100%; border-collapse: collapse; background: #2a2a2a; border-radius: 8px;">
+        <table style="width: 100%; border-collapse: collapse; background: #f8fafc; border: 1px solid #d9e2ec; border-radius: 8px;">
           <thead>
-            <tr style="background: #333;">
+            <tr style="background: #eef2f7;">
               <th style="padding: 10px; text-align: left;">Contribution</th>
               <th style="padding: 10px; text-align: right;">Amount</th>
               <th style="padding: 10px; text-align: right;">Status</th>
@@ -317,10 +317,10 @@ function generateContributionReminderEmail(
     <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; }
+        body { font-family: Arial, sans-serif; background-color: #f5f7fb; color: #172033; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #d9e2ec; border-radius: 12px; padding: 30px; }
         h1 { color: #d4a537; margin-bottom: 10px; }
-        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+        .footer { margin-top: 30px; text-align: center; color: #667085; font-size: 12px; }
       </style>
     </head>
     <body>
@@ -352,10 +352,10 @@ function generateFinanceOverdueEmail(
   
   const memberRows = overdueByMember.map(({ member, unpaidMonths, totalDue }) => `
     <tr>
-      <td style="padding: 10px; border-bottom: 1px solid #333;">${member.name}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333;">${member.email}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${unpaidMonths} month${unpaidMonths > 1 ? 's' : ''}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: #ff6b6b; font-weight: bold;">${formatAmount(totalDue)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #d9e2ec;">${member.name}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #d9e2ec;">${member.email}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: center;">${unpaidMonths} month${unpaidMonths > 1 ? 's' : ''}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #d9e2ec; text-align: right; color: #ff6b6b; font-weight: bold;">${formatAmount(totalDue)}</td>
     </tr>
   `).join('');
 
@@ -364,14 +364,14 @@ function generateFinanceOverdueEmail(
     <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 700px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; }
+        body { font-family: Arial, sans-serif; background-color: #f5f7fb; color: #172033; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; background: #ffffff; border: 1px solid #d9e2ec; border-radius: 12px; padding: 30px; }
         h1 { color: #d4a537; margin-bottom: 10px; }
         .stats { display: flex; gap: 20px; margin: 20px 0; }
-        .stat { background: #2a2a2a; padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
+        .stat { background: #f8fafc; border: 1px solid #d9e2ec; padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
         .stat-value { font-size: 24px; font-weight: bold; color: #ff6b6b; }
-        .stat-label { font-size: 12px; color: #888; }
-        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+        .stat-label { font-size: 12px; color: #667085; }
+        .footer { margin-top: 30px; text-align: center; color: #667085; font-size: 12px; }
       </style>
     </head>
     <body>
@@ -392,9 +392,9 @@ function generateFinanceOverdueEmail(
           </div>
         </div>
         
-        <table style="width: 100%; border-collapse: collapse; background: #2a2a2a; border-radius: 8px; margin-top: 20px;">
+        <table style="width: 100%; border-collapse: collapse; background: #f8fafc; border: 1px solid #d9e2ec; border-radius: 8px; margin-top: 20px;">
           <thead>
-            <tr style="background: #333;">
+            <tr style="background: #eef2f7;">
               <th style="padding: 10px; text-align: left;">Member</th>
               <th style="padding: 10px; text-align: left;">Email</th>
               <th style="padding: 10px; text-align: center;">Items</th>
@@ -404,7 +404,7 @@ function generateFinanceOverdueEmail(
           <tbody>${memberRows}</tbody>
         </table>
         
-        <p style="margin-top: 20px; color: #888;">
+        <p style="margin-top: 20px; color: #667085;">
           Consider following up with these members to collect outstanding contributions.
         </p>
         
@@ -531,11 +531,11 @@ function generatePersonalBirthdayEmail(member: Member): string {
     <!DOCTYPE html>
     <html>
     <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-    <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background-color: #f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1a1a1a 0%, #2a1f1a 100%); border-radius: 16px; overflow: hidden;">
+            <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden;">
               <!-- Golden Header -->
               <tr>
                 <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 40px; text-align: center;">
@@ -551,13 +551,13 @@ function generatePersonalBirthdayEmail(member: Member): string {
                 <td style="padding: 30px; text-align: center;">
                   <div style="font-size: 24px; margin-bottom: 15px;">🎉 🎈 🎊 🎁 🎉</div>
                   <h2 style="margin: 0 0 15px; color: #d4a537; font-size: 22px;">Dear ${firstName},</h2>
-                  <p style="color: #ccc; font-size: 16px; line-height: 1.8; margin: 0 0 20px;">
+                  <p style="color: #475467; font-size: 16px; line-height: 1.8; margin: 0 0 20px;">
                     On this beautiful day, the entire Serenades of Praise family 
                     sends you our warmest birthday blessings! Your voice is a 
                     gift from God, and your presence in our choir brings joy to 
                     everyone around you.
                   </p>
-                  <p style="color: #ccc; font-size: 16px; line-height: 1.8; margin: 0 0 20px;">
+                  <p style="color: #475467; font-size: 16px; line-height: 1.8; margin: 0 0 20px;">
                     May this new year of your life be filled with God's abundant 
                     grace, beautiful melodies, and endless blessings. May you 
                     continue to grow in faith and use your talents to glorify 
@@ -571,7 +571,7 @@ function generatePersonalBirthdayEmail(member: Member): string {
                 <td style="padding: 0 30px 30px;">
                   <div style="background: linear-gradient(135deg, #d4a53720 0%, #b8860b15 100%); border-radius: 12px; padding: 25px; border: 1px solid #d4a53740; text-align: center;">
                     <div style="font-size: 30px; margin-bottom: 10px;">📖</div>
-                    <p style="color: #fff; font-size: 16px; line-height: 1.8; font-style: italic; margin: 0 0 12px;">
+                    <p style="color: #172033; font-size: 16px; line-height: 1.8; font-style: italic; margin: 0 0 12px;">
                       "${verse.text}"
                     </p>
                     <p style="color: #d4a537; font-size: 14px; font-weight: bold; margin: 0;">
@@ -584,9 +584,9 @@ function generatePersonalBirthdayEmail(member: Member): string {
               <!-- Birthday Prayer -->
               <tr>
                 <td style="padding: 0 30px 30px; text-align: center;">
-                  <div style="background-color: #252525; border-radius: 12px; padding: 25px;">
+                  <div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 12px; padding: 25px;">
                     <p style="color: #d4a537; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px;">A Birthday Prayer for You</p>
-                    <p style="color: #ccc; font-size: 15px; line-height: 1.8; font-style: italic; margin: 0;">
+                    <p style="color: #475467; font-size: 15px; line-height: 1.8; font-style: italic; margin: 0;">
                       Heavenly Father, we thank You for the gift of ${firstName}'s life. 
                       Bless ${firstName} with good health, joy, and peace in this new year. 
                       May Your love surround them, Your wisdom guide them, 
@@ -607,9 +607,9 @@ function generatePersonalBirthdayEmail(member: Member): string {
               
               <!-- Footer -->
               <tr>
-                <td style="padding: 20px 30px; background-color: #151515; text-align: center;">
+                <td style="padding: 20px 30px; background-color: #eef2f7; text-align: center;">
                   <p style="margin: 0 0 8px; color: #d4a537; font-size: 14px; font-weight: bold;">With love from your Serenades of Praise Family ❤️</p>
-                  <p style="margin: 0; color: #666; font-size: 11px;">Kacyiru SDA Church, Kigali, Rwanda</p>
+                  <p style="margin: 0; color: #98a2b3; font-size: 11px;">Kacyiru SDA Church, Kigali, Rwanda</p>
                 </td>
               </tr>
             </table>
@@ -634,10 +634,10 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
   const memberCards = birthdayMembers.map(m => {
     const firstName = m.name.split(' ')[0];
     return `
-      <div style="background-color: #252525; border-radius: 12px; padding: 20px; margin-bottom: 12px; text-align: center; border: 1px solid #d4a53730;">
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 12px; text-align: center; border: 1px solid #d4a53730;">
         <div style="font-size: 40px; margin-bottom: 8px;">🎂</div>
         <p style="color: #d4a537; font-size: 20px; font-weight: bold; margin: 0 0 4px;">${m.name}</p>
-        <p style="color: #888; font-size: 13px; margin: 0;">Send ${firstName} a birthday wish today!</p>
+        <p style="color: #667085; font-size: 13px; margin: 0;">Send ${firstName} a birthday wish today!</p>
       </div>
     `;
   }).join('');
@@ -646,11 +646,11 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
     <!DOCTYPE html>
     <html>
     <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-    <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background-color: #f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1a1a1a; border-radius: 16px; overflow: hidden;">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden;">
               <!-- Header -->
               <tr>
                 <td style="background: linear-gradient(135deg, #d4a537 0%, #b8860b 100%); padding: 30px; text-align: center;">
@@ -664,7 +664,7 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
               <!-- Birthday Members -->
               <tr>
                 <td style="padding: 30px;">
-                  <p style="color: #ccc; font-size: 15px; line-height: 1.6; text-align: center; margin: 0 0 20px;">
+                  <p style="color: #475467; font-size: 15px; line-height: 1.6; text-align: center; margin: 0 0 20px;">
                     Today is a special day! ${isPlural ? 'Some of our' : 'One of our'} beloved choir 
                     ${isPlural ? 'members are' : 'member is'} celebrating ${isPlural ? 'their' : 'a'} birthday. 
                     Let's shower ${isPlural ? 'them' : 'them'} with love and blessings!
@@ -677,7 +677,7 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
               <tr>
                 <td style="padding: 0 30px 30px;">
                   <div style="background: #d4a53715; border-radius: 12px; padding: 20px; border: 1px solid #d4a53730; text-align: center;">
-                    <p style="color: #fff; font-size: 14px; font-style: italic; line-height: 1.6; margin: 0 0 8px;">
+                    <p style="color: #172033; font-size: 14px; font-style: italic; line-height: 1.6; margin: 0 0 8px;">
                       "${verse.text}"
                     </p>
                     <p style="color: #d4a537; font-size: 13px; font-weight: bold; margin: 0;">— ${verse.ref}</p>
@@ -687,9 +687,9 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
               
               <!-- Footer -->
               <tr>
-                <td style="padding: 20px 30px; background-color: #151515; text-align: center;">
-                  <p style="margin: 0 0 8px; color: #888; font-size: 12px;">With love from the Serenades of Praise Family</p>
-                  <p style="margin: 0; color: #666; font-size: 11px;">Kacyiru SDA Church, Kigali, Rwanda</p>
+                <td style="padding: 20px 30px; background-color: #eef2f7; text-align: center;">
+                  <p style="margin: 0 0 8px; color: #667085; font-size: 12px;">With love from the Serenades of Praise Family</p>
+                  <p style="margin: 0; color: #98a2b3; font-size: 11px;">Kacyiru SDA Church, Kigali, Rwanda</p>
                 </td>
               </tr>
             </table>
@@ -704,11 +704,11 @@ function generateBirthdayNotificationEmail(birthdayMembers: Member[]): string {
 // Generate event reminder email HTML
 function generateEventReminderEmail(events: Event[]): string {
   const eventList = events.map(e => `
-    <div style="padding: 15px; background: #2a2a2a; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #d4a537;">
+    <div style="padding: 15px; background: #f8fafc; border: 1px solid #d9e2ec; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #d4a537;">
       <strong style="color: #d4a537; font-size: 16px;">${e.title}</strong><br>
-      <span style="color: #aaa;">📅 ${new Date(e.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span><br>
-      <span style="color: #aaa;">⏰ ${e.time}</span><br>
-      ${e.location ? `<span style="color: #aaa;">📍 ${e.location}</span>` : ''}
+      <span style="color: #667085;">📅 ${new Date(e.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span><br>
+      <span style="color: #667085;">⏰ ${e.time}</span><br>
+      ${e.location ? `<span style="color: #667085;">📍 ${e.location}</span>` : ''}
     </div>
   `).join('');
 
@@ -717,10 +717,10 @@ function generateEventReminderEmail(events: Event[]): string {
     <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; }
+        body { font-family: Arial, sans-serif; background-color: #f5f7fb; color: #172033; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #d9e2ec; border-radius: 12px; padding: 30px; }
         h1 { color: #d4a537; margin-bottom: 20px; }
-        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+        .footer { margin-top: 30px; text-align: center; color: #667085; font-size: 12px; }
       </style>
     </head>
     <body>
@@ -743,11 +743,11 @@ function generateEventReminderEmail(events: Event[]): string {
 
 function generateMeetingReminderEmail(memberName: string, meetings: MeetingSchedule[]): string {
   const meetingList = meetings.map((meeting) => `
-    <div style="padding: 15px; background: #2a2a2a; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #d4a537;">
+    <div style="padding: 15px; background: #f8fafc; border: 1px solid #d9e2ec; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #d4a537;">
       <strong style="color: #d4a537; font-size: 16px;">${meeting.title}</strong><br>
-      <span style="color: #aaa;">📅 ${new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span><br>
-      ${meeting.start_time ? `<span style="color: #aaa;">⏰ ${meeting.start_time}</span><br>` : ''}
-      ${meeting.location ? `<span style="color: #aaa;">📍 ${meeting.location}</span><br>` : ''}
+      <span style="color: #667085;">📅 ${new Date(meeting.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span><br>
+      ${meeting.start_time ? `<span style="color: #667085;">⏰ ${meeting.start_time}</span><br>` : ''}
+      ${meeting.location ? `<span style="color: #667085;">📍 ${meeting.location}</span><br>` : ''}
       ${meeting.google_meet_link ? `<a href="${meeting.google_meet_link}" style="color: #d4a537; text-decoration: none;">🎥 Join Google Meet</a>` : ''}
     </div>
   `).join('');
@@ -757,10 +757,10 @@ function generateMeetingReminderEmail(memberName: string, meetings: MeetingSched
     <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; background-color: #0a0a0a; color: #fff; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #1a1a1a; border-radius: 12px; padding: 30px; }
+        body { font-family: Arial, sans-serif; background-color: #f5f7fb; color: #172033; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #d9e2ec; border-radius: 12px; padding: 30px; }
         h1 { color: #d4a537; margin-bottom: 20px; }
-        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+        .footer { margin-top: 30px; text-align: center; color: #667085; font-size: 12px; }
       </style>
     </head>
     <body>
@@ -804,16 +804,16 @@ async function sendEmail(to: string[], subject: string, html: string): Promise<b
             return `<${tag}${before}style="${style}"${after}>`;
           }
           const separator = style.trim().endsWith(";") || style.trim().length === 0 ? "" : ";";
-          return `<${tag}${before}style="${style}${separator} color: #f5f5f5;"${after}>`;
+          return `<${tag}${before}style="${style}${separator} color: #172033;"${after}>`;
         });
 
         const withoutStyleRegex = new RegExp(`<${tag}(?![^>]*style=)([^>]*)>`, "gi");
-        normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #f5f5f5;"$1>`);
+        normalized = normalized.replace(withoutStyleRegex, `<${tag} style="color: #172033;"$1>`);
       }
 
       normalized = normalized.replace(
         /<body(?![^>]*style=)([^>]*)>/gi,
-        '<body style="margin: 0; padding: 0; background-color: #0a0a0a; color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
+        '<body style="margin: 0; padding: 0; background-color: #f5f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;"$1>',
       );
 
       return normalized;
