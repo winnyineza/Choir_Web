@@ -91,6 +91,130 @@ export function buildAnnouncementPreviewEmail(choirName: string): string {
   `, choirName);
 }
 
+export function buildLeaveRequestDecisionPreviewEmail(
+  choirName: string,
+  status: "approved" | "denied",
+): string {
+  const statusColor = status === "approved" ? "#22c55e" : "#ef4444";
+  const statusText = status === "approved" ? "Approved" : "Denied";
+
+  return emailWrapper(`Leave Request ${statusText}`, `
+    <p style="color: #344054; margin: 0 0 12px 0;">Hi <strong>Aimee Uwase</strong>,</p>
+    <p style="color: #344054; margin: 0 0 16px 0;">Your leave request has been <span style="color: ${statusColor}; font-weight: bold;">${statusText.toLowerCase()}</span>.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">From:</td><td style="color: #172033; padding: 4px 0;">Thu, Mar 19, 2026</td></tr>
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">To:</td><td style="color: #172033; padding: 4px 0;">Sun, Mar 22, 2026</td></tr>
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">Status:</td><td style="color: ${statusColor}; padding: 4px 0; font-weight: bold;">${statusText}</td></tr>
+    </table>
+    ${status === "approved"
+      ? `<p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px;">Your leave has been approved. You are excused from activities during this period.</p>`
+      : `<p style="color: #ef4444; margin: 16px 0 0 0; font-size: 14px;">Unfortunately your leave request was not approved. Please contact the admin team for more details.</p>`
+    }
+  `, choirName);
+}
+
+export function buildUnlockRequestCreatedPreviewEmail(choirName: string): string {
+  return emailWrapper("Month Unlock Request", `
+    <p style="color: #344054; margin: 0 0 12px 0;"><strong>Samuel Rugamba</strong> (Finance Admin) has requested to unlock a locked month.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">Month:</td><td style="color: #172033; padding: 4px 0;">January 2026</td></tr>
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">Type:</td><td style="color: #172033; padding: 4px 0;">Contributions</td></tr>
+      <tr><td style="color: #667085; padding: 4px 8px 4px 0; white-space: nowrap;">Reason:</td><td style="color: #172033; padding: 4px 0;">Late finance reconciliation for test records.</td></tr>
+    </table>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 14px;">Please log in to the admin portal Settings to approve or deny this request.</p>
+  `, choirName);
+}
+
+export function buildUnlockRequestDecisionPreviewEmail(
+  choirName: string,
+  status: "approved" | "denied",
+): string {
+  const statusColor = status === "approved" ? "#22c55e" : "#ef4444";
+  const statusText = status === "approved" ? "Approved" : "Denied";
+
+  return emailWrapper(`Unlock Request ${statusText}`, `
+    <p style="color: #344054; margin: 0 0 12px 0;">Hi <strong>Samuel Rugamba</strong>,</p>
+    <p style="color: #344054; margin: 0 0 16px 0;">Your unlock request for <strong>January 2026</strong> has been <span style="color: ${statusColor}; font-weight: bold;">${statusText.toLowerCase()}</span> by Winny Ineza.</p>
+    ${status === "approved"
+      ? `<p style="color: #22c55e; margin: 0 0 8px 0; font-size: 14px;">The month is now unlocked for <strong>3 days</strong>. Please complete your data entry before it locks again.</p>`
+      : `<p style="color: #ef4444; margin: 0 0 8px 0; font-size: 14px;">The request was denied. Please contact the admin team if you have questions.</p>`
+    }
+  `, choirName);
+}
+
+export function buildEventCreatedPreviewEmail(choirName: string): string {
+  return emailWrapper("New Event", `
+    <h3 style="color: #d4af37; margin: 0 0 16px 0;">Choir Sabbath Rehearsal</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; white-space: nowrap;">Date:</td><td style="color: #172033; padding: 6px 0;">Saturday, March 28, 2026</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; white-space: nowrap;">Time:</td><td style="color: #172033; padding: 6px 0;">2:30 PM</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; white-space: nowrap;">Location:</td><td style="color: #172033; padding: 6px 0;">Kacyiru SDA Church Sanctuary</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; white-space: nowrap;">Admission:</td><td style="color: #22c55e; padding: 6px 0;">Free</td></tr>
+    </table>
+    <p style="color: #344054; margin: 16px 0 0 0; line-height: 1.5;">Voice warmup begins 20 minutes earlier for all sections. Please come prepared with your folders.</p>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 13px;">Mark your calendar! Visit the portal for more details.</p>
+  `, choirName);
+}
+
+export function buildDisciplinaryActionPreviewEmail(choirName: string): string {
+  return emailWrapper("Disciplinary Notice", `
+    <p style="color: #344054; margin: 0 0 12px 0;">Dear <strong>John Bosco</strong>,</p>
+    <p style="color: #344054; margin: 0 0 16px 0;">This is to inform you of a disciplinary action that has been recorded.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Type:</td><td style="color: #172033; padding: 6px 0; border-bottom: 1px solid #e4e7ec;">Warning</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Severity:</td><td style="color: #eab308; padding: 6px 0; border-bottom: 1px solid #e4e7ec; font-weight: bold;">Moderate</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Reason:</td><td style="color: #172033; padding: 6px 0; border-bottom: 1px solid #e4e7ec;">Repeated absence from scheduled rehearsals.</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0;">Action:</td><td style="color: #172033; padding: 6px 0;">Formal written warning issued.</td></tr>
+    </table>
+    <p style="color: #344054; margin: 16px 0 0 0; font-size: 14px;">If you have questions, please reach out to the choir administration.</p>
+  `, choirName);
+}
+
+export function buildDisciplinaryResolvedPreviewEmail(choirName: string): string {
+  return emailWrapper("Record Resolved", `
+    <p style="color: #344054; margin: 0 0 12px 0;">Dear <strong>John Bosco</strong>,</p>
+    <p style="color: #22c55e; margin: 0 0 16px 0;">Your disciplinary record (<strong>Warning</strong>) has been resolved.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Record Type:</td><td style="color: #172033; padding: 6px 0; border-bottom: 1px solid #e4e7ec;">Warning</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Resolution:</td><td style="color: #22c55e; padding: 6px 0; border-bottom: 1px solid #e4e7ec;">Attendance improved for six straight weeks.</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0;">Resolved By:</td><td style="color: #172033; padding: 6px 0;">Winny Ineza</td></tr>
+    </table>
+    <p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px;">This matter is now closed. Thank you for your cooperation.</p>
+  `, choirName);
+}
+
+export function buildMemberStatusChangedPreviewEmail(choirName: string): string {
+  return emailWrapper("Membership Status Update", `
+    <p style="color: #344054; margin: 0 0 12px 0;">Dear <strong>Grace Uwineza</strong>,</p>
+    <p style="color: #344054; margin: 0 0 16px 0;">Your membership status has been updated.</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0; border-bottom: 1px solid #e4e7ec;">Previous Status:</td><td style="color: #172033; padding: 6px 0; border-bottom: 1px solid #e4e7ec;">Pending</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0;">New Status:</td><td style="color: #22c55e; padding: 6px 0; font-weight: bold;">Active</td></tr>
+    </table>
+    <p style="color: #22c55e; margin: 16px 0 0 0; font-size: 14px;">Welcome! You now have full access to choir activities and the member portal.</p>
+  `, choirName);
+}
+
+export function buildSurveyPublishedPreviewEmail(choirName: string): string {
+  return emailWrapper("New Survey", `
+    <h3 style="color: #d4af37; margin: 0 0 12px 0;">Easter Program Feedback Survey</h3>
+    <p style="color: #344054; margin: 0 0 16px 0; line-height: 1.5;">Please share your feedback on rehearsal timing, song preparation, and communication flow for the Easter season.</p>
+    <p style="color: #344054; margin: 0 0 8px 0;">A new survey is available for you to complete. Your feedback is important to us!</p>
+    <p style="color: #d4af37; margin: 16px 0 0 0; font-size: 13px;">Visit the member portal to submit your response.</p>
+  `, choirName);
+}
+
+export function buildMeetingMinutesApprovedPreviewEmail(choirName: string): string {
+  return emailWrapper("Meeting Minutes", `
+    <h3 style="color: #d4af37; margin: 0 0 16px 0;">Executive Committee Review</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0;">Date:</td><td style="color: #172033; padding: 6px 0;">Sunday, March 15, 2026</td></tr>
+      <tr><td style="color: #667085; padding: 6px 8px 6px 0;">Approved By:</td><td style="color: #172033; padding: 6px 0;">Winny Ineza</td></tr>
+    </table>
+    <p style="color: #344054; margin: 16px 0 0 0;">The meeting minutes have been approved and are now available for leadership review in the admin portal.</p>
+  `, choirName);
+}
+
 // ============ LEAVE REQUEST NOTIFICATIONS ============
 
 export async function notifyLeaveRequestCreated(

@@ -4,28 +4,11 @@ import { Copy, Eye, ExternalLink, FileCode2, Mail, Sparkles } from "lucide-react
 
 import { useAuth } from "@/contexts/AuthContext";
 import { getSettings, type Member, type Settings } from "@/lib/dataService";
-import { generateEmailTemplate } from "@/lib/emailVerificationService";
-import {
-  buildAdminInviteEmailHtml,
-  buildAdminWelcomeEmailHtml,
-  generateWelcomeEmailHtml,
-} from "@/lib/memberInviteService";
-import {
-  buildAnnouncementPreviewEmail,
-  buildContributionReceiptPreviewEmail,
-  buildLeaveRequestCreatedPreviewEmail,
-} from "@/lib/notificationEmailService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-
-type EmailPreview = {
-  id: string;
-  title: string;
-  description: string;
-  html: string;
-};
+import { buildEmailPreviewCatalog, type EmailPreview, type EmailPreviewCategory } from "@/lib/emailPreviewCatalog";
 
 const defaultSettings: Settings = {
   choirName: "Serenades of Praise Choir",
@@ -48,6 +31,15 @@ const previewMember: Partial<Member> = {
   phone: "+250 788 000 111",
 };
 
+const CATEGORY_LABELS: Record<EmailPreviewCategory, string> = {
+  access: "Access & Onboarding",
+  requests: "Requests & Approvals",
+  contributions: "Contributions & Tickets",
+  communication: "Communication",
+  discipline: "Member Status & Discipline",
+  automation: "Automated Reminders",
+};
+
 export default function EmailPreviews() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -61,68 +53,19 @@ export default function EmailPreviews() {
   }, []);
 
   const previews = useMemo<EmailPreview[]>(() => {
-    const choirName = settings.choirName || defaultSettings.choirName;
     const portalUrl = `${window.location.origin}/member-portal`;
     const adminUrl = `${window.location.origin}/admin`;
 
-    return [
-      {
-        id: "verification",
-        title: "Verification Code",
-        description: "Sent during leave verification and member confirmation flows.",
-        html: generateEmailTemplate("Winny Ineza", "483920"),
-      },
-      {
-        id: "member-invite",
-        title: "Member Invite",
-        description: "Portal invitation email sent to newly added choir members.",
-        html: generateWelcomeEmailHtml(previewMember, settings.memberPortalPin || "2024", portalUrl),
-      },
-      {
-        id: "admin-invite",
-        title: "Admin Invite",
-        description: "One-time invite for onboarding a new admin.",
-        html: buildAdminInviteEmailHtml(
-          "samuel.admin@example.com",
-          "Samuel Rugamba",
-          "Finance Admin",
-          "INV-7H2FQ9",
-          `${adminUrl}/login?invite=INV-7H2FQ9`,
-        ),
-      },
-      {
-        id: "admin-welcome",
-        title: "Admin Welcome",
-        description: "Confirmation email after an admin account is created.",
-        html: buildAdminWelcomeEmailHtml(
-          "samuel.admin@example.com",
-          "Samuel Rugamba",
-          "Finance Admin",
-          adminUrl,
-        ),
-      },
-      {
-        id: "leave-request",
-        title: "Leave Request Notification",
-        description: "Approval alert sent to leave approvers.",
-        html: buildLeaveRequestCreatedPreviewEmail(choirName),
-      },
-      {
-        id: "contribution-receipt",
-        title: "Contribution Receipt",
-        description: "Receipt notification email after a contribution is recorded.",
-        html: buildContributionReceiptPreviewEmail(choirName),
-      },
-      {
-        id: "announcement",
-        title: "Announcement",
-        description: "Broadcast email used for choir-wide announcements.",
-        html: buildAnnouncementPreviewEmail(choirName),
-      },
-    ];
+    return buildEmailPreviewCatalog(settings, previewMember, portalUrl, adminUrl);
   }, [settings]);
 
   const selectedPreview = previews.find((item) => item.id === selectedId) ?? previews[0];
+  const groupedPreviews = useMemo(() => {
+    return previews.reduce<Record<EmailPreviewCategory, EmailPreview[]>>((acc, preview) => {
+      acc[preview.category] = [...(acc[preview.category] || []), preview];
+      return acc;
+    }, {} as Record<EmailPreviewCategory, EmailPreview[]>);
+  }, [previews]);
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
@@ -139,7 +82,7 @@ export default function EmailPreviews() {
               </div>
               <CardTitle className="font-display text-3xl text-primary">Email Preview Lab</CardTitle>
               <CardDescription className="max-w-2xl text-sm text-muted-foreground">
-                Preview the main transactional email templates with current choir branding before triggering them in production.
+                Preview the real email families used across onboarding, approvals, finance, automation, and choir communication before triggering them in production.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -162,24 +105,34 @@ export default function EmailPreviews() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="space-y-3">
-              {previews.map((preview) => (
-                <button
-                  key={preview.id}
-                  type="button"
-                  onClick={() => setSelectedId(preview.id)}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
-                    preview.id === selectedPreview.id
-                      ? "border-primary/30 bg-primary/10 shadow-[0_12px_32px_rgba(212,175,55,0.12)]"
-                      : "border-primary/10 bg-secondary/20 hover:border-primary/20 hover:bg-secondary/30"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Mail className={`h-4 w-4 ${preview.id === selectedPreview.id ? "text-primary" : "text-muted-foreground"}`} />
-                    {preview.title}
+            <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+              {Object.entries(groupedPreviews).map(([category, items]) => (
+                <div key={category} className="space-y-2">
+                  <div className="sticky top-0 z-10 rounded-lg bg-background/90 px-1 py-2 backdrop-blur-sm">
+                    <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                      <span>{CATEGORY_LABELS[category as EmailPreviewCategory]}</span>
+                      <span className="text-muted-foreground">{items.length}</span>
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">{preview.description}</p>
-                </button>
+                  {items.map((preview) => (
+                    <button
+                      key={preview.id}
+                      type="button"
+                      onClick={() => setSelectedId(preview.id)}
+                      className={`w-full rounded-2xl border p-4 text-left transition ${
+                        preview.id === selectedPreview.id
+                          ? "border-primary/30 bg-primary/10 shadow-[0_12px_32px_rgba(212,175,55,0.12)]"
+                          : "border-primary/10 bg-secondary/20 hover:border-primary/20 hover:bg-secondary/30"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Mail className={`h-4 w-4 ${preview.id === selectedPreview.id ? "text-primary" : "text-muted-foreground"}`} />
+                        {preview.title}
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{preview.description}</p>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
 
