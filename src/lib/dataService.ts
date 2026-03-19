@@ -86,6 +86,8 @@ export interface Settings {
   memberPortalPin: string;
   scannerPin: string;
   contributionLockDay: number; // Day of the next month when previous month locks (1-28, default 5)
+  contributionCurrentMonthDueDay: number; // Day within the current month before it becomes overdue (1-28, default 10)
+  contributionOverdueReminderIntervalDays: number; // Minimum days between overdue reminder emails for the same member
 }
 
 export interface EventStaff {
@@ -480,6 +482,8 @@ const DEFAULT_SETTINGS: Settings = {
   memberPortalPin: "2024",
   scannerPin: "2024",
   contributionLockDay: 5,
+  contributionCurrentMonthDueDay: 10,
+  contributionOverdueReminderIntervalDays: 7,
 };
 
 export async function getSettings(): Promise<Settings> {

@@ -4244,6 +4244,71 @@ export default function Admin() {
                 </div>
               </div>
 
+              <div className="card-glass rounded-2xl p-6 w-full">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-primary" />
+                  Contribution Reminder Timing
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Control when the current month starts counting as overdue and how often overdue reminder emails can be resent.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="currentMonthDueDay">Current Month Due Day</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <Input
+                        id="currentMonthDueDay"
+                        type="number"
+                        min={1}
+                        max={28}
+                        value={settings.contributionCurrentMonthDueDay || 10}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(28, parseInt(e.target.value) || 10));
+                          setSettingsState({ ...settings, contributionCurrentMonthDueDay: val });
+                        }}
+                        className="bg-secondary border-primary/20 max-w-24 text-center text-lg font-semibold"
+                      />
+                      <span className="text-sm text-muted-foreground">day of this month</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Members can pay the current month up to day <span className="font-medium text-foreground">{settings.contributionCurrentMonthDueDay || 10}</span> without that month being treated as overdue.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="overdueReminderInterval">Overdue Reminder Interval</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <Input
+                        id="overdueReminderInterval"
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={settings.contributionOverdueReminderIntervalDays || 7}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(30, parseInt(e.target.value) || 7));
+                          setSettingsState({ ...settings, contributionOverdueReminderIntervalDays: val });
+                        }}
+                        className="bg-secondary border-primary/20 max-w-24 text-center text-lg font-semibold"
+                      />
+                      <span className="text-sm text-muted-foreground">days between overdue emails</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Example: if set to <span className="font-medium text-foreground">{settings.contributionOverdueReminderIntervalDays || 7}</span>, a member who is still overdue will only get another overdue email after {settings.contributionOverdueReminderIntervalDays || 7} days.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 text-xs text-muted-foreground space-y-1">
+                    <p className="font-medium text-foreground">How it works:</p>
+                    <p>- Previous unpaid months stay overdue until paid</p>
+                    <p>- The current month only becomes overdue after the due day passes</p>
+                    <p>- Overdue reminder emails are throttled using the interval above</p>
+                    <p>- Special contribution reminders still send based on their deadlines</p>
+                  </div>
+
+                  <Button variant="gold" onClick={handleSaveSettings}>Save Reminder Settings</Button>
+                </div>
+              </div>
+
               {/* Unlock Requests Management */}
               {(currentUser?.role === "super_admin" || currentUser?.role === "main_admin") && (
               <div className="card-glass rounded-2xl p-6 w-full">

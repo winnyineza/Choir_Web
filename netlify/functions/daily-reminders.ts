@@ -60,6 +60,24 @@ interface MeetingReminderDelivery {
   sent_at: string;
 }
 
+interface ContributionReminderDelivery {
+  id: string;
+  member_id: string;
+  recipient_email: string;
+  recipient_name: string;
+  reminder_type: string;
+  reminder_date: string;
+  overdue_months: number;
+  total_due: number;
+  job_run_id: string;
+  sent_at: string;
+}
+
+interface ReminderSettings {
+  contributionCurrentMonthDueDay: number;
+  contributionOverdueReminderIntervalDays: number;
+}
+
 interface Contribution {
   id: string;
   member_id: string;
@@ -180,15 +198,19 @@ function getTomorrowMeetings(meetings: MeetingSchedule[]): MeetingSchedule[] {
 function getUnpaidMonthsForMember(
   memberId: string,
   contributions: Contribution[],
-  monthlyAmount: number
+  monthlyAmount: number,
+  currentMonthDueDay: number
 ): { month: number; year: number; expectedAmount: number }[] {
   const now = new Date();
   const currentMonth = now.getMonth() + 1; // 1-12
   const currentYear = now.getFullYear();
+  const currentDay = now.getDate();
   const unpaid: { month: number; year: number; expectedAmount: number }[] = [];
 
   // Check each month of the current year up to the current month
   for (let m = 1; m <= currentMonth; m++) {
+    if (m === currentMonth && currentDay <= currentMonthDueDay) continue;
+
     const paid = contributions.filter(
       c => c.member_id === memberId && c.category === 'monthly' && c.month === m && c.year === currentYear
     );
@@ -199,6 +221,28 @@ function getUnpaidMonthsForMember(
   }
 
   return unpaid;
+}
+
+function normalizeReminderSettings(raw: Record<string, unknown> | null | undefined): ReminderSettings {
+  const dueDay = Number(raw?.contributionCurrentMonthDueDay);
+  const interval = Number(raw?.contributionOverdueReminderIntervalDays);
+
+  return {
+    contributionCurrentMonthDueDay: Number.isFinite(dueDay)
+      ? Math.max(1, Math.min(28, dueDay))
+      : 10,
+    contributionOverdueReminderIntervalDays: Number.isFinite(interval)
+      ? Math.max(1, Math.min(30, interval))
+      : 7,
+  };
+}
+
+function getDaysBetween(fromDate: string, toDate: Date): number {
+  const start = new Date(fromDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(toDate);
+  end.setHours(0, 0, 0, 0);
+  return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 // Helper to find special contributions with deadlines that are approaching or overdue
@@ -915,6 +959,8 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     let approvedLeave: ApprovedLeave[] = [];
     let contributions: Contribution[] = [];
     let contributionTypes: ContributionType[] = [];
+    let reminderSettings: ReminderSettings = normalizeReminderSettings(undefined);
+    let latestContributionReminderDates = new Map<string, string>();
 
     if (SUPABASE_URL && SUPABASE_KEY) {
       const headers = {
@@ -966,6 +1012,61 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
           return rows.length;
         } catch (e) {
           console.error("Failed to write meeting reminder logs:", e);
+          return 0;
+        }
+      };
+
+      const getLatestContributionReminderDates = async (): Promise<Map<string, string>> => {
+        try {
+          const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/contribution_reminder_deliveries?select=member_id,recipient_email,reminder_date&reminder_type=eq.monthly_overdue&order=reminder_date.desc`,
+            { headers },
+          );
+
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Failed to fetch contribution reminder logs:", text);
+            return new Map<string, string>();
+          }
+
+          const rows = (await res.json()) as Array<Pick<ContributionReminderDelivery, "member_id" | "recipient_email" | "reminder_date">>;
+          const latest = new Map<string, string>();
+
+          for (const row of rows) {
+            const key = row.member_id || row.recipient_email?.toLowerCase();
+            if (key && !latest.has(key)) latest.set(key, row.reminder_date);
+          }
+
+          return latest;
+        } catch (e) {
+          console.error("Failed to query contribution reminder logs:", e);
+          return new Map<string, string>();
+        }
+      };
+
+      const insertContributionReminderLogs = async (rows: ContributionReminderDelivery[]): Promise<number> => {
+        if (rows.length === 0) return 0;
+
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/contribution_reminder_deliveries`, {
+            method: "POST",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+              Prefer: "resolution=ignore-duplicates,return=minimal",
+            },
+            body: JSON.stringify(rows),
+          });
+
+          if (!res.ok) {
+            const text = await res.text();
+            console.error("Failed to insert contribution reminder logs:", text);
+            return 0;
+          }
+
+          return rows.length;
+        } catch (e) {
+          console.error("Failed to write contribution reminder logs:", e);
           return 0;
         }
       };
@@ -1052,6 +1153,33 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       } catch (e) {
         console.error("Failed to fetch contribution types:", e);
       }
+
+      try {
+        const settingsRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/choir_settings?select=key,value&key=in.(contributionCurrentMonthDueDay,contributionOverdueReminderIntervalDays)`,
+          { headers }
+        );
+        if (settingsRes.ok) {
+          const rows = await settingsRes.json() as Array<{ key: string; value: string }>;
+          const rawSettings = rows.reduce<Record<string, unknown>>((acc, row) => {
+            if (!row?.key) return acc;
+            try {
+              acc[row.key] = JSON.parse(row.value);
+            } catch {
+              acc[row.key] = row.value;
+            }
+            return acc;
+          }, {});
+          reminderSettings = normalizeReminderSettings(rawSettings);
+          console.log("Contribution reminder settings loaded:", reminderSettings);
+        }
+      } catch (e) {
+        console.error("Failed to fetch reminder settings:", e);
+      }
+
+      latestContributionReminderDates = await getLatestContributionReminderDates();
+      results.contributionCurrentMonthDueDay = reminderSettings.contributionCurrentMonthDueDay;
+      results.contributionReminderIntervalDays = reminderSettings.contributionOverdueReminderIntervalDays;
     } else {
       return {
         statusCode: 200,
@@ -1261,12 +1389,20 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
     if (members.length > 0 && monthlyAmount > 0) {
       const overdueByMember: { member: Member; unpaidMonths: number; totalDue: number }[] = [];
       let totalMembersReminded = 0;
+      const successfulContributionLogs: ContributionReminderDelivery[] = [];
+      const today = new Date();
+      const todayDate = today.toISOString().split("T")[0];
 
       for (const member of members) {
         if (!member.email) continue;
 
         // Check unpaid monthly dues
-        const unpaidMonths = getUnpaidMonthsForMember(member.id, contributions, monthlyAmount);
+        const unpaidMonths = getUnpaidMonthsForMember(
+          member.id,
+          contributions,
+          monthlyAmount,
+          reminderSettings.contributionCurrentMonthDueDay
+        );
 
         // Check special contributions
         const specialReminders = getSpecialContributionReminders(member.id, contributions, contributionTypes);
@@ -1274,16 +1410,25 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         // Determine if we need to send a reminder
         const hasUnpaid = unpaidMonths.length > 0;
         const hasSpecial = specialReminders.overdue.length > 0 || specialReminders.upcoming.length > 0;
+        const lastOverdueReminderDate =
+          latestContributionReminderDates.get(member.id) ||
+          latestContributionReminderDates.get(member.email.toLowerCase());
+        const overdueIntervalMet = !lastOverdueReminderDate ||
+          getDaysBetween(lastOverdueReminderDate, today) >= reminderSettings.contributionOverdueReminderIntervalDays;
+        const shouldSendOverdue = hasUnpaid && overdueIntervalMet;
+        const shouldSendSpecialOnly = hasSpecial && !shouldSendOverdue;
 
-        if (hasUnpaid || hasSpecial) {
+        if (shouldSendOverdue || shouldSendSpecialOnly) {
+          const overdueMonthsForEmail = shouldSendOverdue ? unpaidMonths : [];
+          const totalDue = unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0);
           const sent = await sendEmail(
             [member.email],
-            hasUnpaid
+            shouldSendOverdue
               ? `⚠️ Contribution Reminder: You have ${unpaidMonths.length} unpaid month${unpaidMonths.length > 1 ? 's' : ''}`
               : `💰 Contribution Reminder: Special contributions due`,
             generateContributionReminderEmail(
               member.name,
-              unpaidMonths,
+              overdueMonthsForEmail,
               specialReminders.overdue,
               specialReminders.upcoming
             )
@@ -1291,18 +1436,35 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
           if (sent) {
             totalMembersReminded++;
-            if (hasUnpaid) results.overdueRemindersSent++;
-            else results.contributionRemindersSent++;
+            if (shouldSendOverdue) {
+              results.overdueRemindersSent++;
+              successfulContributionLogs.push({
+                id: `cr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                member_id: member.id,
+                recipient_email: member.email.toLowerCase(),
+                recipient_name: member.name,
+                reminder_type: "monthly_overdue",
+                reminder_date: todayDate,
+                overdue_months: unpaidMonths.length,
+                total_due: totalDue,
+                job_run_id: jobRunId,
+                sent_at: new Date().toISOString(),
+              });
+              latestContributionReminderDates.set(member.id, todayDate);
+              latestContributionReminderDates.set(member.email.toLowerCase(), todayDate);
+            } else {
+              results.contributionRemindersSent++;
+            }
           }
 
           // Track for finance summary
-          if (hasUnpaid) {
-            const totalDue = unpaidMonths.reduce((sum, m) => sum + m.expectedAmount, 0);
+          if (shouldSendOverdue) {
             overdueByMember.push({ member, unpaidMonths: unpaidMonths.length, totalDue });
           }
         }
       }
 
+      results.contributionReminderLogsInserted = await insertContributionReminderLogs(successfulContributionLogs);
       console.log(`Sent contribution reminders to ${totalMembersReminded} members`);
 
       // Send finance admin summary if there are overdues
