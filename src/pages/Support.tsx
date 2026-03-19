@@ -11,7 +11,7 @@ import {
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { FlutterwavePayment } from "@/components/FlutterwavePayment";
+import { DonationCheckout } from "@/components/payments/DonationCheckout";
 
 const impactAreas = [
   {
@@ -200,7 +200,7 @@ export default function Support() {
                     </p>
                   </div>
                   
-                  <FlutterwavePayment />
+                  <DonationCheckout />
                   
                   {/* Trust Badges */}
                   <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-primary/10">

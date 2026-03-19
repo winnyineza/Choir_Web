@@ -42,7 +42,7 @@ export interface TicketOrder {
   status: "pending" | "confirmed" | "cancelled" | "used";
   archivedAt?: string;
   archivedReason?: string;
-  paymentMethod: "momo" | "card" | "bank";
+  paymentMethod: "mtn" | "airtel" | "card" | "bank";
   transactionId?: string;
   qrCodeData: string;
   createdAt: string;
@@ -163,7 +163,7 @@ export async function updateOrderStatus(
 export async function confirmOrderByTxRef(txRef: string, transactionId: string): Promise<TicketOrder | null> {
   const order = await getOrderByTxRef(txRef);
   if (!order) return null;
-  return updateOrderStatus(order.id, "confirmed", transactionId);
+  return confirmOrder(order.id, transactionId);
 }
 
 // Get order statistics

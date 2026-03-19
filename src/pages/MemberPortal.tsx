@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import logo from "@/assets/LogoTSC.jpg";
 import montserratRegularTtf from "@/assets/fonts/Montserrat-Regular.ttf";
 import montserratBoldTtf from "@/assets/fonts/Montserrat-Bold.ttf";
@@ -117,6 +117,8 @@ import {
 } from "@/lib/surveyService";
 import { exportMemberStatement } from "@/lib/exportUtils";
 import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
+import { isValidMtnRwandaMsisdn } from "@/lib/momo";
+import { startMomoCollection, waitForMomoPayment } from "@/lib/momoPaymentService";
 
 type View = "pin" | "dashboard" | "leave-form" | "verify" | "submit" | "success" | "attendance" | "requests" | "contributions";
 
@@ -136,6 +138,16 @@ interface ReceiptDisplayData {
   reference?: string;
   amountLabel: string;
   recordedBy: string;
+}
+
+interface ContributionPaymentDraft {
+  typeId?: string;
+  typeName: string;
+  category: "monthly" | "special";
+  amount: number;
+  month?: number;
+  year?: number;
+  expectedAmount?: number;
 }
 
 function getReceiptDisplayData(receipt: Contribution, settings: Settings): ReceiptDisplayData {
@@ -547,12 +559,24 @@ export default function MemberPortal() {
   const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
+  const [contributionPaymentDraft, setContributionPaymentDraft] = useState<ContributionPaymentDraft | null>(null);
+  const [contributionPaymentPhone, setContributionPaymentPhone] = useState("");
+  const [isContributionPaymentLoading, setIsContributionPaymentLoading] = useState(false);
   const selectedReceiptDisplay = selectedReceipt ? getReceiptDisplayData(selectedReceipt, choirSettings) : null;
 
   useEffect(() => {
     getSettings().then(setChoirSettings).catch(() => {
       // Keep the fallback branding if settings fail to load.
     });
+  }, []);
+
+  const loadContributionData = useCallback(async (member: Member) => {
+    const [contributions, status] = await Promise.all([
+      getContributionsByMemberEmail(member.email),
+      getMemberContributionStatus(member.id, member.name, member.email),
+    ]);
+    setMyContributions(contributions);
+    setContributionStatus(status);
   }, []);
 
   // Load announcements when PIN is verified
@@ -565,17 +589,9 @@ export default function MemberPortal() {
   // Load contributions when member logs in
   useEffect(() => {
     if (memberInfo) {
-      const loadContributions = async () => {
-        const [contributions, status] = await Promise.all([
-          getContributionsByMemberEmail(memberInfo.email),
-          getMemberContributionStatus(memberInfo.id, memberInfo.name, memberInfo.email),
-        ]);
-        setMyContributions(contributions);
-        setContributionStatus(status);
-      };
-      loadContributions();
+      loadContributionData(memberInfo);
     }
-  }, [memberInfo]);
+  }, [loadContributionData, memberInfo]);
 
   // Populate edit form when member info is loaded
   useEffect(() => {
@@ -630,6 +646,73 @@ export default function MemberPortal() {
       });
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const openContributionPayment = (draft: ContributionPaymentDraft) => {
+    setContributionPaymentDraft(draft);
+    setContributionPaymentPhone(memberInfo?.phone || "");
+  };
+
+  const handleContributionPayment = async () => {
+    if (!memberInfo || !contributionPaymentDraft) return;
+
+    if (!isValidMtnRwandaMsisdn(contributionPaymentPhone)) {
+      toast({
+        title: "Invalid MTN number",
+        description: "Enter a valid MTN Rwanda number before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsContributionPaymentLoading(true);
+    try {
+      const response = await startMomoCollection({
+        amount: contributionPaymentDraft.amount,
+        phone: contributionPaymentPhone,
+        purpose: "contribution",
+        customer: {
+          name: memberInfo.name,
+          email: memberInfo.email,
+          memberId: memberInfo.id,
+        },
+        metadata: {
+          contribution: {
+            typeId: contributionPaymentDraft.typeId,
+            typeName: contributionPaymentDraft.typeName,
+            category: contributionPaymentDraft.category,
+            month: contributionPaymentDraft.month,
+            year: contributionPaymentDraft.year,
+            expectedAmount: contributionPaymentDraft.expectedAmount,
+          },
+        },
+      });
+
+      toast({
+        title: "Approve on your phone",
+        description: response.message || "An MTN MoMo prompt has been sent to your phone.",
+      });
+
+      const finalStatus = await waitForMomoPayment(response.payment.id);
+      if (!finalStatus.success || finalStatus.payment.status !== "successful") {
+        throw new Error(finalStatus.message || "The contribution payment was not completed.");
+      }
+
+      await loadContributionData(memberInfo);
+      setContributionPaymentDraft(null);
+      toast({
+        title: "Contribution paid",
+        description: "Your contribution was recorded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Payment failed",
+        description: error?.message || "The MTN MoMo payment was not completed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsContributionPaymentLoading(false);
     }
   };
 
@@ -2262,17 +2345,36 @@ export default function MemberPortal() {
                     <div className="space-y-2">
                       {contributionStatus.unpaidMonths.map((item, index) => (
                         <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-red-500/10">
-                          <span className="text-foreground">
-                            {getMonthName(item.month)} {item.year}
-                          </span>
-                          <span className="font-semibold text-red-400">
-                            {formatCurrency(item.expectedAmount)}
-                          </span>
+                          <div>
+                            <span className="text-foreground">
+                              {getMonthName(item.month)} {item.year}
+                            </span>
+                            <p className="text-xs text-muted-foreground">Monthly dues</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-red-400">
+                              {formatCurrency(item.expectedAmount)}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="gold"
+                              onClick={() => openContributionPayment({
+                                typeName: "Monthly Dues",
+                                category: "monthly",
+                                amount: item.expectedAmount,
+                                month: item.month,
+                                year: item.year,
+                                expectedAmount: item.expectedAmount,
+                              })}
+                            >
+                              Pay with MTN
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
                     <p className="text-sm text-muted-foreground mt-4">
-                      Please contact the choir treasurer to make payments.
+                      Payments are collected instantly with MTN MoMo and added to your contribution history after confirmation.
                     </p>
                   </div>
                 )}
@@ -2313,7 +2415,7 @@ export default function MemberPortal() {
                             </span>
                           </div>
                           {!item.isPaid && (
-                            <div className="mt-2">
+                            <div className="mt-3">
                               <div className="w-full h-2 bg-red-500/20 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-green-500 rounded-full"
@@ -2324,6 +2426,20 @@ export default function MemberPortal() {
                                 {((item.paidAmount / item.expectedAmount) * 100).toFixed(0)}% paid • 
                                 <span className="font-medium"> {formatCurrency(item.expectedAmount - item.paidAmount)} remaining</span>
                               </p>
+                              <Button
+                                size="sm"
+                                variant="gold"
+                                className="mt-3"
+                                onClick={() => openContributionPayment({
+                                  typeId: item.typeId,
+                                  typeName: item.typeName,
+                                  category: "special",
+                                  amount: Math.max(0, item.expectedAmount - item.paidAmount),
+                                  expectedAmount: item.expectedAmount,
+                                })}
+                              >
+                                Pay Remaining With MTN
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -2539,6 +2655,78 @@ export default function MemberPortal() {
                         >
                           <Printer className="w-4 h-4 mr-2" />
                           Print Receipt
+                        </Button>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog
+                  open={!!contributionPaymentDraft}
+                  onOpenChange={(open) => {
+                    if (!open && !isContributionPaymentLoading) {
+                      setContributionPaymentDraft(null);
+                    }
+                  }}
+                >
+                  <DialogContent className="sm:max-w-md bg-background border-primary/20">
+                    <DialogHeader>
+                      <DialogTitle>Pay Contribution With MTN</DialogTitle>
+                      <DialogDescription>
+                        Approve the prompt on your MTN phone to clear this contribution.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {contributionPaymentDraft && (
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-primary/15 bg-secondary/20 p-4 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Contribution</span>
+                            <span className="font-medium text-foreground">{contributionPaymentDraft.typeName}</span>
+                          </div>
+                          {(contributionPaymentDraft.month && contributionPaymentDraft.year) && (
+                            <div className="mt-2 flex items-center justify-between">
+                              <span className="text-muted-foreground">Period</span>
+                              <span className="text-foreground">
+                                {getMonthName(contributionPaymentDraft.month)} {contributionPaymentDraft.year}
+                              </span>
+                            </div>
+                          )}
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-muted-foreground">Amount</span>
+                            <span className="font-semibold text-primary">{formatCurrency(contributionPaymentDraft.amount)}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="member-mtn-phone">MTN phone number</Label>
+                          <Input
+                            id="member-mtn-phone"
+                            type="tel"
+                            value={contributionPaymentPhone}
+                            onChange={(event) => setContributionPaymentPhone(event.target.value)}
+                            placeholder="078xxxxxxx"
+                            disabled={isContributionPaymentLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Only MTN Rwanda numbers are supported in this checkout.
+                          </p>
+                        </div>
+
+                        <Button
+                          className="w-full"
+                          variant="gold"
+                          onClick={handleContributionPayment}
+                          disabled={isContributionPaymentLoading}
+                        >
+                          {isContributionPaymentLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Waiting for confirmation...
+                            </>
+                          ) : (
+                            `Pay ${formatCurrency(contributionPaymentDraft.amount)}`
+                          )}
                         </Button>
                       </div>
                     )}

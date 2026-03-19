@@ -51,11 +51,13 @@ import { getAllContributions } from "@/lib/contributionService";
 import { getAllExpenses, Expense, getCategoryLabel } from "@/lib/expenseService";
 import { getAllDisciplinaryRecords, getOutstandingFineBalanceTotal } from "@/lib/disciplinaryService";
 import { getAllDonations, createDonation, updateDonation, deleteDonation, Donation } from "@/lib/donationService";
+import { listPayments, type PaymentIntent } from "@/lib/paymentService";
 import { useAuth } from "@/contexts/AuthContext";
 import { addAuditLog } from "@/lib/adminService";
 import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 import { TicketHealthWidget } from "@/components/admin/TicketHealthWidget";
 import { getTicketedEvents } from "@/lib/ticketVisibility";
+import { getMomoPaymentStatus } from "@/lib/momoPaymentService";
 import {
   PieChart,
   Pie,
@@ -131,6 +133,8 @@ export function Treasury({ onRefresh }: TreasuryProps) {
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [allContributions, setAllContributions] = useState<any[]>([]);
   const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [payments, setPayments] = useState<PaymentIntent[]>([]);
+  const [refreshingPaymentId, setRefreshingPaymentId] = useState<string | null>(null);
   const [ticketingOverview, setTicketingOverview] = useState({
     ticketedEvents: 0,
     ticketCapacity: 0,
@@ -201,6 +205,9 @@ export function Treasury({ onRefresh }: TreasuryProps) {
     const donTotal = allDonations.reduce((sum, d) => sum + d.amount, 0);
     setDonationTotal(donTotal);
 
+    const allPayments = await listPayments();
+    setPayments(allPayments);
+
     // Expenses
     const expenses = await getAllExpenses();
     setAllExpenses(expenses);
@@ -266,6 +273,16 @@ export function Treasury({ onRefresh }: TreasuryProps) {
      .slice(0, 20);
 
     setRecentTransactions(transactions);
+  };
+
+  const handleRefreshPayment = async (paymentId: string) => {
+    setRefreshingPaymentId(paymentId);
+    try {
+      await getMomoPaymentStatus(paymentId);
+      await loadFinancialData();
+    } finally {
+      setRefreshingPaymentId(null);
+    }
   };
 
   const totalIncome = ticketRevenue + contributionTotal + donationTotal;
@@ -619,99 +636,145 @@ export function Treasury({ onRefresh }: TreasuryProps) {
 
       {/* Overview Tab */}
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Income Breakdown Chart */}
-          <div className="lg:col-span-1 card-glass rounded-xl p-5">
-            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-              <Target className="w-4 h-4 text-primary" />
-              Income Sources
-            </h3>
-            {incomeBreakdownData.length > 0 ? (
-              <>
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={incomeBreakdownData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {incomeBreakdownData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-2 mt-4">
-                  {incomeBreakdownData.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="text-muted-foreground">{item.name}</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Income Breakdown Chart */}
+            <div className="lg:col-span-1 card-glass rounded-xl p-5">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Target className="w-4 h-4 text-primary" />
+                Income Sources
+              </h3>
+              {incomeBreakdownData.length > 0 ? (
+                <>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={incomeBreakdownData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={70}
+                          paddingAngle={4}
+                          dataKey="value"
+                        >
+                          {incomeBreakdownData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2 mt-4">
+                    {incomeBreakdownData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="text-muted-foreground">{item.name}</span>
+                        </div>
+                        <span className="font-medium">{formatCurrency(item.value)}</span>
                       </div>
-                      <span className="font-medium">{formatCurrency(item.value)}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="h-48 flex items-center justify-center text-muted-foreground">
+                  No income data yet
                 </div>
-              </>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-muted-foreground">
-                No income data yet
+              )}
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="lg:col-span-2 card-glass rounded-xl overflow-hidden">
+              <div className="p-4 border-b border-primary/10 flex items-center justify-between">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  Recent Transactions
+                </h3>
+                <span className="text-xs text-muted-foreground">Last 20</span>
               </div>
-            )}
+              <div className="divide-y divide-primary/10 max-h-[400px] overflow-y-auto">
+                {recentTransactions.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>No transactions yet</p>
+                  </div>
+                ) : (
+                  recentTransactions.map((tx) => (
+                    <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-secondary/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center",
+                          tx.isIncome 
+                            ? tx.type === "ticket" ? "bg-blue-500/20" 
+                              : tx.type === "contribution" ? "bg-purple-500/20" 
+                              : "bg-pink-500/20"
+                            : "bg-red-500/20"
+                        )}>
+                          {tx.type === "ticket" && <Ticket className="w-5 h-5 text-blue-400" />}
+                          {tx.type === "contribution" && <Users className="w-5 h-5 text-purple-400" />}
+                          {tx.type === "donation" && <Heart className="w-5 h-5 text-pink-400" />}
+                          {tx.type === "expense" && <ArrowDownRight className="w-5 h-5 text-red-400" />}
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground text-sm">{tx.description}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(tx.date)}</p>
+                        </div>
+                      </div>
+                      <span className={cn(
+                        "font-semibold tabular-nums",
+                        tx.isIncome ? "text-green-400" : "text-red-400"
+                      )}>
+                        {tx.isIncome ? "+" : "-"}{formatCurrency(tx.amount)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Recent Transactions */}
-          <div className="lg:col-span-2 card-glass rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-primary/10 flex items-center justify-between">
-              <h3 className="font-semibold text-foreground flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                Recent Transactions
-              </h3>
-              <span className="text-xs text-muted-foreground">Last 20</span>
+          <div className="card-glass rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-primary/10 p-4">
+              <div>
+                <h3 className="font-semibold text-foreground">MTN Payment Reconciliation</h3>
+                <p className="text-xs text-muted-foreground">Refresh stuck MTN payments and inspect provider references.</p>
+              </div>
+              <span className="text-xs text-muted-foreground">{payments.filter((payment) => payment.provider === "mtn_momo").length} tracked</span>
             </div>
-            <div className="divide-y divide-primary/10 max-h-[400px] overflow-y-auto">
-              {recentTransactions.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">
-                  <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>No transactions yet</p>
-                </div>
-              ) : (
-                recentTransactions.map((tx) => (
-                  <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-secondary/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center",
-                        tx.isIncome 
-                          ? tx.type === "ticket" ? "bg-blue-500/20" 
-                            : tx.type === "contribution" ? "bg-purple-500/20" 
-                            : "bg-pink-500/20"
-                          : "bg-red-500/20"
-                      )}>
-                        {tx.type === "ticket" && <Ticket className="w-5 h-5 text-blue-400" />}
-                        {tx.type === "contribution" && <Users className="w-5 h-5 text-purple-400" />}
-                        {tx.type === "donation" && <Heart className="w-5 h-5 text-pink-400" />}
-                        {tx.type === "expense" && <ArrowDownRight className="w-5 h-5 text-red-400" />}
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground text-sm">{tx.description}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(tx.date)}</p>
-                      </div>
-                    </div>
-                    <span className={cn(
-                      "font-semibold tabular-nums",
-                      tx.isIncome ? "text-green-400" : "text-red-400"
-                    )}>
-                      {tx.isIncome ? "+" : "-"}{formatCurrency(tx.amount)}
-                    </span>
+            <div className="divide-y divide-primary/10">
+              {payments.filter((payment) => payment.provider === "mtn_momo").slice(0, 8).map((payment) => (
+                <div key={payment.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">
+                      {payment.purpose} • {formatCurrency(payment.amount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Ref: {payment.reference || payment.id} • Provider: {payment.providerReference || "pending"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Status: <span className="capitalize text-foreground">{payment.status}</span>
+                      {payment.statusDetail ? ` • ${payment.statusDetail}` : ""}
+                    </p>
                   </div>
-                ))
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRefreshPayment(payment.id)}
+                      disabled={refreshingPaymentId === payment.id || (payment.status !== "pending" && payment.status !== "processing")}
+                    >
+                      <RefreshCw className={cn("mr-2 h-4 w-4", refreshingPaymentId === payment.id && "animate-spin")} />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {payments.filter((payment) => payment.provider === "mtn_momo").length === 0 && (
+                <div className="p-8 text-center text-muted-foreground">
+                  No MTN payment intents yet.
+                </div>
               )}
             </div>
           </div>

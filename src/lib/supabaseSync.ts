@@ -742,32 +742,60 @@ const SYNC_CONFIG: Record<string, TableConfig> = {
     table: 'payments',
     orderBy: 'created_at',
     orderAsc: false,
-    toDb: (p: any) => ({
-      id: p.id,
-      member_id: p.memberId || null,
-      amount: p.amount,
-      currency: p.currency || 'RWF',
-      method: p.method || null,
-      purpose: p.purpose || null,
-      reference: p.reference || null,
-      status: p.status || 'pending',
-      metadata: p.metadata || {},
-      created_at: p.createdAt || new Date().toISOString(),
-      updated_at: p.updatedAt || new Date().toISOString(),
-    }),
-    fromDb: (r: any) => ({
-      id: r.id,
-      memberId: r.member_id || '',
-      amount: Number(r.amount),
-      currency: r.currency || 'RWF',
-      method: r.method || '',
-      purpose: r.purpose || '',
-      reference: r.reference || '',
-      status: r.status || 'pending',
-      metadata: r.metadata || {},
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    }),
+    toDb: (p: any) => {
+      const metadata = {
+        ...(p.metadata || {}),
+        provider: p.provider || undefined,
+        channel: p.channel || (p.method === 'mpesa' ? 'mtn' : p.method) || undefined,
+        providerReference: p.providerReference || undefined,
+        externalId: p.externalId || undefined,
+        payerPhone: p.payerPhone || undefined,
+        statusDetail: p.statusDetail || undefined,
+        linkedRecordId: p.linkedRecordId || undefined,
+        callbackPayload: p.callbackPayload || undefined,
+      };
+
+      Object.keys(metadata).forEach((key) => metadata[key] === undefined && delete metadata[key]);
+
+      return {
+        id: p.id,
+        member_id: p.memberId || null,
+        amount: p.amount,
+        currency: p.currency || 'RWF',
+        method: p.channel || p.method || null,
+        purpose: p.purpose || null,
+        reference: p.reference || null,
+        status: p.status || 'pending',
+        metadata,
+        created_at: p.createdAt || new Date().toISOString(),
+        updated_at: p.updatedAt || new Date().toISOString(),
+      };
+    },
+    fromDb: (r: any) => {
+      const metadata = r.metadata || {};
+      const method = metadata.channel || r.method || '';
+      return {
+        id: r.id,
+        memberId: r.member_id || '',
+        amount: Number(r.amount),
+        currency: r.currency || 'RWF',
+        method,
+        provider: metadata.provider || undefined,
+        channel: metadata.channel || (r.method || undefined),
+        purpose: r.purpose || '',
+        reference: r.reference || '',
+        providerReference: metadata.providerReference || undefined,
+        externalId: metadata.externalId || undefined,
+        payerPhone: metadata.payerPhone || undefined,
+        status: r.status || 'pending',
+        statusDetail: metadata.statusDetail || undefined,
+        linkedRecordId: metadata.linkedRecordId || undefined,
+        callbackPayload: metadata.callbackPayload || null,
+        metadata,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      };
+    },
   },
 
   // --- Contributions ---

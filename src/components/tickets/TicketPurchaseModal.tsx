@@ -15,10 +15,12 @@ import { PaymentStep, type PaymentMethod } from "./PaymentStep";
 import { ProcessingPayment } from "./ProcessingPayment";
 import { TicketConfirmation } from "./TicketConfirmation";
 import { generateTxRef, isFlutterwaveConfigured, FLUTTERWAVE_PUBLIC_KEY, formatCurrency } from "@/lib/flutterwave";
-import { createOrder, confirmOrder, type TicketTier, type TicketOrder } from "@/lib/ticketService";
+import { createOrder, confirmOrder, getOrderById, type TicketTier, type TicketOrder } from "@/lib/ticketService";
 import { validatePromoCode, redeemPromoCode, type PromoValidation } from "@/lib/promoService";
 import { sendTicketConfirmationEmail } from "@/lib/ticketEmailService";
 import { useToast } from "@/hooks/use-toast";
+import { getMomoFeatureFlag, getRwandaNetwork, isValidMtnRwandaMsisdn } from "@/lib/momo";
+import { startMomoCollection, waitForMomoPayment } from "@/lib/momoPaymentService";
 
 export interface TicketEvent {
   id: string | number; // Support both for backwards compatibility
@@ -145,6 +147,30 @@ export function TicketPurchaseModal({
     setStep("payment");
   };
 
+  const handleConfirmedOrderSuccess = async (order: TicketOrder, successMessage: string) => {
+    if (promoValidation?.valid && promoCode) {
+      await redeemPromoCode(promoCode);
+    }
+
+    window.dispatchEvent(new Event("eventsUpdated"));
+
+    sendTicketConfirmationEmail(order).then((result) => {
+      if (result.success) {
+        toast({
+          title: "Ticket sent to your email! 📧",
+          description: `Confirmation sent to ${order.customer.email}`,
+        });
+      }
+    });
+
+    setConfirmedOrder(order);
+    setStep("confirmation");
+    toast({
+      title: "Payment Successful! 🎉",
+      description: successMessage,
+    });
+  };
+
   const handlePayment = async () => {
     // Validate customer info
     if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
@@ -160,6 +186,33 @@ export function TicketPurchaseModal({
       toast({
         title: "Select payment method",
         description: "Please choose a payment method.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (paymentMethod === "mtn" && !getMomoFeatureFlag()) {
+      toast({
+        title: "MTN MoMo unavailable",
+        description: "Direct MTN payments are not enabled right now.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (paymentMethod === "mtn" && !isValidMtnRwandaMsisdn(customerInfo.phone)) {
+      toast({
+        title: "Invalid MTN number",
+        description: "Enter a valid MTN Rwanda number before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (paymentMethod === "airtel" && getRwandaNetwork(customerInfo.phone) !== "airtel") {
+      toast({
+        title: "Invalid Airtel number",
+        description: "Enter a valid Airtel Rwanda number before continuing.",
         variant: "destructive",
       });
       return;
@@ -189,7 +242,7 @@ export function TicketPurchaseModal({
       discount,
       promoCode: promoValidation?.valid ? promoCode : undefined,
       customer: customerInfo,
-      paymentMethod: paymentMethod === "demo" ? "momo" : paymentMethod,
+      paymentMethod: paymentMethod === "demo" ? "mtn" : paymentMethod,
     });
     
     if (!orderResult.success || !orderResult.order) {
@@ -215,31 +268,7 @@ export function TicketPurchaseModal({
       const confirmed = await confirmOrder(order.id, `DEMO-${Date.now()}`);
       
       if (confirmed) {
-        // Mark promo code as used if applied
-        if (promoValidation?.valid && promoCode) {
-          await redeemPromoCode(promoCode);
-        }
-        
-        // Dispatch event to refresh events page
-        window.dispatchEvent(new Event("eventsUpdated"));
-        
-        // Send ticket confirmation email automatically
-        sendTicketConfirmationEmail(confirmed).then((result) => {
-          if (result.success) {
-            toast({
-              title: "Ticket sent to your email! 📧",
-              description: `Confirmation sent to ${confirmed.customer.email}`,
-            });
-          }
-        });
-        
-        setConfirmedOrder(confirmed);
-        setStep("confirmation");
-        
-        toast({
-          title: "Demo Payment Successful! 🎉",
-          description: "This is a test transaction. Your ticket is ready!",
-        });
+        await handleConfirmedOrderSuccess(confirmed, "This is a test transaction. Your ticket is ready!");
       } else {
         toast({
           title: "Order confirmation failed",
@@ -252,8 +281,58 @@ export function TicketPurchaseModal({
       return;
     }
 
-    // If Flutterwave is configured and using Card
-    if (isFlutterwaveConfigured() && paymentMethod === "card") {
+    if (paymentMethod === "mtn") {
+      try {
+        setStep("processing");
+        const response = await startMomoCollection({
+          amount: total,
+          phone: customerInfo.phone,
+          purpose: "ticket",
+          reference: txRef,
+          linkedRecordId: order.id,
+          customer: {
+            name: customerInfo.name,
+            email: customerInfo.email,
+          },
+          metadata: {
+            eventTitle: event.title,
+            eventId: String(event.id),
+            txRef,
+            ticketCount,
+          },
+        });
+
+        toast({
+          title: "Approve on your phone",
+          description: response.message || "An MTN prompt has been sent to your phone.",
+        });
+
+        const finalStatus = await waitForMomoPayment(response.payment.id);
+        if (!finalStatus.success || finalStatus.payment.status !== "successful") {
+          throw new Error(finalStatus.message || "The MTN MoMo payment was not completed");
+        }
+
+        const confirmedOrder = await getOrderById(order.id);
+        if (!confirmedOrder || confirmedOrder.status !== "confirmed") {
+          throw new Error("Payment succeeded but ticket confirmation could not be verified yet");
+        }
+
+        await handleConfirmedOrderSuccess(confirmedOrder, "Your tickets have been confirmed.");
+      } catch (error: any) {
+        toast({
+          title: "MTN payment failed",
+          description: error?.message || "The MTN MoMo payment was not completed.",
+          variant: "destructive",
+        });
+        setStep("payment");
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
+    // If Flutterwave is configured and using Airtel or Card
+    if (isFlutterwaveConfigured() && (paymentMethod === "card" || paymentMethod === "airtel")) {
       setStep("processing");
       
       // Load Flutterwave script if not already loaded
@@ -279,7 +358,7 @@ export function TicketPurchaseModal({
         initFlutterwavePayment(order);
       }
     } else {
-      // Manual confirmation flow (MoMo or Bank)
+      // Manual confirmation flow (Bank)
       setStep("processing");
       
       // Simulate processing delay
@@ -319,7 +398,7 @@ export function TicketPurchaseModal({
       tx_ref: txRef,
       amount: total,
       currency: "RWF",
-      payment_options: paymentMethod === "momo" ? "mobilemoneyrwanda" : "card",
+      payment_options: paymentMethod === "airtel" ? "mobilemoneyrwanda" : "card",
       customer: {
         email: customerInfo.email,
         phone_number: customerInfo.phone,
@@ -336,31 +415,7 @@ export function TicketPurchaseModal({
           const confirmed = await confirmOrder(order.id, response.transaction_id?.toString());
           
           if (confirmed) {
-            // Mark promo code as used if applied
-            if (promoValidation?.valid && promoCode) {
-              redeemPromoCode(promoCode);
-            }
-            
-            // Dispatch event to refresh events page
-            window.dispatchEvent(new Event("eventsUpdated"));
-            
-            // Send ticket confirmation email automatically
-            sendTicketConfirmationEmail(confirmed).then((result) => {
-              if (result.success) {
-                toast({
-                  title: "Ticket sent to your email! 📧",
-                  description: `Confirmation sent to ${confirmed.customer.email}`,
-                });
-              }
-            });
-            
-            setConfirmedOrder(confirmed);
-            setStep("confirmation");
-            
-            toast({
-              title: "Payment Successful! 🎉",
-              description: "Your tickets have been confirmed.",
-            });
+            await handleConfirmedOrderSuccess(confirmed, "Your tickets have been confirmed.");
           }
         } else {
           toast({
@@ -564,4 +619,3 @@ export function TicketPurchaseModal({
     </Dialog>
   );
 }
-

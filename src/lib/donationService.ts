@@ -8,7 +8,7 @@ export interface Donation {
   donorName: string;
   donorEmail?: string;
   amount: number;
-  method: "bank" | "mtn" | "airtel" | "cash" | "other";
+  method: "bank" | "mtn" | "airtel" | "card" | "cash" | "other";
   reference?: string;
   message?: string;
   date: string;

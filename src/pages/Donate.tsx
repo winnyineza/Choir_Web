@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useState } from "react";
+import { DonationCheckout } from "@/components/payments/DonationCheckout";
 import {
   Heart,
   CreditCard,
@@ -138,6 +139,16 @@ export default function Donate() {
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="card-glass rounded-2xl p-6 md:col-span-2">
+                  <div className="mb-6 text-center">
+                    <h3 className="font-display text-2xl font-semibold">Give Online</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Pay directly with MTN MoMo, or use Airtel Money and cards through Flutterwave.
+                    </p>
+                  </div>
+                  <DonationCheckout />
+                </div>
+
                 {/* Bank Transfer */}
                 <div className="card-glass rounded-2xl p-6">
                   <div className="flex items-center gap-3 mb-6">
@@ -361,5 +372,4 @@ export default function Donate() {
     </div>
   );
 }
-
 

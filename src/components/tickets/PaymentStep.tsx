@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Phone, CreditCard, Building2, Sparkles, Loader2, CheckCircle, Smartphone } from "lucide-react";
-import { formatCurrency, isFlutterwaveConfigured, detectMomoProvider, getPaymentSettings, type PaymentSettings, defaultPaymentSettings } from "@/lib/flutterwave";
+import { formatCurrency, isFlutterwaveConfigured, detectMomoProvider } from "@/lib/flutterwave";
+import { getMomoFeatureFlag } from "@/lib/momo";
 
-export type PaymentMethod = "momo" | "card" | "bank" | "demo";
+export type PaymentMethod = "mtn" | "airtel" | "card" | "bank" | "demo";
 
 interface PaymentStepProps {
   total: number;
@@ -33,11 +33,7 @@ export function PaymentStep({
   isProcessing,
 }: PaymentStepProps) {
   const flutterwaveReady = isFlutterwaveConfigured();
-  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
-
-  useEffect(() => {
-    getPaymentSettings().then(setPaymentSettings);
-  }, []);
+  const directMomoEnabled = getMomoFeatureFlag();
 
   const paymentMethods = [
     {
@@ -49,11 +45,18 @@ export function PaymentStep({
       highlight: true,
     },
     {
-      id: "momo" as PaymentMethod,
+      id: "mtn" as PaymentMethod,
       name: "MTN MoMo",
       icon: Phone,
-      description: flutterwaveReady ? "Pay instantly with mobile money" : "Mobile money payment",
-      available: true,
+      description: directMomoEnabled ? "Direct MTN request to pay" : "Not enabled yet",
+      available: directMomoEnabled,
+    },
+    {
+      id: "airtel" as PaymentMethod,
+      name: "Airtel Money",
+      icon: Smartphone,
+      description: "Handled through Flutterwave",
+      available: flutterwaveReady,
     },
     {
       id: "card" as PaymentMethod,
@@ -203,13 +206,13 @@ export function PaymentStep({
         </div>
       )}
 
-      {/* MoMo Payment Info */}
-      {selectedMethod === "momo" && (
+      {/* MTN Payment Info */}
+      {selectedMethod === "mtn" && (
         <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-semibold text-foreground flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-primary" />
-              Mobile Money Payment
+              MTN MoMo Payment
             </h4>
             <span className="text-xs text-muted-foreground font-mono">{txRef}</span>
           </div>
@@ -224,30 +227,14 @@ export function PaymentStep({
                     <CheckCircle className="w-4 h-4 text-green-500" />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {flutterwaveReady 
-                      ? "Click Pay Now to receive a USSD push notification on your phone." 
-                      : paymentSettings.momoInstructions.mtn}
-                  </p>
-                </div>
-              );
-            } else if (provider === "airtel") {
-              return (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500 text-white">Airtel Money</span>
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {flutterwaveReady 
-                      ? "Click Pay Now to receive a USSD push notification on your phone."
-                      : paymentSettings.momoInstructions.airtel}
+                    Click Pay Now to receive an MTN approval prompt on your phone.
                   </p>
                 </div>
               );
             }
             return (
               <p className="text-sm text-muted-foreground">
-                Enter a valid Rwanda phone number (078/079 for MTN, 072/073 for Airtel)
+                Enter a valid MTN Rwanda number starting with 078 or 079
               </p>
             );
           })()}
@@ -258,6 +245,40 @@ export function PaymentStep({
             </p>
           )}
           
+          <div className="flex justify-between text-sm pt-2 border-t border-primary/10">
+            <span className="text-muted-foreground">Amount to pay</span>
+            <span className="font-semibold gold-text">{formatCurrency(total)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Airtel Payment Info */}
+      {selectedMethod === "airtel" && (
+        <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-foreground flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-primary" />
+              Airtel Money Payment
+            </h4>
+            <span className="text-xs text-muted-foreground font-mono">{txRef}</span>
+          </div>
+
+          {customerInfo.phone && detectMomoProvider(customerInfo.phone) === "airtel" ? (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500 text-white">Airtel Money</span>
+                <CheckCircle className="w-4 h-4 text-green-500" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Click Pay Now to continue with Airtel Money in Flutterwave.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Enter a valid Airtel Rwanda number starting with 072 or 073
+            </p>
+          )}
+
           <div className="flex justify-between text-sm pt-2 border-t border-primary/10">
             <span className="text-muted-foreground">Amount to pay</span>
             <span className="font-semibold gold-text">{formatCurrency(total)}</span>
@@ -316,7 +337,9 @@ export function PaymentStep({
             <Sparkles className="w-4 h-4 mr-2" />
             Complete Demo Payment
           </>
-        ) : flutterwaveReady && selectedMethod === "card" ? (
+        ) : selectedMethod === "mtn" ? (
+          "Send MTN Prompt"
+        ) : flutterwaveReady && (selectedMethod === "card" || selectedMethod === "airtel") ? (
           "Pay Now"
         ) : (
           "Submit Order"
@@ -325,7 +348,9 @@ export function PaymentStep({
 
       {selectedMethod && selectedMethod !== "demo" && (
         <p className="text-xs text-center text-muted-foreground">
-          {selectedMethod === "momo" || selectedMethod === "bank"
+          {selectedMethod === "mtn"
+            ? "You will receive an MTN approval prompt on your phone."
+            : selectedMethod === "bank"
             ? "You'll receive payment details via email. Payment confirmation within 24 hours."
             : "Secure payment powered by Flutterwave."}
         </p>
@@ -333,4 +358,3 @@ export function PaymentStep({
     </div>
   );
 }
-

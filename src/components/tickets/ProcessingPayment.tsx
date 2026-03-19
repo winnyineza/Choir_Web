@@ -1,4 +1,4 @@
-import { Loader2, Phone, CreditCard, Building2, Sparkles } from "lucide-react";
+import { Loader2, Phone, CreditCard, Building2, Sparkles, Smartphone } from "lucide-react";
 import { formatCurrency } from "@/lib/flutterwave";
 import type { PaymentMethod } from "./PaymentStep";
 
@@ -15,10 +15,15 @@ export function ProcessingPayment({ method, amount, txRef }: ProcessingPaymentPr
       title: "Processing Demo Payment",
       description: "Simulating a successful payment...",
     },
-    momo: {
+    mtn: {
       icon: Phone,
-      title: "Submitting Order",
-      description: "Your order is being processed. You'll receive payment instructions shortly.",
+      title: "Waiting For MTN Approval",
+      description: "Approve the payment prompt on your MTN phone to confirm your tickets.",
+    },
+    airtel: {
+      icon: Smartphone,
+      title: "Processing Airtel Payment",
+      description: "Please complete the Airtel Money checkout in Flutterwave.",
     },
     card: {
       icon: CreditCard,
@@ -78,4 +83,3 @@ export function ProcessingPayment({ method, amount, txRef }: ProcessingPaymentPr
     </div>
   );
 }
-
