@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { addMember, updateMember, getAllMembers, type Member, type EmergencyContact } from "@/lib/dataService";
+import { updateMemberContributionClass, type ContributionClass } from "@/lib/memberContributionClassService";
 import { sendMemberInvite } from "@/lib/memberInviteService";
+import { CONTRIBUTION_CLASSES } from "@/lib/memberContributionClassService";
+import { type AdminUser } from "@/lib/adminService";
+import { createSpecialContributionAssignmentsForMember } from "@/lib/contributionService";
 import { Loader2, Cake, Upload, User, X, Phone, ChevronDown, ChevronUp, Mail } from "lucide-react";
 
 interface AddMemberModalProps {
@@ -27,13 +31,16 @@ interface AddMemberModalProps {
   onClose: () => void;
   onSuccess: () => void;
   editMember?: Member | null;
+  canEditContributionClass?: boolean;
+  currentUser?: Pick<AdminUser, "id" | "email" | "name" | "role"> | null;
 }
 
-export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMemberModalProps) {
+export function AddMemberModal({ isOpen, onClose, onSuccess, editMember, canEditContributionClass = false, currentUser = null }: AddMemberModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [voice, setVoice] = useState<Member["voice"]>("Soprano");
+  const [specialContributionClass, setSpecialContributionClass] = useState<Member["specialContributionClass"] | "">("");
   const [status, setStatus] = useState<Member["status"]>("Pending");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [photo, setPhoto] = useState("");
@@ -56,6 +63,7 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
       setEmail(editMember.email);
       setPhone(editMember.phone);
       setVoice(editMember.voice);
+      setSpecialContributionClass(editMember.specialContributionClass || "");
       setStatus(editMember.status);
       setDateOfBirth(editMember.dateOfBirth || "");
       setPhoto(editMember.photo || "");
@@ -73,6 +81,7 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
     setEmail("");
     setPhone("");
     setVoice("Soprano");
+    setSpecialContributionClass("");
     setStatus("Pending");
     setDateOfBirth("");
     setPhoto("");
@@ -136,6 +145,7 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
         email, 
         phone, 
         voice, 
+        specialContributionClass: specialContributionClass || undefined,
         status, 
         dateOfBirth: dateOfBirth || undefined,
         photo: photo || undefined,
@@ -159,6 +169,21 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
           }
         }
         await updateMember(editMember.id, memberData);
+        if (
+          canEditContributionClass &&
+          currentUser &&
+          specialContributionClass !== (editMember.specialContributionClass || "")
+        ) {
+          await updateMemberContributionClass({
+            memberId: editMember.id,
+            newClass: specialContributionClass || undefined,
+            changedBy: currentUser,
+          });
+          const updatedMember = await getAllMembers().then((items) => items.find((item) => item.id === editMember.id));
+          if (updatedMember && specialContributionClass) {
+            await createSpecialContributionAssignmentsForMember(updatedMember);
+          }
+        }
         toast({
           title: "Member Updated",
           description: `${name} has been updated successfully.`,
@@ -178,7 +203,10 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
           setIsLoading(false);
           return;
         }
-        await addMember(memberData);
+        const createdMember = await addMember(memberData);
+        if (canEditContributionClass && specialContributionClass) {
+          await createSpecialContributionAssignmentsForMember(createdMember);
+        }
         
         // Send welcome invite email if checkbox is checked
         if (sendInvite && email) {
@@ -351,6 +379,23 @@ export function AddMemberModal({ isOpen, onClose, onSuccess, editMember }: AddMe
               </SelectContent>
             </Select>
           </div>
+
+          {canEditContributionClass && (
+            <div>
+              <Label htmlFor="specialContributionClass">Special Contribution Class</Label>
+              <Select value={specialContributionClass || "unassigned"} onValueChange={(v) => setSpecialContributionClass(v === "unassigned" ? "" : (v as ContributionClass))}>
+                <SelectTrigger className="mt-1 bg-secondary border-primary/20">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {CONTRIBUTION_CLASSES.map((item) => (
+                    <SelectItem key={item} value={item}>{item}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="status">Status</Label>

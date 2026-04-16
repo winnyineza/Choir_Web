@@ -1,6 +1,7 @@
 // Contribution Service - Track member dues and special contributions (Supabase-direct)
 
 import { getAllMembers, type Member } from "./dataService";
+import { getClassAmountForMember, type ContributionClass } from "./memberContributionClassService";
 import { createReceipt } from "./receiptService";
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
 import { isMonthTemporarilyUnlocked } from './unlockRequestService';
@@ -9,9 +10,11 @@ import { getOutstandingFineBalanceByMember, getOutstandingFineBalanceTotal } fro
 const CONTRIBUTIONS_KEY = "choir_contributions";
 const CONTRIBUTION_TYPES_KEY = "choir_contribution_types";
 const MONTHLY_DUES_EXCEPTIONS_KEY = "choir_monthly_dues_exceptions";
+const SPECIAL_CONTRIBUTION_ASSIGNMENTS_KEY = "choir_special_contribution_assignments";
 const LEGACY_DUES_BASELINE_DATE = new Date("2026-03-13T23:59:59.999Z");
 
 export type ContributionCategory = "monthly" | "special";
+export type SpecialContributionMode = "flat_per_member" | "class_based";
 
 export interface RateHistoryEntry {
   amount: number;
@@ -23,6 +26,10 @@ export interface ContributionType {
   name: string;
   category: ContributionCategory;
   amount: number;
+  specialAmountMode?: SpecialContributionMode;
+  class1Amount?: number;
+  class2Amount?: number;
+  class3Amount?: number;
   description?: string;
   isRecurring?: boolean;
   rateHistory?: RateHistoryEntry[];
@@ -47,8 +54,19 @@ export interface Contribution {
   paymentMethod?: "cash" | "momo" | "bank";
   reference?: string;
   notes?: string;
+  classAtPayment?: ContributionClass;
   recordedBy: string;
   createdAt: string;
+}
+
+export interface SpecialContributionAssignment {
+  id: string;
+  typeId: string;
+  memberId: string;
+  classAtAssignment?: ContributionClass;
+  expectedAmount: number;
+  assignmentSource: "type_created" | "member_added";
+  assignedAt: string;
 }
 
 export type MonthlyDuesExceptionStatus = "tolerated";
@@ -254,16 +272,95 @@ export async function getContributionTypeById(id: string): Promise<ContributionT
   return type || undefined;
 }
 
+export async function getAllSpecialContributionAssignments(): Promise<SpecialContributionAssignment[]> {
+  return dbGetAll<SpecialContributionAssignment>(SPECIAL_CONTRIBUTION_ASSIGNMENTS_KEY);
+}
+
+export async function getSpecialContributionAssignmentsByType(typeId: string): Promise<SpecialContributionAssignment[]> {
+  const assignments = await getAllSpecialContributionAssignments();
+  return assignments.filter((assignment) => assignment.typeId === typeId);
+}
+
+export async function getSpecialContributionAssignment(typeId: string, memberId: string): Promise<SpecialContributionAssignment | undefined> {
+  const assignments = await getSpecialContributionAssignmentsByType(typeId);
+  return assignments.find((assignment) => assignment.memberId === memberId);
+}
+
+export async function createSpecialContributionAssignmentsForType(typeId: string): Promise<SpecialContributionAssignment[]> {
+  const [type, members, existingAssignments] = await Promise.all([
+    getContributionTypeById(typeId),
+    getAllMembers(),
+    getSpecialContributionAssignmentsByType(typeId),
+  ]);
+
+  if (!type) return [];
+
+  const created: SpecialContributionAssignment[] = [];
+  for (const member of members) {
+    if (existingAssignments.some((assignment) => assignment.memberId === member.id)) continue;
+
+    const expectedAmount = getClassAmountForMember(type, member.specialContributionClass);
+    const assignment = await dbInsert<SpecialContributionAssignment>(SPECIAL_CONTRIBUTION_ASSIGNMENTS_KEY, {
+      id: `special-assign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      typeId,
+      memberId: member.id,
+      classAtAssignment: member.specialContributionClass,
+      expectedAmount,
+      assignmentSource: "type_created",
+      assignedAt: new Date().toISOString(),
+    });
+    created.push(assignment);
+  }
+
+  return created;
+}
+
+export async function createSpecialContributionAssignmentsForMember(member: Member): Promise<SpecialContributionAssignment[]> {
+  const types = await getAllContributionTypes();
+  const activeSpecialTypes = types.filter((type) => type.category === "special" && type.isActive);
+  const created: SpecialContributionAssignment[] = [];
+
+  for (const type of activeSpecialTypes) {
+    const existing = await getSpecialContributionAssignment(type.id, member.id);
+    if (existing) continue;
+
+    const expectedAmount = getClassAmountForMember(type, member.specialContributionClass);
+    const assignment = await dbInsert<SpecialContributionAssignment>(SPECIAL_CONTRIBUTION_ASSIGNMENTS_KEY, {
+      id: `special-assign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      typeId: type.id,
+      memberId: member.id,
+      classAtAssignment: member.specialContributionClass,
+      expectedAmount,
+      assignmentSource: "member_added",
+      assignedAt: new Date().toISOString(),
+    });
+    created.push(assignment);
+  }
+
+  return created;
+}
+
+function getSpecialExpectedAmountForMember(type: ContributionType, member: Member): number {
+  return getClassAmountForMember(type, member.specialContributionClass);
+}
+
 export async function createContributionType(
   data: Omit<ContributionType, "id" | "createdAt" | "isActive">
 ): Promise<ContributionType> {
   const newType: ContributionType = {
     ...data,
+    specialAmountMode: data.category === "special" ? data.specialAmountMode || "flat_per_member" : undefined,
     id: `type-${Date.now()}`,
     isActive: true,
     createdAt: new Date().toISOString(),
   };
-  return dbInsert<ContributionType>(CONTRIBUTION_TYPES_KEY, newType);
+  const inserted = await dbInsert<ContributionType>(CONTRIBUTION_TYPES_KEY, newType);
+
+  if (inserted.category === "special") {
+    await createSpecialContributionAssignmentsForType(inserted.id);
+  }
+
+  return inserted;
 }
 
 export async function updateContributionType(
@@ -579,8 +676,22 @@ export async function setMemberMonthlyPayment(
 export async function createContribution(
   data: Omit<Contribution, "id" | "createdAt">
 ): Promise<Contribution> {
+  let classAtPayment = data.classAtPayment;
+
+  if (data.category === "special" && !classAtPayment) {
+    const member = (await getAllMembers()).find((entry) => entry.id === data.memberId);
+    if (member) {
+      const type = await getContributionTypeById(data.typeId);
+      if (type) {
+        const assignment = await getSpecialContributionAssignment(type.id, member.id);
+        classAtPayment = assignment?.classAtAssignment || member.specialContributionClass;
+      }
+    }
+  }
+
   const newContribution: Contribution = {
     ...data,
+    classAtPayment,
     id: `contrib-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     createdAt: new Date().toISOString(),
   };
@@ -664,6 +775,7 @@ export async function getMemberContributionStatus(
     getAllContributionTypes(),
     getAllMembers(),
   ]);
+  const allAssignments = await getAllSpecialContributionAssignments();
 
   const totalPaid = contributions.reduce((sum, c) => sum + c.amount, 0);
   const monthlyDuesPaid = contributions
@@ -707,13 +819,15 @@ export async function getMemberContributionStatus(
     const paid = contributions
       .filter(c => c.typeId === type.id)
       .reduce((sum, c) => sum + c.amount, 0);
+    const assignment = memberRecord ? allAssignments.find((entry) => entry.typeId === type.id && entry.memberId === memberId) : undefined;
+    const expectedAmount = assignment?.expectedAmount ?? (memberRecord ? getSpecialExpectedAmountForMember(type, memberRecord) : type.amount);
 
     return {
       typeId: type.id,
       typeName: type.name,
-      expectedAmount: type.amount,
+      expectedAmount,
       paidAmount: paid,
-      isPaid: paid >= type.amount,
+      isPaid: paid >= expectedAmount,
     };
   });
 
@@ -879,26 +993,33 @@ export async function getSpecialContributionProgress(typeId: string, members: { 
   if (!type) return null;
 
   const contributions = await getContributionsByType(typeId);
+  const assignments = await getSpecialContributionAssignmentsByType(typeId);
   const totalCollected = contributions.reduce((sum, c) => sum + c.amount, 0);
 
+  const memberRecords = await getAllMembers();
   const memberStatus = members.map(member => {
     const memberContribs = contributions.filter(c => c.memberId === member.id);
     const paidAmount = memberContribs.reduce((sum, c) => sum + c.amount, 0);
+    const memberRecord = memberRecords.find((entry) => entry.id === member.id);
+    const assignment = assignments.find((entry) => entry.memberId === member.id);
+    const expectedAmount = assignment?.expectedAmount ?? (memberRecord ? getSpecialExpectedAmountForMember(type, memberRecord) : type.amount);
 
     return {
       memberId: member.id,
       memberName: member.name,
-      expectedAmount: type.amount,
+      expectedAmount,
       paidAmount,
-      isPaid: paidAmount >= type.amount,
+      isPaid: paidAmount >= expectedAmount,
     };
   });
+
+  const targetAmount = type.targetAmount || memberStatus.reduce((sum, item) => sum + item.expectedAmount, 0);
 
   return {
     type,
     totalCollected,
-    targetAmount: type.targetAmount || type.amount * members.length,
-    progress: type.targetAmount ? (totalCollected / type.targetAmount) * 100 : 0,
+    targetAmount,
+    progress: targetAmount > 0 ? (totalCollected / targetAmount) * 100 : 0,
     paidCount: memberStatus.filter(m => m.isPaid).length,
     totalMembers: members.length,
     memberStatus,

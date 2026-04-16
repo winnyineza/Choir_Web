@@ -4473,6 +4473,8 @@ export default function Admin() {
           refreshCoreData();
         }}
         editMember={editingMember}
+        canEditContributionClass={!!currentUser && ["finance", "main_admin", "super_admin"].includes(currentUser.role)}
+        currentUser={currentUser}
       />
 
       <BulkAddMembersModal

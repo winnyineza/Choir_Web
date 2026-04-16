@@ -1355,9 +1355,14 @@ export default function MemberPortal() {
                           Member <span className="gold-text">Portal</span>
                         </h1>
                         {memberInfo ? (
-                          <p className="text-muted-foreground">
-                            Welcome back, <span className="text-primary">{memberInfo.name}</span>!
-                          </p>
+                          <div className="space-y-1">
+                            <p className="text-muted-foreground">
+                              Welcome back, <span className="text-primary">{memberInfo.name}</span>!
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Special contribution class: <span className="text-foreground font-medium">{memberInfo.specialContributionClass || "Unassigned"}</span>
+                            </p>
+                          </div>
                         ) : (
                           <p className="text-muted-foreground">
                             Enter your email to view your personal data

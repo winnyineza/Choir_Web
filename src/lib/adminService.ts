@@ -594,6 +594,11 @@ export function canEditMembers(user: AdminUser | null): boolean {
   return hasPermission(user, "members_edit");
 }
 
+export function canChangeContributionClass(user: Pick<AdminUser, "role"> | null): boolean {
+  if (!user) return false;
+  return ["finance", "main_admin", "super_admin"].includes(user.role);
+}
+
 export function isReviewer(user: AdminUser | null): boolean {
   return user?.role === "reviewer";
 }

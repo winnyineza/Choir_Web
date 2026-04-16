@@ -14,6 +14,7 @@ import {
   getAllContributionTypes,
   getContributionsByMember,
   getMemberContributionStatus,
+  getSpecialContributionAssignmentsByType,
   getMonthName,
   MONTH_NAMES,
   getMonthlyDuesReport,
@@ -79,6 +80,14 @@ export interface ContributionTypeTransactionReportFilters {
 export interface ContributionStatusReportFilters {
   typeId: string;
   year: number;
+  month?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ClassBasedSpecialContributionReportFilters {
+  typeId: string;
+  year?: number;
   month?: number;
   startDate?: string;
   endDate?: string;
@@ -1717,6 +1726,116 @@ export async function exportContributionStatusReport(
   format: ContributionReportFormat = "excel"
 ): Promise<void> {
   const report = await buildContributionStatusReport(filters);
+  await downloadContributionReport(report, format);
+}
+
+export async function buildClassBasedSpecialContributionReport(
+  filters: ClassBasedSpecialContributionReportFilters
+) {
+  const [type, contributions, assignments] = await Promise.all([
+    getAllContributionTypes().then((types) => types.find((entry) => entry.id === filters.typeId)),
+    filterContributionsForReport(await getAllContributions(), {
+      year: filters.year,
+      month: filters.month,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      typeId: filters.typeId,
+      category: "special",
+    }),
+    getSpecialContributionAssignmentsByType(filters.typeId),
+  ]);
+
+  if (!type) {
+    throw new Error("Contribution type not found.");
+  }
+
+  if (type.category !== "special" || type.specialAmountMode !== "class_based") {
+    throw new Error("Selected contribution type is not class-based special contribution.");
+  }
+
+  const classBuckets: Array<"Class 1" | "Class 2" | "Class 3" | "Unassigned"> = ["Class 1", "Class 2", "Class 3", "Unassigned"];
+
+  const summaryRows = classBuckets.map((className) => {
+    const groupedAssignments = assignments.filter((assignment) => (assignment.classAtAssignment || "Unassigned") === className);
+    const expectedTotal = groupedAssignments.reduce((sum, assignment) => sum + assignment.expectedAmount, 0);
+
+    const paidByMember = new Map<string, number>();
+    contributions.forEach((contribution) => {
+      paidByMember.set(contribution.memberId, (paidByMember.get(contribution.memberId) || 0) + contribution.amount);
+    });
+
+    const paidTotal = groupedAssignments.reduce((sum, assignment) => sum + (paidByMember.get(assignment.memberId) || 0), 0);
+    const completedMembers = groupedAssignments.filter((assignment) => (paidByMember.get(assignment.memberId) || 0) >= assignment.expectedAmount && assignment.expectedAmount > 0).length;
+    const completionRate = expectedTotal > 0 ? (paidTotal / expectedTotal) * 100 : 0;
+
+    return {
+      className,
+      membersCount: groupedAssignments.length,
+      expectedTotal,
+      paidTotal,
+      completedMembers,
+      completionRate,
+    };
+  });
+
+  const totalExpected = summaryRows.reduce((sum, row) => sum + row.expectedTotal, 0);
+  const totalPaid = summaryRows.reduce((sum, row) => sum + row.paidTotal, 0);
+  const totalMembers = summaryRows.reduce((sum, row) => sum + row.membersCount, 0);
+  const totalCompletedMembers = summaryRows.reduce((sum, row) => sum + row.completedMembers, 0);
+
+  const subtitle = filters.startDate && filters.endDate
+    ? `${filters.startDate} to ${filters.endDate}`
+    : filters.month && filters.year
+      ? `${getMonthName(filters.month)} ${filters.year}`
+      : filters.year
+        ? `Year ${filters.year}`
+        : "All time";
+
+  return {
+    title: `${type.name} Class Performance Report`,
+    filename: [
+      "class-special-report",
+      type.name.replace(/\s+/g, "-").toLowerCase(),
+      filters.startDate && filters.endDate
+        ? `${filters.startDate}-to-${filters.endDate}`
+        : filters.month && filters.year
+          ? `${filters.year}-${String(filters.month).padStart(2, "0")}`
+          : filters.year || "all-time",
+    ].join("-"),
+    sheetName: "Class Summary",
+    headers: ["Class", "Members", "Expected Total", "Paid Total", "Completed Members", "Completion Rate (%)"],
+    rows: summaryRows
+      .filter((row) => row.membersCount > 0)
+      .map((row) => [
+        row.className,
+        row.membersCount,
+        row.expectedTotal,
+        row.paidTotal,
+        row.completedMembers,
+        Number(row.completionRate.toFixed(2)),
+      ]),
+    subtitle,
+    meta: [
+      { label: "Contribution Type", value: type.name },
+      { label: "Mode", value: "Class-based special" },
+      { label: "Period", value: subtitle },
+    ],
+    summary: [
+      { label: "Members", value: totalMembers },
+      { label: "Expected Total", value: formatCurrency(totalExpected) },
+      { label: "Paid Total", value: formatCurrency(totalPaid) },
+      { label: "Completed Members", value: totalCompletedMembers },
+      { label: "Overall Completion", value: `${totalExpected > 0 ? ((totalPaid / totalExpected) * 100).toFixed(2) : "0.00"}%` },
+    ],
+    emptyMessage: "No assignment data found for this class-based contribution.",
+  };
+}
+
+export async function exportClassBasedSpecialContributionReport(
+  filters: ClassBasedSpecialContributionReportFilters,
+  format: ContributionReportFormat = "excel"
+): Promise<void> {
+  const report = await buildClassBasedSpecialContributionReport(filters);
   await downloadContributionReport(report, format);
 }
 

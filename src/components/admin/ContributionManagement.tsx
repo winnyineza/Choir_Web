@@ -64,6 +64,8 @@ import {
   markMemberMonthlyTolerance,
   clearMemberMonthlyTolerance,
   getMonthlyRateForPeriod,
+  createSpecialContributionAssignmentsForType,
+  createSpecialContributionAssignmentsForMember,
   getMemberDuesStartMonth,
   getMonthName,
   isMonthLocked,
@@ -76,6 +78,7 @@ import {
   type ContributionCategory,
   type MonthlyDuesException,
 } from "@/lib/contributionService";
+import { CONTRIBUTION_CLASSES, getClassAmountForMember, getMemberContributionClassHistory, updateMemberContributionClass, type ContributionClass } from "@/lib/memberContributionClassService";
 import { isMonthTemporarilyUnlocked, createUnlockRequest, type UnlockRequestType } from "@/lib/unlockRequestService";
 import { notifyUnlockRequestCreated, notifyContributionRecorded } from "@/lib/notificationEmailService";
 import { cn } from "@/lib/utils";
@@ -84,6 +87,7 @@ import {
   exportFullContributionHistory,
   exportContributionTypeTransactionReport,
   exportContributionStatusReport,
+  exportClassBasedSpecialContributionReport,
   exportAnnualFinancialSummary,
   type ContributionReportFormat,
   type ContributionCategoryFilter,
@@ -116,7 +120,8 @@ export function ContributionManagement() {
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showAddType, setShowAddType] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [reportKind, setReportKind] = useState<"full_history" | "contribution_type" | "status_report" | "annual_summary">("full_history");
+  const [showClassManager, setShowClassManager] = useState(false);
+  const [reportKind, setReportKind] = useState<"full_history" | "contribution_type" | "status_report" | "class_special" | "annual_summary">("full_history");
   const [reportScope, setReportScope] = useState<ContributionReportScope>("year");
   const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
   const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth() + 1);
@@ -173,6 +178,11 @@ export function ContributionManagement() {
   const [savingCellPayment, setSavingCellPayment] = useState(false);
   const [savingTolerance, setSavingTolerance] = useState(false);
   const [savingSpecialPayment, setSavingSpecialPayment] = useState(false);
+  const [savingClassMemberId, setSavingClassMemberId] = useState<string | null>(null);
+  const [memberClassDrafts, setMemberClassDrafts] = useState<Record<string, ContributionClass | "">>({});
+  const [bulkAssignClass, setBulkAssignClass] = useState<ContributionClass>("Class 3");
+  const [selectedClassHistoryMemberId, setSelectedClassHistoryMemberId] = useState<string>("");
+  const [selectedClassHistory, setSelectedClassHistory] = useState<Awaited<ReturnType<typeof getMemberContributionClassHistory>>>([]);
   
   
   // Forms
@@ -191,6 +201,10 @@ export function ContributionManagement() {
     name: "",
     category: "monthly" as ContributionCategory,
     amount: "",
+    specialAmountMode: "flat_per_member" as "flat_per_member" | "class_based",
+    class1Amount: "",
+    class2Amount: "",
+    class3Amount: "",
     description: "",
     targetAmount: "",
     deadline: "",
@@ -206,6 +220,26 @@ export function ContributionManagement() {
       getExpensesByYear(summaryYear).then(setSummaryYearExpenses);
     }
   }, [showFinancialSummary, summaryYear]);
+
+  useEffect(() => {
+    setMemberClassDrafts((current) => {
+      const next = { ...current };
+      members.forEach((member) => {
+        if (next[member.id] === undefined) {
+          next[member.id] = member.specialContributionClass || "";
+        }
+      });
+      return next;
+    });
+  }, [members]);
+
+  useEffect(() => {
+    if (!selectedClassHistoryMemberId) {
+      setSelectedClassHistory([]);
+      return;
+    }
+    getMemberContributionClassHistory(selectedClassHistoryMemberId).then(setSelectedClassHistory);
+  }, [selectedClassHistoryMemberId]);
 
   useEffect(() => {
     if (members.length === 0) return;
@@ -368,7 +402,7 @@ export function ContributionManagement() {
     setShowUnlockRequest(true);
   };
 
-  const openReportModal = (kind: "full_history" | "contribution_type" | "status_report" | "annual_summary") => {
+  const openReportModal = (kind: "full_history" | "contribution_type" | "status_report" | "class_special" | "annual_summary") => {
     setReportKind(kind);
     if (kind === "annual_summary") {
       setReportTypeId("all");
@@ -377,12 +411,86 @@ export function ContributionManagement() {
     } else if (kind === "full_history") {
       setReportTypeId("all");
       setReportScope("year");
-    } else if (kind === "contribution_type" || kind === "status_report") {
-      const firstActiveType = contributionTypes.find((type) => type.isActive);
+    } else if (kind === "contribution_type" || kind === "status_report" || kind === "class_special") {
+      const firstActiveType = kind === "class_special"
+        ? contributionTypes.find((type) => type.isActive && type.category === "special" && type.specialAmountMode === "class_based")
+        : contributionTypes.find((type) => type.isActive);
       setReportTypeId(firstActiveType?.id || "all");
-      setReportScope(kind === "status_report" ? "month" : "year");
+      setReportScope(kind === "status_report" || kind === "class_special" ? "month" : "year");
     }
     setShowReport(true);
+  };
+
+  const handleSaveMemberClass = async (memberId: string) => {
+    const member = members.find((item) => item.id === memberId);
+    if (!member) return;
+
+    const nextClass = memberClassDrafts[memberId];
+    if (!currentUser) return;
+
+    setSavingClassMemberId(memberId);
+    try {
+      const updatedMember = await updateMemberContributionClass({
+        memberId,
+        newClass: nextClass || undefined,
+        changedBy: currentUser,
+      });
+      if (updatedMember && nextClass) {
+        await createSpecialContributionAssignmentsForMember(updatedMember);
+      }
+      toast({ title: "Class Updated", description: `${member.name} is now ${nextClass || "unassigned"}.` });
+      await loadData();
+      setSelectedClassHistoryMemberId(memberId);
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to update class.", variant: "destructive" });
+    } finally {
+      setSavingClassMemberId(null);
+    }
+  };
+
+  const handleBulkAssignUnassigned = async () => {
+    if (!currentUser) return;
+
+    if (unassignedMembers.length === 0) {
+      toast({ title: "Nothing to assign", description: "All members already have assigned classes." });
+      return;
+    }
+
+    const shouldProceed = confirmDestructiveAction({
+      action: "assign contribution class",
+      subject: `${unassignedMembers.length} unassigned member(s)`,
+      warning: `This sets all unassigned members to ${bulkAssignClass}. Existing assignments are not changed.`,
+      confirmWord: "ASSIGN",
+    });
+    if (!shouldProceed) {
+      return;
+    }
+
+    setSavingClassMemberId("bulk-assign");
+    try {
+      await Promise.all(
+        unassignedMembers.map(async (member) => {
+          const updated = await updateMemberContributionClass({
+            memberId: member.id,
+            newClass: bulkAssignClass,
+            changedBy: currentUser,
+            reason: "Initial bulk class assignment",
+          });
+          if (updated) {
+            await createSpecialContributionAssignmentsForMember(updated);
+          }
+        })
+      );
+      toast({
+        title: "Bulk assignment complete",
+        description: `${unassignedMembers.length} member(s) assigned to ${bulkAssignClass}.`,
+      });
+      await loadData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to bulk assign classes.", variant: "destructive" });
+    } finally {
+      setSavingClassMemberId(null);
+    }
   };
 
   const handleExportReport = async (format: ContributionReportFormat) => {
@@ -450,6 +558,30 @@ export function ContributionManagement() {
         format
       );
       toast({ title: "Exported", description: `${selectedType?.name || "Contribution"} status report exported to ${format === "pdf" ? "PDF" : "Excel"}` });
+      return;
+    }
+
+    if (reportKind === "class_special") {
+      if (reportTypeId === "all") {
+        toast({ title: "Select a type", description: "Choose a class-based special contribution type first.", variant: "destructive" });
+        return;
+      }
+      const selectedType = contributionTypes.find((type) => type.id === reportTypeId);
+      if (!selectedType || selectedType.category !== "special" || selectedType.specialAmountMode !== "class_based") {
+        toast({ title: "Invalid type", description: "Select a class-based special contribution type.", variant: "destructive" });
+        return;
+      }
+      await exportClassBasedSpecialContributionReport(
+        {
+          typeId: reportTypeId,
+          year: reportScope === "year" || reportScope === "month" ? reportYear : undefined,
+          month: reportScope === "month" ? reportMonth : undefined,
+          startDate: reportScope === "period" ? reportStartDate : undefined,
+          endDate: reportScope === "period" ? reportEndDate : undefined,
+        },
+        format
+      );
+      toast({ title: "Exported", description: `${selectedType.name} class summary exported to ${format === "pdf" ? "PDF" : "Excel"}` });
       return;
     }
 
@@ -616,6 +748,7 @@ export function ContributionManagement() {
   // Handle special contribution cell click
   const handleSpecialCellClick = (member: Member, type: ContributionType) => {
     const currentPaid = getMemberSpecialPayment(member.id, type.id);
+    const expectedAmount = getClassAmountForMember(type, member.specialContributionClass);
     
     setSpecialCellPayment({
       memberId: member.id,
@@ -624,7 +757,7 @@ export function ContributionManagement() {
       typeId: type.id,
       typeName: type.name,
       amount: "",
-      expectedAmount: type.amount,
+      expectedAmount,
       currentPaid,
     });
   };
@@ -848,16 +981,47 @@ export function ContributionManagement() {
       toast({ title: "Error", description: "Please enter a valid amount.", variant: "destructive" });
       return;
     }
+
+    const class1Amount = typeForm.class1Amount ? parseFloat(typeForm.class1Amount) : undefined;
+    const class2Amount = typeForm.class2Amount ? parseFloat(typeForm.class2Amount) : undefined;
+    const class3Amount = typeForm.class3Amount ? parseFloat(typeForm.class3Amount) : undefined;
+
+    if (typeForm.category === "special" && typeForm.specialAmountMode === "class_based") {
+      if (!class1Amount || !class2Amount || !class3Amount) {
+        toast({ title: "Error", description: "Please provide amounts for Class 1, Class 2, and Class 3.", variant: "destructive" });
+        return;
+      }
+      if (class1Amount < class2Amount || class1Amount < class3Amount) {
+        toast({ title: "Error", description: "Class 1 must have the highest amount.", variant: "destructive" });
+        return;
+      }
+      const unassignedMembers = members.filter((member) => !member.specialContributionClass);
+      if (unassignedMembers.length > 0) {
+        toast({
+          title: "Assign classes first",
+          description: `${unassignedMembers.length} member(s) still have no class. Assign classes before creating a class-based special contribution.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     if (editingType) {
       await updateContributionType(editingType.id, {
         name: typeForm.name,
         category: typeForm.category,
         amount,
+        specialAmountMode: typeForm.category === "special" ? typeForm.specialAmountMode : undefined,
+        class1Amount: typeForm.category === "special" ? class1Amount : undefined,
+        class2Amount: typeForm.category === "special" ? class2Amount : undefined,
+        class3Amount: typeForm.category === "special" ? class3Amount : undefined,
         description: typeForm.description || undefined,
         targetAmount: typeForm.targetAmount ? parseFloat(typeForm.targetAmount) : undefined,
         deadline: typeForm.deadline || undefined,
       });
+      if (typeForm.category === "special" && typeForm.specialAmountMode === "class_based") {
+        await createSpecialContributionAssignmentsForType(editingType.id);
+      }
       if (currentUser) {
         addAuditLog(currentUser, "UPDATE_CONTRIBUTION_TYPE", `Updated contribution type: ${typeForm.name}`);
       }
@@ -867,6 +1031,10 @@ export function ContributionManagement() {
         name: typeForm.name,
         category: typeForm.category,
         amount,
+        specialAmountMode: typeForm.category === "special" ? typeForm.specialAmountMode : undefined,
+        class1Amount: typeForm.category === "special" ? class1Amount : undefined,
+        class2Amount: typeForm.category === "special" ? class2Amount : undefined,
+        class3Amount: typeForm.category === "special" ? class3Amount : undefined,
         description: typeForm.description || undefined,
         isRecurring: typeForm.category === "monthly",
         targetAmount: typeForm.targetAmount ? parseFloat(typeForm.targetAmount) : undefined,
@@ -889,6 +1057,10 @@ export function ContributionManagement() {
       name: "",
       category: "monthly",
       amount: "",
+      specialAmountMode: "flat_per_member",
+      class1Amount: "",
+      class2Amount: "",
+      class3Amount: "",
       description: "",
       targetAmount: "",
       deadline: "",
@@ -945,6 +1117,8 @@ export function ContributionManagement() {
   const paidCount = statusPreviewRows.filter(r => r.status === "paid").length;
   const toleratedCount = statusPreviewRows.filter(r => r.status === "tolerated").length;
   const unpaidCount = statusPreviewRows.filter(r => r.status === "unpaid" || r.status === "partial").length;
+  const unassignedMembers = members.filter((member) => !member.specialContributionClass);
+  const unassignedPreviewNames = unassignedMembers.slice(0, 5).map((member) => member.name).join(", ");
   
   const monthlyMemberColumnClass = "min-w-[280px] w-[280px]";
 
@@ -1040,6 +1214,12 @@ export function ContributionManagement() {
               <Plus className="w-4 h-4 mr-2" />
               New Type
             </Button>
+            {currentUser && ["finance", "main_admin", "super_admin"].includes(currentUser.role) && (
+              <Button variant="outline" onClick={() => setShowClassManager(true)}>
+                <Users className="w-4 h-4 mr-2" />
+                Manage Classes
+              </Button>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1060,6 +1240,10 @@ export function ContributionManagement() {
                 <DropdownMenuItem onClick={() => openReportModal("status_report")}>
                   <Users className="w-4 h-4 mr-2" />
                   Status Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openReportModal("class_special")}>
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Class Special Report
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openReportModal("annual_summary")}>
                   <TrendingUp className="w-4 h-4 mr-2" />
@@ -2023,6 +2207,57 @@ export function ContributionManagement() {
             {typeForm.category !== "monthly" && (
               <>
                 <div>
+                  <Label>Special Amount Mode</Label>
+                  <Select
+                    value={typeForm.specialAmountMode}
+                    onValueChange={(v) => setTypeForm({ ...typeForm, specialAmountMode: v as "flat_per_member" | "class_based" })}
+                  >
+                    <SelectTrigger className="mt-1 bg-secondary border-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="flat_per_member">Flat per member</SelectItem>
+                      <SelectItem value="class_based">Class based</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {typeForm.specialAmountMode === "class_based" && (
+                  <div className="space-y-3 rounded-lg border border-primary/20 p-3 bg-secondary/30">
+                    <div>
+                      <Label>Class 1 Amount (RWF) *</Label>
+                      <Input
+                        type="number"
+                        value={typeForm.class1Amount}
+                        onChange={(e) => setTypeForm({ ...typeForm, class1Amount: e.target.value })}
+                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="10000"
+                      />
+                    </div>
+                    <div>
+                      <Label>Class 2 Amount (RWF) *</Label>
+                      <Input
+                        type="number"
+                        value={typeForm.class2Amount}
+                        onChange={(e) => setTypeForm({ ...typeForm, class2Amount: e.target.value })}
+                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="7500"
+                      />
+                    </div>
+                    <div>
+                      <Label>Class 3 Amount (RWF) *</Label>
+                      <Input
+                        type="number"
+                        value={typeForm.class3Amount}
+                        onChange={(e) => setTypeForm({ ...typeForm, class3Amount: e.target.value })}
+                        className="mt-1 bg-secondary border-primary/20"
+                        placeholder="5000"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
                   <Label>Target Total (Optional)</Label>
                   <Input
                     type="number"
@@ -2063,6 +2298,134 @@ export function ContributionManagement() {
               <Button variant="gold" className="flex-1" onClick={handleSaveType}>
                 {editingType ? "Update" : "Create"}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClassManager} onOpenChange={setShowClassManager}>
+        <DialogContent className="max-w-4xl bg-background border-primary/20 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              Manage Special Contribution Classes
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Finance, main admins, and super admins can assign or change member classes here.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-primary/20 bg-secondary/20 p-3 flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Initial setup utility</p>
+              <p className="text-xs text-muted-foreground">Assign all currently unassigned members in one click.</p>
+              <p className="text-xs text-primary mt-1">
+                Preview: {unassignedMembers.length} member(s) will be changed to {bulkAssignClass}.
+              </p>
+              {unassignedMembers.length > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {unassignedPreviewNames}{unassignedMembers.length > 5 ? ` and ${unassignedMembers.length - 5} more` : ""}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <Select value={bulkAssignClass} onValueChange={(value) => setBulkAssignClass(value as ContributionClass)}>
+                <SelectTrigger className="w-full sm:w-44 bg-secondary border-primary/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTRIBUTION_CLASSES.map((item) => (
+                    <SelectItem key={item} value={item}>{item}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="gold"
+                onClick={handleBulkAssignUnassigned}
+                disabled={savingClassMemberId === "bulk-assign" || unassignedMembers.length === 0}
+              >
+                {savingClassMemberId === "bulk-assign" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Assign Unassigned Members
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Members</h3>
+              <div className="space-y-3">
+                {members.map((member) => (
+                  <div key={member.id} className="rounded-lg border border-primary/20 p-3 bg-secondary/20 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">{member.email}</p>
+                      <p className="text-xs text-muted-foreground">Current class: {member.specialContributionClass || "Unassigned"}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full lg:w-auto">
+                      <Select
+                        value={memberClassDrafts[member.id] || "unassigned"}
+                        onValueChange={(value) => setMemberClassDrafts((current) => ({ ...current, [member.id]: value === "unassigned" ? "" : (value as ContributionClass) }))}
+                      >
+                        <SelectTrigger className="w-full sm:w-52 bg-secondary border-primary/20">
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {CONTRIBUTION_CLASSES.map((item) => (
+                            <SelectItem key={item} value={item}>{item}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="gold"
+                        onClick={() => handleSaveMemberClass(member.id)}
+                        disabled={savingClassMemberId === member.id}
+                      >
+                        {savingClassMemberId === member.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                        Save
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setSelectedClassHistoryMemberId(member.id)}
+                      >
+                        History
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Class Change History</h3>
+              <Select value={selectedClassHistoryMemberId} onValueChange={setSelectedClassHistoryMemberId}>
+                <SelectTrigger className="bg-secondary border-primary/20">
+                  <SelectValue placeholder="Select a member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="rounded-lg border border-primary/20 bg-secondary/20 p-3 space-y-3 max-h-[420px] overflow-y-auto">
+                {selectedClassHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No class changes recorded for this member yet.</p>
+                ) : (
+                  selectedClassHistory.map((entry) => (
+                    <div key={entry.id} className="rounded-md bg-background/60 p-3">
+                      <p className="text-sm font-medium text-foreground">
+                        {entry.oldClass || "Unassigned"} → {entry.newClass || "Unassigned"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Changed by {entry.changedByName} ({entry.changedByRole}) on {new Date(entry.changedAt).toLocaleString()}
+                      </p>
+                      {entry.reason && <p className="text-xs text-muted-foreground mt-1">Reason: {entry.reason}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -2132,6 +2495,27 @@ export function ContributionManagement() {
               </button>
               <button
                 onClick={() => {
+                  setReportKind("class_special");
+                  if (
+                    reportTypeId === "all" ||
+                    !contributionTypes.find((type) => type.id === reportTypeId && type.category === "special" && type.specialAmountMode === "class_based")
+                  ) {
+                    setReportTypeId(
+                      contributionTypes.find((type) => type.isActive && type.category === "special" && type.specialAmountMode === "class_based")?.id || "all"
+                    );
+                  }
+                }}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                  reportKind === "class_special"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Class Special
+              </button>
+              <button
+                onClick={() => {
                   setReportKind("annual_summary");
                   setReportTypeId("all");
                 }}
@@ -2177,7 +2561,7 @@ export function ContributionManagement() {
                 </SelectContent>
               </Select>
 
-              {(reportKind === "full_history" || reportKind === "contribution_type" || reportKind === "status_report") && (
+              {(reportKind === "full_history" || reportKind === "contribution_type" || reportKind === "status_report" || reportKind === "class_special") && (
                 <Select
                   value={reportTypeId}
                   onValueChange={setReportTypeId}
@@ -2190,6 +2574,7 @@ export function ContributionManagement() {
                       <SelectItem value="all">All contribution types</SelectItem>
                     )}
                     {contributionTypes
+                      .filter((type) => (reportKind !== "class_special" || (type.category === "special" && type.specialAmountMode === "class_based")))
                       .filter((type) => type.isActive || type.id === reportTypeId)
                       .map((type) => (
                         <SelectItem key={type.id} value={type.id}>

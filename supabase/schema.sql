@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS members (
   email VARCHAR(255) UNIQUE NOT NULL,
   phone VARCHAR(50),
   voice VARCHAR(20) NOT NULL CHECK (voice IN ('Soprano', 'Alto', 'Tenor', 'Bass')),
+  special_contribution_class VARCHAR(20) CHECK (special_contribution_class IN ('Class 1', 'Class 2', 'Class 3')),
   status VARCHAR(20) DEFAULT 'Pending' CHECK (status IN ('Active', 'Pending', 'Inactive')),
   joined_date DATE DEFAULT CURRENT_DATE,
   invite_status TEXT DEFAULT 'not_invited',
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS contributions (
   payment_method VARCHAR(50),
   reference VARCHAR(255),
   notes TEXT,
+  class_at_payment VARCHAR(20) CHECK (class_at_payment IN ('Class 1', 'Class 2', 'Class 3')),
   recorded_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -111,6 +113,10 @@ CREATE TABLE IF NOT EXISTS contribution_types (
   name VARCHAR(255) NOT NULL,
   category VARCHAR(20) DEFAULT 'monthly',
   amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  special_amount_mode VARCHAR(20) DEFAULT 'flat_per_member' CHECK (special_amount_mode IN ('flat_per_member', 'class_based')),
+  class_1_amount DECIMAL(12, 2),
+  class_2_amount DECIMAL(12, 2),
+  class_3_amount DECIMAL(12, 2),
   description TEXT,
   is_recurring BOOLEAN DEFAULT false,
   rate_history JSONB DEFAULT '[]'::jsonb,
@@ -119,6 +125,40 @@ CREATE TABLE IF NOT EXISTS contribution_types (
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- =============================================
+-- MEMBER CLASS HISTORY TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS member_class_changes (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  old_class VARCHAR(20) CHECK (old_class IN ('Class 1', 'Class 2', 'Class 3')),
+  new_class VARCHAR(20) CHECK (new_class IN ('Class 1', 'Class 2', 'Class 3')),
+  changed_by_admin_id TEXT,
+  changed_by_name VARCHAR(255),
+  changed_by_role VARCHAR(50),
+  reason TEXT,
+  changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_member_class_changes_member ON member_class_changes(member_id);
+CREATE INDEX IF NOT EXISTS idx_member_class_changes_changed_at ON member_class_changes(changed_at);
+
+-- =============================================
+-- SPECIAL CONTRIBUTION ASSIGNMENTS
+-- =============================================
+CREATE TABLE IF NOT EXISTS special_contribution_assignments (
+  id TEXT PRIMARY KEY,
+  type_id TEXT NOT NULL,
+  member_id TEXT NOT NULL,
+  class_at_assignment VARCHAR(20) CHECK (class_at_assignment IN ('Class 1', 'Class 2', 'Class 3')),
+  expected_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  assignment_source VARCHAR(20) DEFAULT 'type_created' CHECK (assignment_source IN ('type_created', 'member_added')),
+  assigned_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_special_contribution_assignments_type ON special_contribution_assignments(type_id);
+CREATE INDEX IF NOT EXISTS idx_special_contribution_assignments_member ON special_contribution_assignments(member_id);
 
 -- =============================================
 -- ATTENDANCE TABLE

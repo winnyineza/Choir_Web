@@ -17,6 +17,7 @@ export interface Member {
   email: string;
   phone: string;
   voice: "Soprano" | "Alto" | "Tenor" | "Bass";
+  specialContributionClass?: "Class 1" | "Class 2" | "Class 3";
   status: "Active" | "Pending" | "Inactive";
   joinedDate: string;
   inviteStatus?: "not_invited" | "invited" | "accepted";
@@ -130,6 +131,10 @@ const KEYS = {
 
 export async function getAllMembers(): Promise<Member[]> {
   return dbGetAll<Member>(KEYS.MEMBERS);
+}
+
+export async function getMemberById(id: string): Promise<Member | null> {
+  return dbGetById<Member>(KEYS.MEMBERS, id);
 }
 
 export async function addMember(member: Omit<Member, "id" | "joinedDate">): Promise<Member> {
