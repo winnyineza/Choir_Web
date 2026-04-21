@@ -443,7 +443,9 @@ export async function deleteInvite(id: string): Promise<boolean> {
 // Get audit log
 export async function getAuditLog(limit: number = 100): Promise<AuditLogEntry[]> {
   const logs = await dbGetAll<AuditLogEntry>(AUDIT_LOG_KEY);
-  return logs.slice(0, limit);
+  return logs
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, limit);
 }
 
 // Add audit log entry

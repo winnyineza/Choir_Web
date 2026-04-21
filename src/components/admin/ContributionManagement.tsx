@@ -794,6 +794,13 @@ export function ContributionManagement() {
     try {
       if (specialCellPayment.editingContributionId) {
         await updateContribution(specialCellPayment.editingContributionId, { amount });
+        if (currentUser) {
+          await addAuditLog(
+            currentUser,
+            "UPDATE_CONTRIBUTION",
+            `Updated special contribution payment: ${specialCellPayment.memberName} - ${specialCellPayment.typeName} (${formatCurrency(amount)})`
+          );
+        }
       } else {
         await createContribution({
           memberId: specialCellPayment.memberId,
@@ -806,6 +813,13 @@ export function ContributionManagement() {
           paymentMethod: "cash",
           recordedBy: currentUser?.name || "Admin",
         });
+        if (currentUser) {
+          await addAuditLog(
+            currentUser,
+            "CREATE_CONTRIBUTION",
+            `Recorded special contribution payment: ${specialCellPayment.memberName} - ${specialCellPayment.typeName} (${formatCurrency(amount)})`
+          );
+        }
       }
       
       toast({
@@ -844,7 +858,15 @@ export function ContributionManagement() {
 
     setSavingSpecialPayment(true);
     try {
+      const contribution = contributions.find((entry) => entry.id === id);
       await deleteContribution(id);
+      if (currentUser) {
+        await addAuditLog(
+          currentUser,
+          "DELETE_CONTRIBUTION",
+          `Deleted special contribution payment: ${contribution?.memberName || specialCellPayment?.memberName || "Member"} - ${contribution?.typeName || specialCellPayment?.typeName || "Type"} (${formatCurrency(contribution?.amount || 0)})`
+        );
+      }
       if (specialCellPayment?.editingContributionId === id) {
         setSpecialCellPayment({ ...specialCellPayment, editingContributionId: undefined, amount: "" });
       }
@@ -993,6 +1015,13 @@ export function ContributionManagement() {
       notes: contributionForm.notes || undefined,
       recordedBy: currentUser?.name || "Admin",
     });
+    if (currentUser) {
+      await addAuditLog(
+        currentUser,
+        "CREATE_CONTRIBUTION",
+        `Recorded contribution: ${member.name} - ${type.name} (${formatCurrency(amount)})`
+      );
+    }
     
     toast({ title: "Contribution Recorded", description: `${formatCurrency(amount)} from ${member.name} recorded.` });
     setShowAddContribution(false);
@@ -1122,6 +1151,13 @@ export function ContributionManagement() {
     })) return;
 
     await deleteContribution(id);
+    if (currentUser) {
+      await addAuditLog(
+        currentUser,
+        "DELETE_CONTRIBUTION",
+        `Deleted contribution record: ${contribution?.memberName || "Member"} - ${contribution?.typeName || "Type"} (${formatCurrency(contribution?.amount || 0)})`
+      );
+    }
     toast({ title: "Deleted", description: "Contribution deleted." });
     await loadData();
   };
@@ -1145,12 +1181,26 @@ export function ContributionManagement() {
     })) return;
 
     await deleteContributionType(id);
+    if (currentUser) {
+      await addAuditLog(
+        currentUser,
+        "DELETE_CONTRIBUTION_TYPE",
+        `Deleted contribution type: ${contributionType?.name || "Unknown type"}`
+      );
+    }
     toast({ title: "Deleted", description: "Contribution type deleted." });
     await loadData();
   };
   
   const handleToggleTypeActive = async (type: ContributionType) => {
     await updateContributionType(type.id, { isActive: !type.isActive });
+    if (currentUser) {
+      await addAuditLog(
+        currentUser,
+        "TOGGLE_CONTRIBUTION_TYPE",
+        `${type.isActive ? "Deactivated" : "Activated"} contribution type: ${type.name}`
+      );
+    }
     await loadData();
     toast({ 
       title: type.isActive ? "Deactivated" : "Activated", 

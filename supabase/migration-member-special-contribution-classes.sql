@@ -30,7 +30,7 @@ BEGIN
     ALTER TABLE contributions
       ADD CONSTRAINT contributions_class_at_payment_check
       CHECK (class_at_payment IN ('Class 1', 'Class 2', 'Class 3'));
-  END IF;
+  END IF; 
 END $$;
 
 ALTER TABLE contribution_types

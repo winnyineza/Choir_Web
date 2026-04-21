@@ -88,7 +88,18 @@ const actionCategories: Record<string, { label: string; icon: typeof LogIn; colo
     label: "Contributions",
     icon: DollarSign,
     color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-    actions: ["CREATE_CONTRIBUTION", "UPDATE_CONTRIBUTION", "DELETE_CONTRIBUTION", "RECORD_CONTRIBUTIONS", "CREATE_CONTRIBUTION_TYPE", "UPDATE_CONTRIBUTION_TYPE", "DELETE_CONTRIBUTION_TYPE"],
+    actions: [
+      "CREATE_CONTRIBUTION",
+      "UPDATE_CONTRIBUTION",
+      "DELETE_CONTRIBUTION",
+      "RECORD_CONTRIBUTIONS",
+      "CREATE_CONTRIBUTION_TYPE",
+      "UPDATE_CONTRIBUTION_TYPE",
+      "DELETE_CONTRIBUTION_TYPE",
+      "TOGGLE_CONTRIBUTION_TYPE",
+      "MONTHLY_DUES_TOLERATED",
+      "MONTHLY_DUES_TOLERANCE_REMOVED",
+    ],
   },
   expenses: {
     label: "Expenses",
@@ -166,7 +177,18 @@ const actionCategories: Record<string, { label: string; icon: typeof LogIn; colo
     label: "Admin Team",
     icon: Shield,
     color: "text-slate-500 bg-slate-500/10 border-slate-500/20",
-    actions: ["CREATE_INVITE", "DELETE_INVITE", "DEACTIVATE_ADMIN", "REACTIVATE_ADMIN", "UPDATE_SETTINGS"],
+    actions: [
+      "CREATE_INVITE",
+      "DELETE_INVITE",
+      "CREATE_ADMIN_INVITE",
+      "DELETE_ADMIN_INVITE",
+      "RESEND_ADMIN_INVITE",
+      "DEACTIVATE_ADMIN",
+      "REACTIVATE_ADMIN",
+      "SEND_MEMBER_INVITE",
+      "BULK_SEND_INVITES",
+      "UPDATE_SETTINGS",
+    ],
   },
 };
 
@@ -198,6 +220,12 @@ const actionIcons: Record<string, typeof LogIn> = {
   UPDATE_CONTRIBUTION: DollarSign,
   DELETE_CONTRIBUTION: DollarSign,
   RECORD_CONTRIBUTIONS: DollarSign,
+  CREATE_CONTRIBUTION_TYPE: DollarSign,
+  UPDATE_CONTRIBUTION_TYPE: DollarSign,
+  DELETE_CONTRIBUTION_TYPE: DollarSign,
+  TOGGLE_CONTRIBUTION_TYPE: DollarSign,
+  MONTHLY_DUES_TOLERATED: DollarSign,
+  MONTHLY_DUES_TOLERANCE_REMOVED: DollarSign,
   CREATE_EXPENSE: Wallet,
   UPDATE_EXPENSE: Wallet,
   DELETE_EXPENSE: Wallet,
@@ -214,6 +242,11 @@ const actionIcons: Record<string, typeof LogIn> = {
   CREATE_DISCIPLINARY: AlertTriangle,
   UPDATE_DISCIPLINARY: AlertTriangle,
   RESOLVE_DISCIPLINARY: AlertTriangle,
+  CREATE_ADMIN_INVITE: Shield,
+  DELETE_ADMIN_INVITE: Shield,
+  RESEND_ADMIN_INVITE: Shield,
+  SEND_MEMBER_INVITE: Shield,
+  BULK_SEND_INVITES: Shield,
 };
 
 // Quick date presets
@@ -245,7 +278,7 @@ export function AuditLogPage() {
   const loadData = async () => {
     setIsLoading(true);
     const [logsData, adminsData] = await Promise.all([
-      getAuditLog(500),
+      getAuditLog(2000),
       getAllAdminUsers(),
     ]);
     setAllLogs(logsData);
