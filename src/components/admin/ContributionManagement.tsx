@@ -51,6 +51,7 @@ import {
   getAllMonthlyDuesExceptions,
   createContribution,
   deleteContribution,
+  updateContribution,
   createContributionType,
   updateContributionType,
   deleteContributionType,
@@ -174,6 +175,7 @@ export function ContributionManagement() {
     amount: string;
     expectedAmount: number;
     currentPaid: number;
+    editingContributionId?: string;
   } | null>(null);
   const [savingCellPayment, setSavingCellPayment] = useState(false);
   const [savingTolerance, setSavingTolerance] = useState(false);
@@ -761,6 +763,21 @@ export function ContributionManagement() {
       currentPaid,
     });
   };
+
+  const specialContributionRecords = specialCellPayment
+    ? contributions
+        .filter(
+          (contribution) =>
+            contribution.memberId === specialCellPayment.memberId &&
+            contribution.typeId === specialCellPayment.typeId &&
+            contribution.category === "special"
+        )
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    : [];
+
+  const editingSpecialContribution = specialCellPayment?.editingContributionId
+    ? specialContributionRecords.find((contribution) => contribution.id === specialCellPayment.editingContributionId)
+    : undefined;
   
   // Save special contribution payment
   const handleSaveSpecialPayment = async () => {
@@ -775,20 +792,24 @@ export function ContributionManagement() {
     
     setSavingSpecialPayment(true);
     try {
-      await createContribution({
-        memberId: specialCellPayment.memberId,
-        memberName: specialCellPayment.memberName,
-        memberEmail: specialCellPayment.memberEmail,
-        typeId: specialCellPayment.typeId,
-        typeName: specialCellPayment.typeName,
-        category: contributionTypes.find(t => t.id === specialCellPayment.typeId)?.category || "special",
-        amount,
-        paymentMethod: "cash",
-        recordedBy: currentUser?.name || "Admin",
-      });
+      if (specialCellPayment.editingContributionId) {
+        await updateContribution(specialCellPayment.editingContributionId, { amount });
+      } else {
+        await createContribution({
+          memberId: specialCellPayment.memberId,
+          memberName: specialCellPayment.memberName,
+          memberEmail: specialCellPayment.memberEmail,
+          typeId: specialCellPayment.typeId,
+          typeName: specialCellPayment.typeName,
+          category: contributionTypes.find(t => t.id === specialCellPayment.typeId)?.category || "special",
+          amount,
+          paymentMethod: "cash",
+          recordedBy: currentUser?.name || "Admin",
+        });
+      }
       
       toast({
-        title: "Payment Recorded",
+        title: specialCellPayment.editingContributionId ? "Payment Updated" : "Payment Recorded",
         description: `${formatCurrency(amount)} for ${specialCellPayment.memberName} - ${specialCellPayment.typeName}`,
       });
       // Send contribution receipt email for special payment
@@ -808,6 +829,29 @@ export function ContributionManagement() {
       
       setSpecialCellPayment(null);
       await loadData();
+    } finally {
+      setSavingSpecialPayment(false);
+    }
+  };
+
+  const handleDeleteSpecialPayment = async (id: string) => {
+    const shouldDelete = confirmDestructiveAction({
+      action: "delete",
+      subject: "special contribution payment",
+      warning: "This will permanently remove the selected special contribution payment.",
+    });
+    if (!shouldDelete) return;
+
+    setSavingSpecialPayment(true);
+    try {
+      await deleteContribution(id);
+      if (specialCellPayment?.editingContributionId === id) {
+        setSpecialCellPayment({ ...specialCellPayment, editingContributionId: undefined, amount: "" });
+      }
+      toast({ title: "Deleted", description: "Special contribution payment removed." });
+      await loadData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to delete payment.", variant: "destructive" });
     } finally {
       setSavingSpecialPayment(false);
     }
@@ -1113,6 +1157,23 @@ export function ContributionManagement() {
       description: `${type.name} is now ${type.isActive ? "inactive" : "active"}.` 
     });
   };
+
+  const openTypeEditor = (type: ContributionType) => {
+    setEditingType(type);
+    setTypeForm({
+      name: type.name,
+      category: type.category,
+      amount: type.amount.toString(),
+      specialAmountMode: type.specialAmountMode || "flat_per_member",
+      class1Amount: type.class1Amount?.toString() || "",
+      class2Amount: type.class2Amount?.toString() || "",
+      class3Amount: type.class3Amount?.toString() || "",
+      description: type.description || "",
+      targetAmount: type.targetAmount?.toString() || "",
+      deadline: type.deadline || "",
+    });
+    setShowAddType(true);
+  };
   
   const selectedReportType = contributionTypes.find((type) => type.id === reportTypeId);
   const statusPreviewRows = selectedReportType?.category === "monthly" ? reportStatusPreview : [];
@@ -1337,27 +1398,36 @@ export function ContributionManagement() {
                     {type.category === "monthly" ? "Monthly" : "Special"}
                   </span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-primary">{formatCurrency(type.amount)}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => {
-                      setEditingType(type);
-                      setTypeForm({
-                        name: type.name,
-                        category: type.category,
-                        amount: type.amount.toString(),
-                        description: type.description || "",
-                        targetAmount: type.targetAmount?.toString() || "",
-                        deadline: type.deadline || "",
-                      });
-                      setShowAddType(true);
-                    }}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-primary">
+                    {type.specialAmountMode === "class_based" 
+                      ? `C1: ${formatCurrency(type.class1Amount || 0)} | C2: ${formatCurrency(type.class2Amount || 0)} | C3: ${formatCurrency(type.class3Amount || 0)}`
+                      : formatCurrency(type.amount)
+                    }
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onClick={() => openTypeEditor(type)}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit Type
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleTypeActive(type)}>
+                        {type.isActive ? "Deactivate Type" : "Activate Type"}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-red-500 focus:text-red-500"
+                        onClick={() => handleDeleteType(type.id)}
+                      >
+                        Delete Type
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}
@@ -1970,27 +2040,36 @@ export function ContributionManagement() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="font-semibold text-muted-foreground">{formatCurrency(type.amount)}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => {
-                          setEditingType(type);
-                          setTypeForm({
-                            name: type.name,
-                            category: type.category,
-                            amount: type.amount.toString(),
-                            description: type.description || "",
-                            targetAmount: type.targetAmount?.toString() || "",
-                            deadline: type.deadline || "",
-                          });
-                          setShowAddType(true);
-                        }}
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-muted-foreground">
+                        {type.specialAmountMode === "class_based" 
+                          ? `C1: ${formatCurrency(type.class1Amount || 0)} | C2: ${formatCurrency(type.class2Amount || 0)} | C3: ${formatCurrency(type.class3Amount || 0)}`
+                          : formatCurrency(type.amount)
+                        }
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem onClick={() => openTypeEditor(type)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit Type
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleTypeActive(type)}>
+                            {type.isActive ? "Deactivate Type" : "Activate Type"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-500 focus:text-red-500"
+                            onClick={() => handleDeleteType(type.id)}
+                          >
+                            Delete Type
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 );
@@ -3399,10 +3478,12 @@ export function ContributionManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Target className="w-5 h-5 text-purple-500" />
-              Record Payment
+              {specialCellPayment?.editingContributionId ? "Edit Payment" : "Record Payment"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
-              Record a payment for the special contribution
+              {specialCellPayment?.editingContributionId
+                ? "Update or remove an existing special contribution payment for this member."
+                : "Record a payment for the special contribution"}
             </DialogDescription>
           </DialogHeader>
           
@@ -3412,28 +3493,76 @@ export function ContributionManagement() {
                 <p className="font-semibold text-foreground">{specialCellPayment.memberName}</p>
                 <p className="text-sm text-purple-400">{specialCellPayment.typeName}</p>
               </div>
-              
-              {/* Current progress */}
-              {specialCellPayment.currentPaid > 0 && (
-                <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                  <p className="text-sm text-yellow-500">
-                    Already paid: <span className="font-bold">{formatCurrency(specialCellPayment.currentPaid)}</span>
-                    {" "}({Math.round((specialCellPayment.currentPaid / specialCellPayment.expectedAmount) * 100)}%)
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Remaining: {formatCurrency(Math.max(0, specialCellPayment.expectedAmount - specialCellPayment.currentPaid))}
-                  </p>
+
+              {specialContributionRecords.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Existing records</p>
+                  <div className="space-y-2">
+                    {specialContributionRecords.map((record) => (
+                      <div key={record.id} className="rounded-lg border border-primary/10 bg-secondary/30 px-3 py-2">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{formatCurrency(record.amount)}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(record.createdAt).toLocaleString()}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 w-full sm:w-auto"
+                              onClick={() => setSpecialCellPayment({
+                                ...specialCellPayment,
+                                amount: record.amount.toString(),
+                                editingContributionId: record.id,
+                              })}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Update
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 w-full sm:w-auto text-red-400 border-red-500/20 hover:bg-red-500/10"
+                              onClick={() => handleDeleteSpecialPayment(record.id)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               
+              {/* Current progress */}
+              {(() => {
+                const baseCurrentPaid = specialContributionRecords.reduce((sum, contribution) => sum + contribution.amount, 0);
+                const currentPaid = editingSpecialContribution
+                  ? Math.max(0, baseCurrentPaid - editingSpecialContribution.amount)
+                  : baseCurrentPaid;
+
+                return currentPaid > 0 ? (
+                <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                  <p className="text-sm text-yellow-500">
+                    Already paid: <span className="font-bold">{formatCurrency(currentPaid)}</span>
+                    {" "}({Math.round((currentPaid / specialCellPayment.expectedAmount) * 100)}%)
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Remaining: {formatCurrency(Math.max(0, specialCellPayment.expectedAmount - currentPaid))}
+                  </p>
+                </div>
+                ) : null;
+              })()}
+              
               <div>
-                <Label>Amount to Add (RWF)</Label>
+                <Label>{specialCellPayment.editingContributionId ? "Amount (RWF)" : "Amount to Add (RWF)"}</Label>
                 <Input
                   type="number"
                   value={specialCellPayment.amount}
                   onChange={(e) => setSpecialCellPayment({ ...specialCellPayment, amount: e.target.value })}
                   className="mt-1 bg-secondary border-primary/20 text-lg font-semibold"
-                  placeholder={`Expected: ${specialCellPayment.expectedAmount}`}
+                  placeholder={specialCellPayment.editingContributionId ? "Update this record" : `Expected: ${specialCellPayment.expectedAmount}`}
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -3445,17 +3574,31 @@ export function ContributionManagement() {
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Quick amounts:</p>
                 <div className="flex gap-2 flex-wrap">
-                  {specialCellPayment.currentPaid < specialCellPayment.expectedAmount && (
+                  {(() => {
+                    const baseCurrentPaid = specialContributionRecords.reduce((sum, contribution) => sum + contribution.amount, 0);
+                    const currentPaid = editingSpecialContribution
+                      ? Math.max(0, baseCurrentPaid - editingSpecialContribution.amount)
+                      : baseCurrentPaid;
+                    return currentPaid < specialCellPayment.expectedAmount;
+                  })() && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="text-xs bg-green-500/10 border-green-500/30 text-green-500 hover:bg-green-500/20"
                       onClick={() => setSpecialCellPayment({ 
                         ...specialCellPayment, 
-                        amount: Math.max(0, specialCellPayment.expectedAmount - specialCellPayment.currentPaid).toString() 
+                        amount: (() => {
+                          const baseCurrentPaid = specialContributionRecords.reduce((sum, contribution) => sum + contribution.amount, 0);
+                          const currentPaid = editingSpecialContribution
+                            ? Math.max(0, baseCurrentPaid - editingSpecialContribution.amount)
+                            : baseCurrentPaid;
+                          return Math.max(0, specialCellPayment.expectedAmount - currentPaid).toString();
+                        })()
                       })}
                     >
-                      Complete ({formatCurrency(Math.max(0, specialCellPayment.expectedAmount - specialCellPayment.currentPaid))})
+                      Complete ({formatCurrency(Math.max(0, specialCellPayment.expectedAmount - (editingSpecialContribution
+                        ? Math.max(0, specialContributionRecords.reduce((sum, contribution) => sum + contribution.amount, 0) - editingSpecialContribution.amount)
+                        : specialContributionRecords.reduce((sum, contribution) => sum + contribution.amount, 0))))})
                     </Button>
                   )}
                   <Button
@@ -3486,7 +3629,11 @@ export function ContributionManagement() {
               {/* Preview */}
               {(() => {
                 const amountToAdd = parseFloat(specialCellPayment.amount) || 0;
-                const newTotal = specialCellPayment.currentPaid + amountToAdd;
+                const baseCurrentPaid = specialContributionRecords.reduce((sum, contribution) => sum + contribution.amount, 0);
+                const currentPaid = editingSpecialContribution
+                  ? Math.max(0, baseCurrentPaid - editingSpecialContribution.amount)
+                  : baseCurrentPaid;
+                const newTotal = currentPaid + amountToAdd;
                 const newPercent = specialCellPayment.expectedAmount > 0 
                   ? Math.round((newTotal / specialCellPayment.expectedAmount) * 100) 
                   : 0;
@@ -3516,7 +3663,11 @@ export function ContributionManagement() {
               })()}
               
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setSpecialCellPayment(null)}>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setSpecialCellPayment(null)}
+                >
                   Cancel
                 </Button>
                 <Button 
@@ -3537,7 +3688,7 @@ export function ContributionManagement() {
                   ) : (
                     <>
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Payment
+                      {specialCellPayment.editingContributionId ? "Update Payment" : "Add Payment"}
                     </>
                   )}
                 </Button>
