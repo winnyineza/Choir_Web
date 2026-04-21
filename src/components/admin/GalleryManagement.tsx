@@ -472,7 +472,7 @@ export function GalleryManagement() {
 
       {/* Add Modal */}
       <Dialog open={showAddModal} onOpenChange={(open) => { if (!open) { setShowAddModal(false); resetForm(); } }}>
-        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Add to Gallery</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">

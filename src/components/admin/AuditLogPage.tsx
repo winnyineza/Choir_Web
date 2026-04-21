@@ -890,7 +890,7 @@ export function AuditLogPage() {
       )}
 
       <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null); }}>
-        <DialogContent className="sm:max-w-xl bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-xl bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Audit Entry Details</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">

@@ -356,7 +356,7 @@ export function EventStaffManagement() {
 
       {/* Add/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-card border-primary/20">
+        <DialogContent className="sm:max-w-[500px] bg-card border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">
               {editingStaff ? "Edit Staff Member" : "Add Staff Member"}
@@ -455,7 +455,7 @@ export function EventStaffManagement() {
 
       {/* Assign Events Modal */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-card border-primary/20">
+        <DialogContent className="sm:max-w-[500px] bg-card border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">
               Assign Events to {assigningStaff?.name}

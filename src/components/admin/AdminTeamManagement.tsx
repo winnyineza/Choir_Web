@@ -599,7 +599,7 @@ export function AdminTeamManagement() {
 
       {/* Invite Modal */}
       <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
-        <DialogContent className="sm:max-w-md bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-md bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-xl gold-text">
               Invite New Admin

@@ -68,7 +68,7 @@ export function EventBookingModal({ event, isOpen, onClose }: EventBookingModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-card border-primary/20">
+      <DialogContent className="sm:max-w-[500px] bg-card border-primary/20 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">
             {isSuccess ? "Booking Confirmed!" : "Book Your Seat"}

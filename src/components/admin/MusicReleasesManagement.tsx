@@ -608,7 +608,7 @@ export function MusicReleasesManagement() {
 
       {/* Video Modal */}
       <Dialog open={showVideoModal} onOpenChange={(open) => { if (!open) { setShowVideoModal(false); resetVideoForm(); } }}>
-        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">
               {selectedVideo ? "Edit Music Video" : "Add Music Video"}

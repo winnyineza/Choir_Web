@@ -371,7 +371,7 @@ export function ContactSubmissions({ onUnreadCountChange }: ContactSubmissionsPr
 
       {/* View Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-        <DialogContent className="max-w-2xl bg-background border-primary/20">
+        <DialogContent className="max-w-2xl bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="w-5 h-5 text-primary" />

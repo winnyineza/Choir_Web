@@ -439,7 +439,7 @@ export function ExpenseManagement() {
       
       {/* Add/Edit Modal */}
       <Dialog open={showAddExpense} onOpenChange={(open) => { setShowAddExpense(open); if (!open) { setEditingExpense(null); resetForm(); } }}>
-        <DialogContent className="max-w-md bg-background border-primary/20">
+        <DialogContent className="max-w-md bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-primary" />

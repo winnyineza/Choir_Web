@@ -971,14 +971,10 @@ export function ContributionManagement() {
   
   // Handle add/edit type
   const handleSaveType = async () => {
-    if (!typeForm.name || !typeForm.amount) {
+    const isClassBasedSpecial = typeForm.category === "special" && typeForm.specialAmountMode === "class_based";
+
+    if (!typeForm.name || (!isClassBasedSpecial && !typeForm.amount)) {
       toast({ title: "Error", description: "Please fill in required fields.", variant: "destructive" });
-      return;
-    }
-    
-    const amount = parseFloat(typeForm.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Error", description: "Please enter a valid amount.", variant: "destructive" });
       return;
     }
 
@@ -986,7 +982,7 @@ export function ContributionManagement() {
     const class2Amount = typeForm.class2Amount ? parseFloat(typeForm.class2Amount) : undefined;
     const class3Amount = typeForm.class3Amount ? parseFloat(typeForm.class3Amount) : undefined;
 
-    if (typeForm.category === "special" && typeForm.specialAmountMode === "class_based") {
+    if (isClassBasedSpecial) {
       if (!class1Amount || !class2Amount || !class3Amount) {
         toast({ title: "Error", description: "Please provide amounts for Class 1, Class 2, and Class 3.", variant: "destructive" });
         return;
@@ -1004,6 +1000,12 @@ export function ContributionManagement() {
         });
         return;
       }
+    }
+
+    const amount = isClassBasedSpecial ? (class3Amount as number) : parseFloat(typeForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Error", description: "Please enter a valid amount.", variant: "destructive" });
+      return;
     }
     
     if (editingType) {
@@ -2000,7 +2002,7 @@ export function ContributionManagement() {
       
       {/* Add Contribution Modal */}
       <Dialog open={showAddContribution} onOpenChange={setShowAddContribution}>
-        <DialogContent className="max-w-md bg-background border-primary/20">
+        <DialogContent className="max-w-md bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="w-5 h-5 text-primary" />
@@ -2155,8 +2157,8 @@ export function ContributionManagement() {
       
       {/* Add/Edit Type Modal */}
       <Dialog open={showAddType} onOpenChange={(open) => { setShowAddType(open); if (!open) { setEditingType(null); resetTypeForm(); } }}>
-        <DialogContent className="max-w-md bg-background border-primary/20">
-          <DialogHeader>
+        <DialogContent className="max-w-md bg-background border-primary/20 max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6">
             <DialogTitle className="flex items-center gap-2">
               <Target className="w-5 h-5 text-primary" />
               {editingType ? "Edit" : "Add"} Contribution Type
@@ -2166,7 +2168,7 @@ export function ContributionManagement() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto px-6 pb-6">
             <div>
               <Label>Name *</Label>
               <Input
@@ -2192,17 +2194,19 @@ export function ContributionManagement() {
                 </SelectContent>
               </Select>
             </div>
-            
-            <div>
-              <Label>Amount per Member (RWF) *</Label>
-              <Input
-                type="number"
-                value={typeForm.amount}
-                onChange={(e) => setTypeForm({ ...typeForm, amount: e.target.value })}
-                className="mt-1 bg-secondary border-primary/20"
-                placeholder="5000"
-              />
-            </div>
+
+            {!(typeForm.category === "special" && typeForm.specialAmountMode === "class_based") && (
+              <div>
+                <Label>Amount per Member (RWF) *</Label>
+                <Input
+                  type="number"
+                  value={typeForm.amount}
+                  onChange={(e) => setTypeForm({ ...typeForm, amount: e.target.value })}
+                  className="mt-1 bg-secondary border-primary/20"
+                  placeholder="5000"
+                />
+              </div>
+            )}
             
             {typeForm.category !== "monthly" && (
               <>
@@ -3042,7 +3046,7 @@ export function ContributionManagement() {
           setSelectedMonths([]); 
         } 
       }}>
-        <DialogContent className="max-w-2xl bg-background border-primary/20">
+        <DialogContent className="max-w-2xl bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" />
@@ -3204,7 +3208,7 @@ export function ContributionManagement() {
 
       {/* Cell Payment Dialog */}
       <Dialog open={!!cellPayment} onOpenChange={(open) => !open && setCellPayment(null)}>
-        <DialogContent className="max-w-sm bg-background border-primary/20">
+        <DialogContent className="max-w-sm bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-primary" />
@@ -3391,7 +3395,7 @@ export function ContributionManagement() {
 
       {/* Special Contribution Payment Dialog */}
       <Dialog open={!!specialCellPayment} onOpenChange={(open) => !open && setSpecialCellPayment(null)}>
-        <DialogContent className="max-w-md bg-background border-primary/20">
+        <DialogContent className="max-w-md bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Target className="w-5 h-5 text-purple-500" />
@@ -3544,7 +3548,7 @@ export function ContributionManagement() {
       </Dialog>
       {/* Request Unlock Dialog */}
       <Dialog open={showUnlockRequest} onOpenChange={setShowUnlockRequest}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Unlock className="w-5 h-5 text-yellow-500" />

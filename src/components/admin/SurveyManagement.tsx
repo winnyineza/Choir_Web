@@ -929,7 +929,7 @@ export function SurveyManagement() {
 
       {/* Preview Modal */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="max-w-lg bg-background border-primary/20">
+        <DialogContent className="max-w-lg bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-5 h-5 text-primary" />

@@ -213,7 +213,7 @@ export function CsvImportModal({ open, onOpenChange, onSuccess }: CsvImportModal
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetState(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-primary" />

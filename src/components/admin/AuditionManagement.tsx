@@ -200,7 +200,7 @@ export function AuditionManagement() {
       </div>
 
       <Dialog open={showModal} onOpenChange={(o) => { if (!o) { resetForm(); setShowModal(false); } else setShowModal(true); }}>
-        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Audition" : "New Audition"}</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">

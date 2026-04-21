@@ -1107,7 +1107,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
 
       {/* Donation Form Dialog */}
       <Dialog open={showDonationForm} onOpenChange={setShowDonationForm}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Heart className="w-5 h-5 text-pink-500" />

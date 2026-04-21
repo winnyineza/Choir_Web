@@ -2674,7 +2674,7 @@ export default function MemberPortal() {
                     }
                   }}
                 >
-                  <DialogContent className="sm:max-w-md bg-background border-primary/20">
+                  <DialogContent className="sm:max-w-md bg-background border-primary/20 max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Pay Contribution With MTN</DialogTitle>
                       <DialogDescription>

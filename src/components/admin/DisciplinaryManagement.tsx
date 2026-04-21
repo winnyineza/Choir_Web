@@ -828,7 +828,7 @@ export function DisciplinaryManagement() {
 
       {/* View Modal */}
       <Dialog open={showViewModal} onOpenChange={(open) => { if (!open) { setShowViewModal(false); setSelectedRecord(null); } }}>
-        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-lg bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Record Details</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
@@ -926,7 +926,7 @@ export function DisciplinaryManagement() {
 
       {/* Resolve Modal */}
       <Dialog open={showResolveModal} onOpenChange={(open) => { if (!open) { setShowResolveModal(false); setSelectedRecord(null); setResolution(""); } }}>
-        <DialogContent className="sm:max-w-md bg-charcoal border-primary/20">
+        <DialogContent className="sm:max-w-md bg-charcoal border-primary/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display gold-text">Resolve Record</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
@@ -971,7 +971,7 @@ export function DisciplinaryManagement() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md bg-charcoal border-red-500/20">
+        <DialogContent className="sm:max-w-md bg-charcoal border-red-500/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-red-400">Delete Disciplinary Record</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
