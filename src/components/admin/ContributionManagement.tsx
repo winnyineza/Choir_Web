@@ -44,7 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/flutterwave";
 import { getAllMembers, getSettings, type Member } from "@/lib/dataService";
-import { addAuditLog } from "@/lib/adminService";
+import { logAuditSafely } from "@/lib/adminService";
 import {
   getAllContributions,
   getAllContributionTypes,
@@ -676,7 +676,7 @@ export function ContributionManagement() {
         recordedBy: currentUser?.name || "Admin",
       })
     ));
-    
+      void logAuditSafely(currentUser, "RECORD_CONTRIBUTIONS", `Recorded ${newMonths.length} month(s) for ${member.name}`);
     if (currentUser) {
       addAuditLog(currentUser, "RECORD_CONTRIBUTIONS", `Recorded ${newMonths.length} month(s) for ${member.name}`);
     }
@@ -794,13 +794,11 @@ export function ContributionManagement() {
     try {
       if (specialCellPayment.editingContributionId) {
         await updateContribution(specialCellPayment.editingContributionId, { amount });
-        if (currentUser) {
-          await addAuditLog(
-            currentUser,
-            "UPDATE_CONTRIBUTION",
-            `Updated special contribution payment: ${specialCellPayment.memberName} - ${specialCellPayment.typeName} (${formatCurrency(amount)})`
-          );
-        }
+        void logAuditSafely(
+          currentUser,
+          "UPDATE_CONTRIBUTION",
+          `Updated special contribution payment: ${specialCellPayment.memberName} - ${specialCellPayment.typeName} (${formatCurrency(amount)})`
+        );
       } else {
         await createContribution({
           memberId: specialCellPayment.memberId,
@@ -813,13 +811,11 @@ export function ContributionManagement() {
           paymentMethod: "cash",
           recordedBy: currentUser?.name || "Admin",
         });
-        if (currentUser) {
-          await addAuditLog(
-            currentUser,
-            "CREATE_CONTRIBUTION",
-            `Recorded special contribution payment: ${specialCellPayment.memberName} - ${specialCellPayment.typeName} (${formatCurrency(amount)})`
-          );
-        }
+        void logAuditSafely(
+          currentUser,
+          "CREATE_CONTRIBUTION",
+          `Recorded special contribution payment: ${specialCellPayment.memberName} - ${specialCellPayment.typeName} (${formatCurrency(amount)})`
+        );
       }
       
       toast({
@@ -860,13 +856,11 @@ export function ContributionManagement() {
     try {
       const contribution = contributions.find((entry) => entry.id === id);
       await deleteContribution(id);
-      if (currentUser) {
-        await addAuditLog(
-          currentUser,
-          "DELETE_CONTRIBUTION",
-          `Deleted special contribution payment: ${contribution?.memberName || specialCellPayment?.memberName || "Member"} - ${contribution?.typeName || specialCellPayment?.typeName || "Type"} (${formatCurrency(contribution?.amount || 0)})`
-        );
-      }
+      void logAuditSafely(
+        currentUser,
+        "DELETE_CONTRIBUTION",
+        `Deleted special contribution payment: ${contribution?.memberName || specialCellPayment?.memberName || "Member"} - ${contribution?.typeName || specialCellPayment?.typeName || "Type"} (${formatCurrency(contribution?.amount || 0)})`
+      );
       if (specialCellPayment?.editingContributionId === id) {
         setSpecialCellPayment({ ...specialCellPayment, editingContributionId: undefined, amount: "" });
       }
@@ -944,7 +938,7 @@ export function ContributionManagement() {
         createdBy: currentUser?.name || "Admin",
         createdByRole: currentUser?.role || "finance",
       });
-      addAuditLog(currentUser, "MONTHLY_DUES_TOLERATED", `${cellPayment.memberName} marked tolerated for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`);
+      void logAuditSafely(currentUser, "MONTHLY_DUES_TOLERATED", `${cellPayment.memberName} marked tolerated for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`);
       toast({
         title: "Marked as Tolerated",
         description: `${cellPayment.memberName} is now tolerated for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}.`,
@@ -970,7 +964,7 @@ export function ContributionManagement() {
         clearedBy: currentUser?.name || "Admin",
         clearedByRole: currentUser?.role || "finance",
       });
-      addAuditLog(currentUser, "MONTHLY_DUES_TOLERANCE_REMOVED", `${cellPayment.memberName} tolerance removed for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`);
+      void logAuditSafely(currentUser, "MONTHLY_DUES_TOLERANCE_REMOVED", `${cellPayment.memberName} tolerance removed for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}`);
       toast({
         title: "Tolerance Removed",
         description: `${cellPayment.memberName} is back to normal dues tracking for ${MONTH_NAMES[cellPayment.month - 1]} ${cellPayment.year}.`,
@@ -1015,13 +1009,11 @@ export function ContributionManagement() {
       notes: contributionForm.notes || undefined,
       recordedBy: currentUser?.name || "Admin",
     });
-    if (currentUser) {
-      await addAuditLog(
-        currentUser,
-        "CREATE_CONTRIBUTION",
-        `Recorded contribution: ${member.name} - ${type.name} (${formatCurrency(amount)})`
-      );
-    }
+    void logAuditSafely(
+      currentUser,
+      "CREATE_CONTRIBUTION",
+      `Recorded contribution: ${member.name} - ${type.name} (${formatCurrency(amount)})`
+    );
     
     toast({ title: "Contribution Recorded", description: `${formatCurrency(amount)} from ${member.name} recorded.` });
     setShowAddContribution(false);
@@ -1097,9 +1089,7 @@ export function ContributionManagement() {
       if (typeForm.category === "special" && typeForm.specialAmountMode === "class_based") {
         await createSpecialContributionAssignmentsForType(editingType.id);
       }
-      if (currentUser) {
-        addAuditLog(currentUser, "UPDATE_CONTRIBUTION_TYPE", `Updated contribution type: ${typeForm.name}`);
-      }
+      void logAuditSafely(currentUser, "UPDATE_CONTRIBUTION_TYPE", `Updated contribution type: ${typeForm.name}`);
       toast({ title: "Updated", description: "Contribution type updated." });
     } else {
       await createContributionType({
@@ -1115,9 +1105,7 @@ export function ContributionManagement() {
         targetAmount: typeForm.targetAmount ? parseFloat(typeForm.targetAmount) : undefined,
         deadline: typeForm.deadline || undefined,
       });
-      if (currentUser) {
-        addAuditLog(currentUser, "CREATE_CONTRIBUTION_TYPE", `Created contribution type: ${typeForm.name}`);
-      }
+      void logAuditSafely(currentUser, "CREATE_CONTRIBUTION_TYPE", `Created contribution type: ${typeForm.name}`);
       toast({ title: "Created", description: "Contribution type created." });
     }
     
@@ -1151,13 +1139,11 @@ export function ContributionManagement() {
     })) return;
 
     await deleteContribution(id);
-    if (currentUser) {
-      await addAuditLog(
-        currentUser,
-        "DELETE_CONTRIBUTION",
-        `Deleted contribution record: ${contribution?.memberName || "Member"} - ${contribution?.typeName || "Type"} (${formatCurrency(contribution?.amount || 0)})`
-      );
-    }
+    void logAuditSafely(
+      currentUser,
+      "DELETE_CONTRIBUTION",
+      `Deleted contribution record: ${contribution?.memberName || "Member"} - ${contribution?.typeName || "Type"} (${formatCurrency(contribution?.amount || 0)})`
+    );
     toast({ title: "Deleted", description: "Contribution deleted." });
     await loadData();
   };
@@ -1181,26 +1167,22 @@ export function ContributionManagement() {
     })) return;
 
     await deleteContributionType(id);
-    if (currentUser) {
-      await addAuditLog(
-        currentUser,
-        "DELETE_CONTRIBUTION_TYPE",
-        `Deleted contribution type: ${contributionType?.name || "Unknown type"}`
-      );
-    }
+    void logAuditSafely(
+      currentUser,
+      "DELETE_CONTRIBUTION_TYPE",
+      `Deleted contribution type: ${contributionType?.name || "Unknown type"}`
+    );
     toast({ title: "Deleted", description: "Contribution type deleted." });
     await loadData();
   };
   
   const handleToggleTypeActive = async (type: ContributionType) => {
     await updateContributionType(type.id, { isActive: !type.isActive });
-    if (currentUser) {
-      await addAuditLog(
-        currentUser,
-        "TOGGLE_CONTRIBUTION_TYPE",
-        `${type.isActive ? "Deactivated" : "Activated"} contribution type: ${type.name}`
-      );
-    }
+    void logAuditSafely(
+      currentUser,
+      "TOGGLE_CONTRIBUTION_TYPE",
+      `${type.isActive ? "Deactivated" : "Activated"} contribution type: ${type.name}`
+    );
     await loadData();
     toast({ 
       title: type.isActive ? "Deactivated" : "Activated", 

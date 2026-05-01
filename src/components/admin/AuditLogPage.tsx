@@ -59,6 +59,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   getAuditLog,
+  getAuditLogPage,
   getAllAdminUsers,
   cleanupAuditLog,
   type AuditLogEntry,
@@ -67,139 +68,37 @@ import {
 import { cn } from "@/lib/utils";
 import { downloadBrandedTableReport } from "@/lib/exportUtils";
 import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
+import { AUDIT_ACTION_CATEGORIES, getAuditCategoryKey } from "@/lib/auditLogMeta";
 
 const ITEMS_PER_PAGE = 25;
 
-// Action categories for grouping
-const actionCategories: Record<string, { label: string; icon: typeof LogIn; color: string; actions: string[] }> = {
-  auth: {
-    label: "Authentication",
-    icon: Shield,
-    color: "text-green-500 bg-green-500/10 border-green-500/20",
-    actions: ["LOGIN", "LOGOUT", "PASSWORD_CHANGE", "PASSWORD_RESET"],
-  },
-  members: {
-    label: "Members",
-    icon: Users,
-    color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-    actions: ["CREATE_MEMBER", "UPDATE_MEMBER", "DELETE_MEMBER", "BULK_UPDATE_MEMBERS", "BULK_DELETE_MEMBERS"],
-  },
-  contributions: {
-    label: "Contributions",
-    icon: DollarSign,
-    color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-    actions: [
-      "CREATE_CONTRIBUTION",
-      "UPDATE_CONTRIBUTION",
-      "DELETE_CONTRIBUTION",
-      "RECORD_CONTRIBUTIONS",
-      "CREATE_CONTRIBUTION_TYPE",
-      "UPDATE_CONTRIBUTION_TYPE",
-      "DELETE_CONTRIBUTION_TYPE",
-      "TOGGLE_CONTRIBUTION_TYPE",
-      "MONTHLY_DUES_TOLERATED",
-      "MONTHLY_DUES_TOLERANCE_REMOVED",
-    ],
-  },
-  expenses: {
-    label: "Expenses",
-    icon: Wallet,
-    color: "text-red-500 bg-red-500/10 border-red-500/20",
-    actions: ["CREATE_EXPENSE", "UPDATE_EXPENSE", "DELETE_EXPENSE"],
-  },
-  donations: {
-    label: "Donations",
-    icon: DollarSign,
-    color: "text-pink-500 bg-pink-500/10 border-pink-500/20",
-    actions: ["CREATE_DONATION", "UPDATE_DONATION", "DELETE_DONATION"],
-  },
-  events: {
-    label: "Events & Tickets",
-    icon: Ticket,
-    color: "text-purple-500 bg-purple-500/10 border-purple-500/20",
-    actions: ["CREATE_EVENT", "UPDATE_EVENT", "DELETE_EVENT", "SCAN_TICKET"],
-  },
-  leave: {
-    label: "Leave Requests",
-    icon: CalendarCheck,
-    color: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20",
-    actions: ["APPROVE_LEAVE", "DENY_LEAVE", "CREATE_LEAVE"],
-  },
-  gallery: {
-    label: "Gallery",
-    icon: Image,
-    color: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20",
-    actions: ["ADD_GALLERY", "DELETE_GALLERY", "BULK_DELETE_GALLERY", "UPLOAD_GALLERY"],
-  },
-  music: {
-    label: "Music Releases",
-    icon: Music,
-    color: "text-violet-500 bg-violet-500/10 border-violet-500/20",
-    actions: ["CREATE_ALBUM", "UPDATE_ALBUM", "DELETE_ALBUM", "CREATE_VIDEO", "UPDATE_VIDEO", "DELETE_VIDEO"],
-  },
-  announcements: {
-    label: "Announcements",
-    icon: Megaphone,
-    color: "text-orange-500 bg-orange-500/10 border-orange-500/20",
-    actions: ["CREATE_ANNOUNCEMENT", "UPDATE_ANNOUNCEMENT", "DELETE_ANNOUNCEMENT", "TOGGLE_ANNOUNCEMENT_PIN", "TOGGLE_ANNOUNCEMENT_ACTIVE"],
-  },
-  disciplinary: {
-    label: "Disciplinary",
-    icon: AlertTriangle,
-    color: "text-red-600 bg-red-600/10 border-red-600/20",
-    actions: ["CREATE_DISCIPLINARY", "UPDATE_DISCIPLINARY", "DELETE_DISCIPLINARY", "RESOLVE_DISCIPLINARY"],
-  },
-  documents: {
-    label: "Documents",
-    icon: FileText,
-    color: "text-teal-500 bg-teal-500/10 border-teal-500/20",
-    actions: ["UPLOAD_DOCUMENT", "UPDATE_DOCUMENT", "DELETE_DOCUMENT", "TOGGLE_DOCUMENT_VISIBILITY"],
-  },
-  meetings: {
-    label: "Meetings",
-    icon: MessageSquare,
-    color: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
-    actions: ["CREATE_MEETING", "UPDATE_MEETING", "DELETE_MEETING", "APPROVE_MEETING"],
-  },
-  inventory: {
-    label: "Inventory",
-    icon: Package,
-    color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-    actions: ["CREATE_INVENTORY", "UPDATE_INVENTORY", "DELETE_INVENTORY", "ASSIGN_INVENTORY", "RETURN_INVENTORY"],
-  },
-  promos: {
-    label: "Promos",
-    icon: Zap,
-    color: "text-lime-500 bg-lime-500/10 border-lime-500/20",
-    actions: ["CREATE_PROMO", "UPDATE_PROMO", "DELETE_PROMO", "TOGGLE_PROMO"],
-  },
-  admin: {
-    label: "Admin Team",
-    icon: Shield,
-    color: "text-slate-500 bg-slate-500/10 border-slate-500/20",
-    actions: [
-      "CREATE_INVITE",
-      "DELETE_INVITE",
-      "CREATE_ADMIN_INVITE",
-      "DELETE_ADMIN_INVITE",
-      "RESEND_ADMIN_INVITE",
-      "DEACTIVATE_ADMIN",
-      "REACTIVATE_ADMIN",
-      "SEND_MEMBER_INVITE",
-      "BULK_SEND_INVITES",
-      "UPDATE_SETTINGS",
-    ],
-  },
+const categoryIcons: Record<string, typeof LogIn> = {
+  auth: Shield,
+  members: Users,
+  contributions: DollarSign,
+  expenses: Wallet,
+  donations: DollarSign,
+  events: Ticket,
+  leave: CalendarCheck,
+  gallery: Image,
+  music: Music,
+  announcements: Megaphone,
+  disciplinary: AlertTriangle,
+  documents: FileText,
+  meetings: MessageSquare,
+  inventory: Package,
+  promos: Zap,
+  admin: Shield,
 };
 
-// Get action category and color
 const getActionCategory = (action: string): { category: string; color: string; icon: typeof LogIn } => {
-  for (const [key, cat] of Object.entries(actionCategories)) {
-    if (cat.actions.some(a => action.includes(a) || action === a)) {
-      return { category: key, color: cat.color, icon: cat.icon };
-    }
-  }
-  return { category: "other", color: "text-muted-foreground bg-muted/10 border-muted/20", icon: History };
+  const category = getAuditCategoryKey(action);
+  const meta = AUDIT_ACTION_CATEGORIES[category];
+  return {
+    category,
+    color: meta?.color || "text-muted-foreground bg-muted/10 border-muted/20",
+    icon: categoryIcons[category] || History,
+  };
 };
 
 // Action icons mapping
@@ -260,6 +159,8 @@ const datePresets = [
 
 export function AuditLogPage() {
   const [allLogs, setAllLogs] = useState<AuditLogEntry[]>([]);
+  const [pagedLogs, setPagedLogs] = useState<AuditLogEntry[]>([]);
+  const [filteredTotal, setFilteredTotal] = useState(0);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<string>("all");
@@ -278,7 +179,7 @@ export function AuditLogPage() {
   const loadData = async () => {
     setIsLoading(true);
     const [logsData, adminsData] = await Promise.all([
-      getAuditLog(2000),
+      getAuditLog(500),
       getAllAdminUsers(),
     ]);
     setAllLogs(logsData);
@@ -286,9 +187,31 @@ export function AuditLogPage() {
     setIsLoading(false);
   };
 
+  const loadPagedLogs = async () => {
+    setIsLoading(true);
+    const result = await getAuditLogPage({
+      page: currentPage,
+      pageSize: ITEMS_PER_PAGE,
+      searchQuery,
+      userId: selectedUser,
+      action: selectedAction,
+      category: selectedCategory,
+      dateFrom,
+      dateTo,
+    });
+
+    setPagedLogs(result.logs);
+    setFilteredTotal(result.total);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    loadPagedLogs();
+  }, [searchQuery, selectedUser, selectedAction, selectedCategory, dateFrom, dateTo, currentPage]);
 
   // Get unique action types from logs
   const actionTypes = useMemo(() => {
@@ -324,54 +247,6 @@ export function AuditLogPage() {
     return Object.values(userCounts).sort((a, b) => b.count - a.count).slice(0, 3);
   }, [allLogs]);
 
-  // Filter logs
-  const filteredLogs = useMemo(() => {
-    return allLogs.filter(log => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch = 
-          log.userName.toLowerCase().includes(query) ||
-          log.userEmail.toLowerCase().includes(query) ||
-          log.action.toLowerCase().includes(query) ||
-          log.details.toLowerCase().includes(query);
-        if (!matchesSearch) return false;
-      }
-      
-      // User filter
-      if (selectedUser !== "all" && log.userId !== selectedUser) {
-        return false;
-      }
-      
-      // Category filter
-      if (selectedCategory !== "all") {
-        const { category } = getActionCategory(log.action);
-        if (category !== selectedCategory) return false;
-      }
-      
-      // Action filter
-      if (selectedAction !== "all" && log.action !== selectedAction) {
-        return false;
-      }
-      
-      // Date from filter
-      if (dateFrom) {
-        const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
-        const fromDate = new Date(dateFrom).setHours(0, 0, 0, 0);
-        if (logDate < fromDate) return false;
-      }
-      
-      // Date to filter
-      if (dateTo) {
-        const logDate = new Date(log.timestamp).setHours(23, 59, 59, 999);
-        const toDate = new Date(dateTo).setHours(23, 59, 59, 999);
-        if (logDate > toDate) return false;
-      }
-      
-      return true;
-    });
-  }, [allLogs, searchQuery, selectedUser, selectedAction, selectedCategory, dateFrom, dateTo]);
-
   // Count active filters
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -384,11 +259,7 @@ export function AuditLogPage() {
   }, [searchQuery, selectedUser, selectedCategory, selectedAction, dateFrom, dateTo]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
-  const paginatedLogs = filteredLogs.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / ITEMS_PER_PAGE));
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -420,9 +291,20 @@ export function AuditLogPage() {
     return formatDate(date);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    const exportResult = await getAuditLogPage({
+      page: 1,
+      pageSize: 250,
+      searchQuery,
+      userId: selectedUser,
+      action: selectedAction,
+      category: selectedCategory,
+      dateFrom,
+      dateTo,
+    });
+
     const headers = ["Timestamp", "User", "Email", "Action", "Details"];
-    const rows = filteredLogs.map(log => [
+    const rows = exportResult.logs.map(log => [
       new Date(log.timestamp).toISOString(),
       log.userName,
       log.userEmail,
@@ -441,14 +323,14 @@ export function AuditLogPage() {
         { label: "Generated", value: new Date().toLocaleString() },
       ],
       summary: [
-        { label: "Entries", value: filteredLogs.length },
+        { label: "Entries", value: exportResult.total },
         { label: "Page", value: currentPage },
       ],
     });
 
     toast({
       title: "Export Complete",
-      description: `Exported ${filteredLogs.length} log entries`,
+      description: `Exported ${exportResult.logs.length} log entries`,
     });
   };
 
@@ -463,6 +345,7 @@ export function AuditLogPage() {
     
     cleanupAuditLog();
     loadData();
+    loadPagedLogs();
     toast({
       title: "Cleanup Complete",
       description: "Old audit logs have been removed",
@@ -543,7 +426,7 @@ export function AuditLogPage() {
         <div className="card-glass rounded-xl p-3">
           <div className="flex items-center justify-between">
             <Filter className="w-4 h-4 text-blue-500" />
-            <span className="text-xl font-bold text-blue-500">{filteredLogs.length.toLocaleString()}</span>
+            <span className="text-xl font-bold text-blue-500">{filteredTotal.toLocaleString()}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Filtered</p>
         </div>
@@ -572,8 +455,8 @@ export function AuditLogPage() {
 
       {/* Category Quick Stats */}
       <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
-        {Object.entries(actionCategories).slice(0, 8).map(([key, cat]) => {
-          const CatIcon = cat.icon;
+        {Object.entries(AUDIT_ACTION_CATEGORIES).slice(0, 8).map(([key, cat]) => {
+          const CatIcon = categoryIcons[key] || History;
           const count = categoryStats[key] || 0;
           return (
             <button
@@ -744,7 +627,7 @@ export function AuditLogPage() {
                 )}
                 {selectedCategory !== "all" && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
-                    Category: {actionCategories[selectedCategory]?.label}
+                    Category: {AUDIT_ACTION_CATEGORIES[selectedCategory]?.label}
                     <button onClick={() => setSelectedCategory("all")}><X className="w-3 h-3" /></button>
                   </span>
                 )}
@@ -796,8 +679,8 @@ export function AuditLogPage() {
 
       {/* Log Entries */}
       <div className="space-y-2">
-        {paginatedLogs.length > 0 ? (
-          paginatedLogs.map((log, idx) => {
+        {pagedLogs.length > 0 ? (
+          pagedLogs.map((log, idx) => {
             const ActionIcon = getActionIcon(log.action);
             const { color: categoryColor } = getActionCategory(log.action);
             
@@ -813,7 +696,7 @@ export function AuditLogPage() {
                 {/* Timeline indicator */}
                 <div className="hidden sm:flex flex-col items-center self-stretch">
                   <div className={cn("w-2 h-2 rounded-full", categoryColor.split(" ")[0].replace("text-", "bg-"))} />
-                  {idx < paginatedLogs.length - 1 && (
+                  {idx < pagedLogs.length - 1 && (
                     <div className="w-0.5 flex-1 bg-primary/10 mt-1" />
                   )}
                 </div>
@@ -870,7 +753,7 @@ export function AuditLogPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-4 border-t border-primary/10">
           <p className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length}
+            Showing {filteredTotal === 0 ? 0 : ((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredTotal)} of {filteredTotal}
           </p>
           
           <div className="flex items-center gap-2">

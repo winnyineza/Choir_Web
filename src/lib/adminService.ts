@@ -3,7 +3,8 @@
 
 import bcrypt from "bcryptjs";
 import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, generateId } from './supabaseDB';
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
+import { getActionsForAuditCategory } from './auditLogMeta';
 
 const ADMIN_USERS_KEY = "choir_admin_users";
 const SALT_ROUNDS = 10;
@@ -84,6 +85,24 @@ export interface AuditLogEntry {
   details: string;
   timestamp: string;
   ipAddress?: string;
+}
+
+export interface AuditLogQueryOptions {
+  page?: number;
+  pageSize?: number;
+  searchQuery?: string;
+  userId?: string;
+  action?: string;
+  category?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface AuditLogPageResult {
+  logs: AuditLogEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface PasswordResetToken {
@@ -467,6 +486,109 @@ export async function addAuditLog(
     ...entry,
     id: `log-${Date.now()}`,
   });
+}
+
+export async function logAuditSafely(
+  user: { id: string; email: string; name: string } | null | undefined,
+  action: string,
+  details: string
+): Promise<boolean> {
+  if (!user) return false;
+
+  try {
+    await addAuditLog(user, action, details);
+    return true;
+  } catch (error) {
+    console.warn("[Audit] Failed to record audit log", { action, details, error });
+    return false;
+  }
+}
+
+export async function getAuditLogPage(options: AuditLogQueryOptions = {}): Promise<AuditLogPageResult> {
+  const page = Math.max(1, options.page || 1);
+  const pageSize = Math.max(1, Math.min(250, options.pageSize || 25));
+
+  if (!isSupabaseConfigured()) {
+    const allLogs = await getAuditLog(5000);
+    const fallback = allLogs.slice((page - 1) * pageSize, page * pageSize);
+    return {
+      logs: fallback,
+      total: allLogs.length,
+      page,
+      pageSize,
+    };
+  }
+
+  let query = supabase
+    .from('audit_logs')
+    .select('*', { count: 'exact' });
+
+  if (options.userId && options.userId !== 'all') {
+    query = query.eq('user_id', options.userId);
+  }
+
+  if (options.action && options.action !== 'all') {
+    query = query.eq('action', options.action);
+  }
+
+  if (options.category && options.category !== 'all') {
+    const categoryActions = getActionsForAuditCategory(options.category);
+    if (categoryActions.length > 0) {
+      query = query.in('action', categoryActions);
+    }
+  }
+
+  if (options.dateFrom) {
+    query = query.gte('created_at', `${options.dateFrom}T00:00:00.000Z`);
+  }
+
+  if (options.dateTo) {
+    query = query.lte('created_at', `${options.dateTo}T23:59:59.999Z`);
+  }
+
+  if (options.searchQuery) {
+    const search = options.searchQuery.replace(/,/g, ' ').trim();
+    if (search) {
+      query = query.or(
+        `user_name.ilike.%${search}%,user_email.ilike.%${search}%,action.ilike.%${search}%,details.ilike.%${search}%`
+      );
+    }
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    console.error('[Audit] Failed to fetch paged logs:', error.message);
+    return {
+      logs: [],
+      total: 0,
+      page,
+      pageSize,
+    };
+  }
+
+  const logs: AuditLogEntry[] = (data || []).map((row: any) => ({
+    id: row.id,
+    userId: row.user_id,
+    userEmail: row.user_email,
+    userName: row.user_name,
+    action: row.action,
+    details: row.details || '',
+    ipAddress: row.ip_address || '',
+    timestamp: row.created_at,
+  }));
+
+  return {
+    logs,
+    total: count || 0,
+    page,
+    pageSize,
+  };
 }
 
 // Clear old audit logs (older than 90 days)
