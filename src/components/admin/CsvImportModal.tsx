@@ -17,7 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createMember, getAllMembers, type Member } from "@/lib/dataService";
+import { addMember, getAllMembers, type Member } from "@/lib/dataService";
 import { cn } from "@/lib/utils";
 
 interface CsvImportModalProps {
@@ -167,7 +167,7 @@ export function CsvImportModal({ open, onOpenChange, onSuccess }: CsvImportModal
       }
 
       try {
-        await createMember({
+        await addMember({
           name: member.name,
           email: member.email,
           phone: member.phone,

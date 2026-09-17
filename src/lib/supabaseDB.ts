@@ -2,7 +2,7 @@
 // All functions are async - NO localStorage dependency
 // Uses table mappings from supabaseSync.ts for camelCase ↔ snake_case conversion
 
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, supabaseUntyped, isSupabaseConfigured } from './supabase';
 import { SYNC_CONFIG } from './supabaseSync';
 
 // ============ HELPERS ============
@@ -14,7 +14,6 @@ export function generateId(): string {
 function getConfig(storageKey: string) {
   const config = SYNC_CONFIG[storageKey];
   if (!config) throw new Error(`[DB] No config for key: ${storageKey}`);
-  if (!isSupabaseConfigured()) throw new Error('[DB] Supabase not configured');
   return config;
 }
 
@@ -76,6 +75,8 @@ export function invalidateCache(storageKey?: string): void {
 
 /** Get all rows from a table (with in-memory caching + request deduplication) */
 export async function dbGetAll<T>(storageKey: string): Promise<T[]> {
+  if (!isSupabaseConfigured()) return [];
+
   // Check cache first
   const cached = getCached<T[]>(storageKey);
   if (cached) return cached;
@@ -87,7 +88,7 @@ export async function dbGetAll<T>(storageKey: string): Promise<T[]> {
   const request = (async () => {
     try {
       const config = getConfig(storageKey);
-      let query = supabase.from(config.table).select('*');
+      let query = supabaseUntyped.from(config.table).select('*');
       if (config.orderBy) {
         query = query.order(config.orderBy, { ascending: config.orderAsc ?? true });
       }
@@ -113,9 +114,10 @@ export async function dbGetAll<T>(storageKey: string): Promise<T[]> {
 
 /** Get a single row by ID */
 export async function dbGetById<T>(storageKey: string, id: string): Promise<T | null> {
+  if (!isSupabaseConfigured()) return null;
   try {
     const config = getConfig(storageKey);
-    const { data, error } = await supabase
+    const { data, error } = await supabaseUntyped
       .from(config.table)
       .select('*')
       .eq('id', id)
@@ -129,6 +131,7 @@ export async function dbGetById<T>(storageKey: string, id: string): Promise<T | 
 
 /** Query rows by a column value (use DB column name) */
 export async function dbQuery<T>(storageKey: string, column: string, value: any): Promise<T[]> {
+  if (!isSupabaseConfigured()) return [];
   const cacheKey = createQueryCacheKey(storageKey, column, value);
   const cached = getCached<T[]>(cacheKey);
   if (cached) return cached;
@@ -139,7 +142,7 @@ export async function dbQuery<T>(storageKey: string, column: string, value: any)
   const request = (async () => {
   try {
     const config = getConfig(storageKey);
-    const { data, error } = await supabase
+    const { data, error } = await supabaseUntyped
       .from(config.table)
       .select('*')
       .eq(column, value);
@@ -160,12 +163,13 @@ export async function dbQuery<T>(storageKey: string, column: string, value: any)
 
 /** Insert a new row */
 export async function dbInsert<T>(storageKey: string, item: any): Promise<T> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
   const config = getConfig(storageKey);
   const dbItem = config.toDb({ ...item, id: item.id || generateId() });
   // Remove undefined values
   Object.keys(dbItem).forEach(k => dbItem[k] === undefined && delete dbItem[k]);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseUntyped
     .from(config.table)
     .insert(dbItem)
     .select()
@@ -177,11 +181,12 @@ export async function dbInsert<T>(storageKey: string, item: any): Promise<T> {
 
 /** Update an existing row */
 export async function dbUpdate<T>(storageKey: string, id: string, updates: any): Promise<T> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
   const config = getConfig(storageKey);
   const dbItem = config.toDb(updates);
   Object.keys(dbItem).forEach(k => dbItem[k] === undefined && delete dbItem[k]);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseUntyped
     .from(config.table)
     .update(dbItem)
     .eq('id', id)
@@ -194,11 +199,12 @@ export async function dbUpdate<T>(storageKey: string, id: string, updates: any):
 
 /** Upsert (insert or update) a row */
 export async function dbUpsert<T>(storageKey: string, item: any): Promise<T> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
   const config = getConfig(storageKey);
   const dbItem = config.toDb({ ...item, id: item.id || generateId() });
   Object.keys(dbItem).forEach(k => dbItem[k] === undefined && delete dbItem[k]);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseUntyped
     .from(config.table)
     .upsert(dbItem, { onConflict: 'id' })
     .select()
@@ -210,8 +216,9 @@ export async function dbUpsert<T>(storageKey: string, item: any): Promise<T> {
 
 /** Delete a row by ID */
 export async function dbDelete(storageKey: string, id: string): Promise<void> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
   const config = getConfig(storageKey);
-  const { error } = await supabase
+  const { error } = await supabaseUntyped
     .from(config.table)
     .delete()
     .eq('id', id);
@@ -221,8 +228,9 @@ export async function dbDelete(storageKey: string, id: string): Promise<void> {
 
 /** Delete rows matching a condition */
 export async function dbDeleteWhere(storageKey: string, column: string, value: any): Promise<void> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
   const config = getConfig(storageKey);
-  const { error } = await supabase
+  const { error } = await supabaseUntyped
     .from(config.table)
     .delete()
     .eq(column, value);
@@ -232,9 +240,10 @@ export async function dbDeleteWhere(storageKey: string, column: string, value: a
 
 /** Count rows in a table */
 export async function dbCount(storageKey: string): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
   try {
     const config = getConfig(storageKey);
-    const { count, error } = await supabase
+    const { count, error } = await supabaseUntyped
       .from(config.table)
       .select('*', { count: 'exact', head: true });
     if (error) return 0;
@@ -301,7 +310,7 @@ export async function dbSaveSettings(settings: Record<string, any>): Promise<voi
 // ============ RAW SUPABASE ACCESS ============
 // For complex queries that don't fit the generic CRUD pattern
 
-export { supabase, isSupabaseConfigured };
+export { supabase, supabaseUntyped, isSupabaseConfigured };
 export function getTableName(storageKey: string): string {
   return SYNC_CONFIG[storageKey]?.table || storageKey;
 }

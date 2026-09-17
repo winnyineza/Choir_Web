@@ -6,11 +6,12 @@ import { supabase, isSupabaseConfigured } from './supabase';
 // VAPID public key for Web Push (generated via web-push generate-vapid-keys)
 const VAPID_PUBLIC_KEY = 'BDACvyDTUHfI4ELQz6yaYei5gRBLR3Vm27-Ga_bkCwJK4wHiUJhas2vXTqArZkr0x7JymjODZaAvENkLiLOQfik';
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
+  // Backed by a plain ArrayBuffer so it satisfies BufferSource for pushManager.subscribe.
+  const outputArray = new Uint8Array(new ArrayBuffer(rawData.length));
   for (let i = 0; i < rawData.length; ++i) {
     outputArray[i] = rawData.charCodeAt(i);
   }
@@ -95,8 +96,9 @@ export async function showNotification(options: PushNotificationOptions): Promis
       tag: options.tag,
       data: options.data,
       requireInteraction: options.requireInteraction,
+      // Service-worker notifications accept `actions`, but lib.dom's NotificationOptions omits it.
       actions: options.actions,
-    });
+    } as NotificationOptions);
     
     return true;
   } catch (error) {

@@ -338,7 +338,8 @@ export async function castVote(
     isDisciplinaryLeaveRequester(request, admins)
   );
 
-  let newStatus = request.status;
+  // Annotated because `request.status` is narrowed to the not-yet-final states above.
+  let newStatus: LeaveRequest['status'] = request.status;
   let reviewedAt = request.reviewedAt;
 
   if (denialCount >= requiredDenials) {

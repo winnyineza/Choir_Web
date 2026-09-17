@@ -88,6 +88,7 @@ export function MeetingMinutesComponent() {
     connected: false,
     googleEmail: null,
     connectedAt: null,
+    calendarId: null,
   });
   const [googleBusy, setGoogleBusy] = useState(false);
 
@@ -174,7 +175,7 @@ export function MeetingMinutesComponent() {
         const status = await getGoogleConnectionStatus(currentUser.id);
         setGoogleConnection(status);
       } catch {
-        setGoogleConnection({ connected: false, googleEmail: null, connectedAt: null });
+        setGoogleConnection({ connected: false, googleEmail: null, connectedAt: null, calendarId: null });
       }
     }
 

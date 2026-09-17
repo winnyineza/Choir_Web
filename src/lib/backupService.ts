@@ -3,7 +3,7 @@
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { supabase, isSupabaseConfigured } from './supabaseDB';
+import { supabase, supabaseUntyped, isSupabaseConfigured } from './supabaseDB';
 
 const LAST_BACKUP_KEY = 'choir_last_backup';
 
@@ -60,7 +60,7 @@ export async function exportSupabaseBackup(): Promise<BackupData> {
 
   for (const table of SUPABASE_TABLES) {
     try {
-      const { data: tableData, error } = await supabase.from(table).select('*');
+      const { data: tableData, error } = await supabaseUntyped.from(table).select('*');
 
       if (!error && tableData) {
         data[table] = tableData;
@@ -150,7 +150,7 @@ export async function downloadBackup(
 function toCsv(records: any[]): string {
   if (!records || records.length === 0) return '';
   const headers = Array.from(
-    records.reduce((keys, row) => {
+    records.reduce<Set<string>>((keys, row) => {
       Object.keys(row || {}).forEach((k) => keys.add(k));
       return keys;
     }, new Set<string>())
@@ -247,7 +247,7 @@ export async function restoreToSupabase(backupData: BackupData): Promise<{
     if (!tableName || !records || records.length === 0) continue;
 
     try {
-      const { error } = await supabase
+      const { error } = await supabaseUntyped
         .from(tableName)
         .upsert(records, { onConflict: 'id' });
 
@@ -332,7 +332,7 @@ export async function getBackupStats(): Promise<{
   let tables = 0;
   for (const table of SUPABASE_TABLES) {
     try {
-      const { count, error } = await supabase
+      const { count, error } = await supabaseUntyped
         .from(table)
         .select('*', { count: 'exact', head: true });
 

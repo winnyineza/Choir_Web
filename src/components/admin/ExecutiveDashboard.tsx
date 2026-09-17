@@ -154,7 +154,10 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
 
     // Ticket stats
     const ticketedEvents = getTicketedEvents(events).length;
-    const totalTicketsSold = confirmedOrders.reduce((sum, o) => sum + (o.ticketQuantity || 0), 0);
+    const totalTicketsSold = confirmedOrders.reduce(
+      (sum, o) => sum + o.tickets.reduce((n, t) => n + t.quantity, 0),
+      0
+    );
     const usedTickets = orders.filter(o => o.status === "used").length;
     const avgCheckInRate = confirmedOrders.length > 0 ? (usedTickets / confirmedOrders.length * 100) : 0;
 
@@ -223,7 +226,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
         .reduce((sum, d) => sum + d.amount, 0) +
         confirmedOrders
         .filter(o => o.createdAt >= monthStart && o.createdAt < monthEnd)
-        .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+        .reduce((sum, o) => sum + (o.total || 0), 0);
       
       const monthExpenses = expenses
         .filter(e => e.date >= monthStart.split('T')[0] && e.date < monthEnd.split('T')[0])

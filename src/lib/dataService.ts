@@ -1,6 +1,6 @@
 // Data Service - Supabase-based data management (NO localStorage)
 
-import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbGetSettings, dbSaveSettings, generateId, supabase } from './supabaseDB';
+import { dbGetAll, dbGetById, dbInsert, dbUpdate, dbDelete, dbQuery, dbGetSettings, dbSaveSettings, generateId, supabase, supabaseUntyped } from './supabaseDB';
 
 // ============ TYPES ============
 
@@ -476,7 +476,7 @@ export async function getDonationStats() {
 
 // ============ SETTINGS ============
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   choirName: "The Serenades of Praise Choir",
   email: "theserenadeschoir@gmail.com",
   phone: "+250 780 623 144",
@@ -531,7 +531,7 @@ export async function clearAllData(): Promise<void> {
   // Delete all rows from core tables
   const tables = ['members', 'events', 'gallery_items', 'donations', 'event_staff', 'scan_records'];
   for (const table of tables) {
-    await supabase.from(table).delete().neq('id', '');
+    await supabaseUntyped.from(table).delete().neq('id', '');
   }
 }
 

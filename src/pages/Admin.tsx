@@ -62,6 +62,7 @@ import {
   getAllEvents,
   getAllGalleryItems,
   getDashboardStats,
+  updateMember,
   deleteMember,
   deleteEvent,
   deleteGalleryItem,
@@ -98,7 +99,6 @@ import {
   getPendingLeaveRequests,
   approveLeaveRequest,
   denyLeaveRequest,
-  getLeaveRequestStats,
   hasAdminVoted,
   getApprovalProgress,
   getLeaveApprovalRequirements,
@@ -184,7 +184,7 @@ import {
 } from "@/lib/notificationEmailService";
 import { getAllDonations } from "@/lib/donationService";
 import { BarChart3, Shield, History, Wallet, Receipt, PiggyBank, X, TrendingUp, TrendingDown, ThumbsUp, ThumbsDown, Info, AlertTriangle } from "lucide-react";
-import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, isReviewer, changePassword, updateAdminUser, getAdminById, getAllAdminUsers, canApproveLeaveRequest, isDisciplinaryLeaveRequester, adminMatchesLeaveRequester, type AdminUser } from "@/lib/adminService";
+import { addAuditLog, getAccessibleTabs, hasPermission, getRoleLabel, canEditMembers, hasWriteAccess, changePassword, updateAdminUser, getAdminById, getAllAdminUsers, canApproveLeaveRequest, isDisciplinaryLeaveRequester, adminMatchesLeaveRequester, type AdminUser } from "@/lib/adminService";
 const ContactSubmissions = lazy(() => import("@/components/admin/ContactSubmissions").then(m => ({ default: m.ContactSubmissions })));
 import { getUnreadCount as getUnreadContactCount } from "@/lib/contactService";
 const ExpenseManagement = lazy(() => import("@/components/admin/ExpenseManagement").then(m => ({ default: m.ExpenseManagement })));
@@ -1514,9 +1514,6 @@ export default function Admin() {
                   <span className="ml-auto px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-medium">
                     {unreadMessages}
                   </span>
-                )}
-                {item.superAdminOnly && (
-                  <Shield className="w-3 h-3 ml-auto text-primary" />
                 )}
               </button>
               );
@@ -3624,29 +3621,30 @@ export default function Admin() {
                                             currentUser?.name || "Admin"
                                           );
                                           refreshTabData("leave");
-                                          if (result && 'error' in result) {
+                                          if (!result) return;
+                                          if ('error' in result) {
                                             toast({
                                               title: "Error",
                                               description: result.error,
                                               variant: "destructive",
                                             });
-                                          } else if (result) {
-                                            if (currentUser) {
-                                              addAuditLog(currentUser, "APPROVE_LEAVE", `Approved leave request for: ${request.memberName}`);
-                                            }
-                                            const progress = getApprovalProgress(result, requirements);
-                                            if (result.status === "approved") {
-                                              toast({
-                                                title: "Leave Fully Approved!",
-                                                description: `${request.memberName}'s leave request has been approved (${progress.approvals}/${progress.required}).`,
-                                              });
-                                              notifyLeaveRequestDecision(request.memberEmail, request.memberName, request.startDate, request.endDate, "approved", currentUser?.name);
-                                            } else {
-                                              toast({
-                                                title: "Vote Recorded",
-                                                description: `Your approval has been recorded (${progress.approvals}/${progress.required}).`,
-                                              });
-                                            }
+                                            return;
+                                          }
+                                          if (currentUser) {
+                                            addAuditLog(currentUser, "APPROVE_LEAVE", `Approved leave request for: ${request.memberName}`);
+                                          }
+                                          const progress = getApprovalProgress(result, requirements);
+                                          if (result.status === "approved") {
+                                            toast({
+                                              title: "Leave Fully Approved!",
+                                              description: `${request.memberName}'s leave request has been approved (${progress.approvals}/${progress.required}).`,
+                                            });
+                                            notifyLeaveRequestDecision(request.memberEmail, request.memberName, request.startDate, request.endDate, "approved", currentUser?.name);
+                                          } else {
+                                            toast({
+                                              title: "Vote Recorded",
+                                              description: `Your approval has been recorded (${progress.approvals}/${progress.required}).`,
+                                            });
                                           }
                                         }}
                                         title="Approve"
@@ -3675,29 +3673,30 @@ export default function Admin() {
                                             notes || undefined
                                           );
                                           refreshTabData("leave");
-                                          if (result && 'error' in result) {
+                                          if (!result) return;
+                                          if ('error' in result) {
                                             toast({
                                               title: "Error",
                                               description: result.error,
                                               variant: "destructive",
                                             });
-                                          } else if (result) {
-                                            if (currentUser) {
-                                              addAuditLog(currentUser, "DENY_LEAVE", `Denied leave request for: ${request.memberName}`);
-                                            }
-                                            const progress = getApprovalProgress(result, requirements);
-                                            if (result.status === "denied") {
-                                              toast({
-                                                title: "Leave Denied",
-                                                description: `${request.memberName}'s leave request has been denied (${progress.denials}/${progress.requiredDenials} denials).`,
-                                              });
-                                              notifyLeaveRequestDecision(request.memberEmail, request.memberName, request.startDate, request.endDate, "denied", currentUser?.name);
-                                            } else {
-                                              toast({
-                                                title: "Vote Recorded",
-                                                description: `Your denial has been recorded (${progress.denials}/${progress.requiredDenials} denials).`,
-                                              });
-                                            }
+                                            return;
+                                          }
+                                          if (currentUser) {
+                                            addAuditLog(currentUser, "DENY_LEAVE", `Denied leave request for: ${request.memberName}`);
+                                          }
+                                          const progress = getApprovalProgress(result, requirements);
+                                          if (result.status === "denied") {
+                                            toast({
+                                              title: "Leave Denied",
+                                              description: `${request.memberName}'s leave request has been denied (${progress.denials}/${progress.requiredDenials} denials).`,
+                                            });
+                                            notifyLeaveRequestDecision(request.memberEmail, request.memberName, request.startDate, request.endDate, "denied", currentUser?.name);
+                                          } else {
+                                            toast({
+                                              title: "Vote Recorded",
+                                              description: `Your denial has been recorded (${progress.denials}/${progress.requiredDenials} denials).`,
+                                            });
                                           }
                                         }}
                                         title="Deny"
@@ -4431,15 +4430,15 @@ export default function Admin() {
                     <Download className="w-4 h-4 mr-2" />
                     Full Backup (JSON)
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => { exportFinancialReportToCSV(); toast({ title: "Financial Report Exported" }); }}>
+                  <Button variant="outline" size="sm" onClick={async () => { await exportFinancialReportToCSV(); toast({ title: "Financial Report Exported" }); }}>
                     <Download className="w-4 h-4 mr-2" />
                     Financial Report
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => { exportMembersToCSV(); toast({ title: "Members Exported" }); }}>
+                  <Button variant="outline" size="sm" onClick={async () => { await exportMembersToCSV(); toast({ title: "Members Exported" }); }}>
                     <Download className="w-4 h-4 mr-2" />
                     Members List
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => { exportAttendanceToCSV(); toast({ title: "Attendance Exported" }); }}>
+                  <Button variant="outline" size="sm" onClick={async () => { await exportAttendanceToCSV(); toast({ title: "Attendance Exported" }); }}>
                     <Download className="w-4 h-4 mr-2" />
                     Attendance
                   </Button>

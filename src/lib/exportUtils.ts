@@ -1,5 +1,6 @@
 // Export utilities for admin panel
 
+import type { CellHookData } from "jspdf-autotable";
 import { type TicketOrder } from "./ticketService";
 import { formatCurrency } from "./flutterwave";
 import { getAllMembers, getAllEvents, getAllGalleryItems, getSettings } from "./dataService";
@@ -696,15 +697,11 @@ export function downloadBrandedTableReport({
       bodyStyles: rows.length === 0
         ? { font: semiBoldFontFamily, textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "normal" }
         : { font: semiBoldFontFamily, textColor: [0, 0, 0], fillColor: [255, 255, 255], fontStyle: "normal" },
-      didParseCell: (data: {
-        section: string;
-        column: { index: number };
-        cell: { styles: { fillColor?: [number, number, number]; textColor?: [number, number, number]; fontStyle?: string; halign?: string } };
-        row: { raw: string[] };
-      }) => {
+      didParseCell: (data: CellHookData) => {
         if (data.section !== "body") return;
 
-        const firstCell = String(data.row.raw[0] ?? "");
+        const rawRow = data.row.raw as unknown;
+        const firstCell = String((Array.isArray(rawRow) ? rawRow[0] : undefined) ?? "");
         const financialColors = getFinancialRowColors(firstCell);
         if (financialColors) {
           data.cell.styles.fillColor = financialColors.fill;
@@ -1050,16 +1047,16 @@ export async function exportFullBackup(): Promise<void> {
 }
 
 // Export members to CSV
-export function exportMembersToCSV(): void {
-  const members = getAllMembers();
-  const headers = ["Name", "Email", "Phone", "Voice Part", "Role", "Join Date", "Status"];
+export async function exportMembersToCSV(): Promise<void> {
+  const members = await getAllMembers();
+  const headers = ["Name", "Email", "Phone", "Voice Part", "Class", "Join Date", "Status"];
   
   const rows = members.map((m) => [
     m.name,
     m.email,
     m.phone,
-    m.voicePart,
-    m.role,
+    m.voice,
+    m.specialContributionClass ?? "",
     m.joinedDate,
     m.status,
   ]);
@@ -1114,7 +1111,7 @@ export async function exportDetailedAttendanceToCSV(): Promise<void> {
 
 // Export attendance by member
 export async function exportAttendanceByMemberToCSV(): Promise<void> {
-  const members = getAllMembers();
+  const members = await getAllMembers();
 
   const headers = ["Member Name", "Email", "Voice Part", "Total Sessions", "Present", "Absent", "Excused", "Late", "Attendance Rate"];
 
@@ -1144,7 +1141,7 @@ export async function exportAttendanceByMemberToCSV(): Promise<void> {
 // Export attendance for a specific month
 export async function exportMonthlyAttendanceToCSV(year: number, month: number): Promise<void> {
   const records = await getAllAttendanceRecords();
-  const members = getAllMembers();
+  const members = await getAllMembers();
   
   // Filter records for the specified month
   const monthRecords = records.filter(r => {
@@ -1192,8 +1189,8 @@ export async function exportMonthlyAttendanceToCSV(year: number, month: number):
 }
 
 // Export financial report to CSV
-export function exportFinancialReportToCSV(): void {
-  const orders = getAllOrders().filter(o => o.status === "confirmed" || o.status === "used");
+export async function exportFinancialReportToCSV(): Promise<void> {
+  const orders = (await getAllOrders()).filter(o => o.status === "confirmed" || o.status === "used");
   
   const headers = [
     "Date",

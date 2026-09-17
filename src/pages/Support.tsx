@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
 import { DonationCheckout } from "@/components/payments/DonationCheckout";
 
 const impactAreas = [
@@ -93,39 +94,47 @@ export default function Support() {
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
           
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
-                <Heart className="w-4 h-4" />
-                Partner With Us
-              </div>
-              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-                Support Our <span className="gold-text">Ministry</span>
-              </h1>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Your generosity enables us to spread the gospel through music, 
-                reaching more hearts across Rwanda and beyond.
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
+                  <Heart className="w-4 h-4" />
+                  Partner With Us
+                </div>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
+                  Support Our <span className="gold-text">Ministry</span>
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+                  Your generosity enables us to spread the gospel through music, 
+                  reaching more hearts across Rwanda and beyond.
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
         {/* Impact Areas */}
         <section className="py-12 bg-charcoal/50">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6" stagger={0.1}>
               {impactAreas.map((area, index) => (
-                <div
-                  key={index}
-                  className="card-glass rounded-2xl p-4 md:p-6 text-center hover:border-primary/30 transition-all group"
-                >
-                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full ${area.bg} flex items-center justify-center mx-auto mb-3 md:mb-4 group-hover:scale-110 transition-transform`}>
-                    <area.icon className={`w-6 h-6 md:w-7 md:h-7 ${area.color}`} />
-                  </div>
-                  <h3 className="font-display text-sm md:text-base font-semibold mb-1 md:mb-2">{area.title}</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">{area.description}</p>
-                </div>
+                <StaggerItem key={index}>
+                  <TiltCard
+                    maxTilt={6}
+                    className="card-glass rounded-2xl p-4 md:p-6 text-center h-full hover:border-primary/30 transition-colors group"
+                  >
+                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full ${area.bg} flex items-center justify-center mx-auto mb-3 md:mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6`}>
+                      <area.icon className={`w-6 h-6 md:w-7 md:h-7 ${area.color}`} />
+                    </div>
+                    <h3 className="font-display text-sm md:text-base font-semibold mb-1 md:mb-2">{area.title}</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">{area.description}</p>
+                  </TiltCard>
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           </div>
         </section>
 
@@ -133,12 +142,14 @@ export default function Support() {
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
-              <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-8">
-                Choose How to <span className="gold-text">Give</span>
-              </h2>
+              <Reveal>
+                <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-8">
+                  Choose How to <span className="gold-text">Give</span>
+                </h2>
+              </Reveal>
 
               {/* Accepted Payment Methods */}
-              <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
+              <Reveal delay={0.08} className="flex flex-wrap items-center justify-center gap-4 mb-6">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
                   <Smartphone className="w-3.5 h-3.5" />
                   MTN MoMo
@@ -155,7 +166,7 @@ export default function Support() {
                   <Banknote className="w-3.5 h-3.5" />
                   Bank Transfer
                 </div>
-              </div>
+              </Reveal>
 
               {/* Payment Mode Toggle */}
               <div className="flex justify-center mb-8">
@@ -225,7 +236,7 @@ export default function Support() {
                 <div className="space-y-6 animate-fade-in-up">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Bank Transfer */}
-                    <div className="card-glass rounded-2xl p-6">
+                    <TiltCard maxTilt={6} className="card-glass rounded-2xl p-6 h-full">
                       <div className="flex items-center gap-3 mb-5">
                         <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
                           <CreditCard className="w-6 h-6 text-blue-500" />
@@ -274,10 +285,10 @@ export default function Support() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </TiltCard>
 
                     {/* Mobile Money */}
-                    <div className="card-glass rounded-2xl p-6">
+                    <TiltCard maxTilt={6} className="card-glass rounded-2xl p-6 h-full">
                       <div className="flex items-center gap-3 mb-5">
                         <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
                           <Phone className="w-6 h-6 text-yellow-500" />
@@ -339,7 +350,7 @@ export default function Support() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </TiltCard>
                   </div>
 
                   {/* Notify Form */}
@@ -379,13 +390,17 @@ export default function Support() {
         {/* Bible Verse */}
         <section className="py-12 bg-charcoal/50">
           <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center">
-              <blockquote className="font-display text-xl sm:text-2xl md:text-3xl italic text-foreground mb-4">
-                "Each of you should give what you have decided in your heart to give, 
-                not reluctantly or under compulsion, for God loves a cheerful giver."
-              </blockquote>
-              <cite className="text-primary font-semibold">— 2 Corinthians 9:7</cite>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.12}>
+              <StaggerItem>
+                <blockquote className="font-display text-xl sm:text-2xl md:text-3xl italic text-foreground mb-4">
+                  "Each of you should give what you have decided in your heart to give, 
+                  not reluctantly or under compulsion, for God loves a cheerful giver."
+                </blockquote>
+              </StaggerItem>
+              <StaggerItem>
+                <cite className="text-primary font-semibold">— 2 Corinthians 9:7</cite>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
@@ -393,16 +408,20 @@ export default function Support() {
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-2xl mx-auto">
-              <div className="text-center mb-8">
-                <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3">
-                  Leave a <span className="gold-text">Message</span>
-                </h2>
-                <p className="text-muted-foreground">
-                  Share words of encouragement with our choir family
-                </p>
-              </div>
+              <Stagger className="text-center mb-8" stagger={0.1}>
+                <StaggerItem>
+                  <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3">
+                    Leave a <span className="gold-text">Message</span>
+                  </h2>
+                </StaggerItem>
+                <StaggerItem>
+                  <p className="text-muted-foreground">
+                    Share words of encouragement with our choir family
+                  </p>
+                </StaggerItem>
+              </Stagger>
 
-              <div className="card-glass rounded-3xl p-6 sm:p-8">
+              <Reveal delay={0.1} className="card-glass rounded-3xl p-6 sm:p-8">
                 {messageSubmitted ? (
                   <div className="text-center py-8">
                     <div className="w-16 h-16 rounded-full bg-green-500/20 mx-auto mb-4 flex items-center justify-center">
@@ -470,7 +489,7 @@ export default function Support() {
                     </Button>
                   </form>
                 )}
-              </div>
+              </Reveal>
             </div>
           </div>
         </section>

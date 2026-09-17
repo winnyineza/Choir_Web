@@ -21,6 +21,7 @@ export interface MusicVideo {
   youtubeId: string;
   thumbnail?: string;
   albumId?: string;
+  releaseDate?: string;
   isLatest: boolean;
   isFeatured: boolean;
   createdAt: string;

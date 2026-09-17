@@ -60,6 +60,7 @@ export interface Database {
           emergency_contact_relationship?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       events: {
         Row: {
@@ -108,6 +109,7 @@ export interface Database {
           is_live?: boolean;
           updated_at?: string;
         };
+        Relationships: [];
       };
       contributions: {
         Row: {
@@ -144,6 +146,7 @@ export interface Database {
           notes?: string | null;
           recorded_by?: string | null;
         };
+        Relationships: [];
       };
       attendance: {
         Row: {
@@ -171,6 +174,7 @@ export interface Database {
           status?: 'present' | 'absent' | 'excused' | 'late';
           notes?: string | null;
         };
+        Relationships: [];
       };
       admin_users: {
         Row: {
@@ -209,6 +213,7 @@ export interface Database {
           last_login?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       login_attempts: {
         Row: {
@@ -231,6 +236,7 @@ export interface Database {
           success?: boolean;
           attempted_at?: string;
         };
+        Relationships: [];
       };
       leave_requests: {
         Row: {
@@ -266,6 +272,7 @@ export interface Database {
           denials?: Json;
           updated_at?: string;
         };
+        Relationships: [];
       };
       expenses: {
         Row: {
@@ -301,6 +308,7 @@ export interface Database {
           receipt_url?: string | null;
           status?: 'pending' | 'approved' | 'rejected';
         };
+        Relationships: [];
       };
       announcements: {
         Row: {
@@ -333,6 +341,7 @@ export interface Database {
           is_pinned?: boolean;
           expires_at?: string | null;
         };
+        Relationships: [];
       };
       audit_logs: {
         Row: {
@@ -355,7 +364,106 @@ export interface Database {
           ip_address?: string | null;
           created_at?: string;
         };
-        Update: never;
+        // Audit rows are append-only; nothing about them may be edited.
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      choir_settings: {
+        Row: {
+          key: string;
+          value: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      analytics_sessions: {
+        Row: {
+          id: string;
+          start_time: string;
+          last_activity: string;
+        };
+        Insert: {
+          id: string;
+          start_time?: string;
+          last_activity?: string;
+        };
+        Update: {
+          id?: string;
+          start_time?: string;
+          last_activity?: string;
+        };
+        Relationships: [];
+      };
+      leave_verification_codes: {
+        Row: {
+          id: string;
+          leave_id: string;
+          email: string;
+          code: string;
+          expires_at: string;
+          used: boolean;
+          created_at: string;
+          // Only present on the legacy schema; see insertVerificationCodeLegacy.
+          approver_id?: string | null;
+        };
+        Insert: {
+          id: string;
+          leave_id: string;
+          email: string;
+          code: string;
+          expires_at: string;
+          used?: boolean;
+          created_at?: string;
+          approver_id?: string | null;
+        };
+        Update: {
+          id?: string;
+          leave_id?: string;
+          email?: string;
+          code?: string;
+          expires_at?: string;
+          used?: boolean;
+          created_at?: string;
+          approver_id?: string | null;
+        };
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: {

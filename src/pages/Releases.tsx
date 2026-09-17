@@ -15,6 +15,7 @@ import {
   type StreamingPlatform,
 } from "@/lib/releaseService";
 import { getPlatformConfig } from "@/lib/streamingPlatforms";
+import { AnimatedCounter, Reveal, Stagger, StaggerItem } from "@/components/motion";
 
 export default function Releases() {
   useDocumentTitle("Music Releases");
@@ -57,17 +58,23 @@ export default function Releases() {
         <section className="relative pt-32 pb-16 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                Music Releases
-              </span>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                <span className="gold-text">Albums</span> & Videos
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Listen everywhere you stream
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
+                  Music Releases
+                </span>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+                  <span className="gold-text">Albums</span> & Videos
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-xl text-muted-foreground">
+                  Listen everywhere you stream
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
@@ -75,22 +82,26 @@ export default function Releases() {
         {platforms.length > 0 && (
           <section className="py-12 bg-charcoal border-y border-primary/10">
             <div className="container mx-auto px-4">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-2 text-primary text-sm font-semibold tracking-wider uppercase mb-2">
-                  <Headphones className="w-4 h-4" />
-                  Listen Everywhere
-                </div>
-                <p className="text-muted-foreground">
-                  Our music is available on all major streaming platforms
-                </p>
-              </div>
+              <Stagger className="text-center mb-8" stagger={0.1}>
+                <StaggerItem>
+                  <div className="inline-flex items-center gap-2 text-primary text-sm font-semibold tracking-wider uppercase mb-2">
+                    <Headphones className="w-4 h-4" />
+                    Listen Everywhere
+                  </div>
+                </StaggerItem>
+                <StaggerItem>
+                  <p className="text-muted-foreground">
+                    Our music is available on all major streaming platforms
+                  </p>
+                </StaggerItem>
+              </Stagger>
               
-              <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+              <Stagger className="flex flex-wrap justify-center gap-4 md:gap-6" stagger={0.06}>
                 {platforms.map((platform) => {
                   const config = getPlatformConfig(platform.name);
                   return (
+                    <StaggerItem key={platform.id}>
                     <a
-                      key={platform.id}
                       href={platform.url || "#"}
                       target={platform.url ? "_blank" : undefined}
                       rel="noopener noreferrer"
@@ -109,9 +120,10 @@ export default function Releases() {
                       </div>
                       <span className="font-medium text-foreground">{platform.name}</span>
                     </a>
+                    </StaggerItem>
                   );
                 })}
-              </div>
+              </Stagger>
               
               <p className="text-center text-sm text-muted-foreground mt-6">
                 ...and many more platforms worldwide
@@ -131,7 +143,7 @@ export default function Releases() {
         {!isLoading && albums.length === 0 && musicVideos.length === 0 && (
           <section className="py-16">
             <div className="container mx-auto px-4">
-              <div className="max-w-2xl mx-auto text-center py-16 card-glass rounded-2xl border border-primary/20">
+              <Reveal className="max-w-2xl mx-auto text-center py-16 card-glass rounded-2xl border border-primary/20">
                 <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mx-auto">
                   <Disc3 className="w-8 h-8 text-primary" />
                 </div>
@@ -139,7 +151,7 @@ export default function Releases() {
                 <p className="text-muted-foreground mb-6">
                   Our music releases will appear here. Check back soon for albums, singles, and music videos!
                 </p>
-              </div>
+              </Reveal>
             </div>
           </section>
         )}
@@ -148,7 +160,7 @@ export default function Releases() {
         {!isLoading && latestAlbum && (
           <section className="py-16">
             <div className="container mx-auto px-4">
-              <div className="max-w-5xl mx-auto">
+              <Reveal className="max-w-5xl mx-auto">
                 <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-4 block">
                   Latest Release
                 </span>
@@ -212,7 +224,7 @@ export default function Releases() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Reveal>
             </div>
           </section>
         )}
@@ -221,13 +233,15 @@ export default function Releases() {
         {!isLoading && albums.length > 0 && (
           <section className="py-16 bg-charcoal">
             <div className="container mx-auto px-4">
-              <h2 className="font-display text-3xl font-bold mb-10">
-                All <span className="gold-text">Albums</span>
-              </h2>
+              <Reveal>
+                <h2 className="font-display text-3xl font-bold mb-10">
+                  All <span className="gold-text">Albums</span>
+                </h2>
+              </Reveal>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <Stagger className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" stagger={0.08}>
                 {albums.map((album) => (
-                  <div key={album.id} className="group">
+                  <StaggerItem key={album.id} className="group hover-lift">
                     <div className="relative rounded-2xl overflow-hidden mb-4">
                       <img
                         src={album.coverImage}
@@ -271,9 +285,9 @@ export default function Releases() {
                     <p className="text-sm text-muted-foreground">
                       {album.year} • {album.trackCount} tracks
                     </p>
-                  </div>
+                  </StaggerItem>
                 ))}
-              </div>
+              </Stagger>
             </div>
           </section>
         )}
@@ -282,7 +296,7 @@ export default function Releases() {
         {!isLoading && musicVideos.length > 0 && (
           <section className="py-16">
             <div className="container mx-auto px-4">
-              <div className="flex items-center justify-between mb-10">
+              <Reveal className="flex items-center justify-between mb-10">
                 <h2 className="font-display text-3xl font-bold">
                   Watch on <span className="gold-text">YouTube</span>
                 </h2>
@@ -296,11 +310,11 @@ export default function Releases() {
                     Visit Channel
                   </a>
                 </Button>
-              </div>
+              </Reveal>
 
               {/* Featured Latest Release Video */}
               {latestVideo && (
-                <div className="mb-10">
+                <Reveal className="mb-10">
                   <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold mb-4">
                     Latest Release
                   </span>
@@ -316,19 +330,19 @@ export default function Releases() {
                       className="w-full aspect-video"
                     />
                   </div>
-                </div>
+                </Reveal>
               )}
 
               {/* Featured Videos Grid */}
               {featuredVideos.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10" stagger={0.08}>
                   {featuredVideos.map((video) => (
+                    <StaggerItem key={video.id}>
                     <a
-                      key={video.id}
                       href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group cursor-pointer"
+                      className="group cursor-pointer hover-lift block"
                     >
                       <div className="relative rounded-2xl overflow-hidden mb-4">
                         <img
@@ -350,22 +364,25 @@ export default function Releases() {
                       </div>
                       <h3 className="font-semibold text-foreground mb-1">{video.title}</h3>
                     </a>
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               )}
 
               {/* Other Videos */}
               {otherVideos.length > 0 && (
                 <>
-                  <h3 className="font-display text-xl font-semibold mb-6">More Videos</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Reveal>
+                    <h3 className="font-display text-xl font-semibold mb-6">More Videos</h3>
+                  </Reveal>
+                  <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4" stagger={0.05}>
                     {otherVideos.map((video) => (
+                      <StaggerItem key={video.id}>
                       <a
-                        key={video.id}
                         href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group cursor-pointer"
+                        className="group cursor-pointer hover-lift block"
                       >
                         <div className="relative rounded-xl overflow-hidden mb-2">
                           <img
@@ -384,8 +401,9 @@ export default function Releases() {
                           {video.title}
                         </h4>
                       </a>
+                      </StaggerItem>
                     ))}
-                  </div>
+                  </Stagger>
                 </>
               )}
             </div>
@@ -400,20 +418,27 @@ export default function Releases() {
             <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
 
             <div className="container mx-auto px-4 relative z-10">
-              <div className="max-w-4xl mx-auto text-center">
+              <Stagger className="max-w-4xl mx-auto text-center" stagger={0.1}>
+                <StaggerItem>
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1DB954]/20 text-[#1DB954] text-sm font-semibold mb-6">
                   <Disc3 className="w-4 h-4 animate-spin" style={{ animationDuration: "3s" }} />
                   Now Streaming
                 </span>
+                </StaggerItem>
 
+                <StaggerItem>
                 <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
                   Stream Our <span className="text-[#1DB954]">Music</span>
                 </h2>
+                </StaggerItem>
 
+                <StaggerItem>
                 <p className="text-muted-foreground text-lg mb-8 max-w-lg mx-auto">
                   Follow us on your favorite streaming platform to stay updated with our latest releases.
                 </p>
+                </StaggerItem>
 
+                <StaggerItem>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button
                     size="lg"
@@ -443,25 +468,32 @@ export default function Releases() {
                     </a>
                   </Button>
                 </div>
+                </StaggerItem>
 
                 {/* Stats */}
+                <StaggerItem>
                 <div className="flex gap-8 mt-10 justify-center">
                   <div className="text-center">
-                    <p className="text-2xl font-bold gold-text">{albums.length}+</p>
+                    <p className="text-2xl font-bold gold-text">
+                      <AnimatedCounter value={albums.length} />+
+                    </p>
                     <p className="text-sm text-muted-foreground">Albums</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold gold-text">
-                      {albums.reduce((acc, a) => acc + a.trackCount, 0)}+
+                      <AnimatedCounter value={albums.reduce((acc, a) => acc + a.trackCount, 0)} />+
                     </p>
                     <p className="text-sm text-muted-foreground">Tracks</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold gold-text">{musicVideos.length}+</p>
+                    <p className="text-2xl font-bold gold-text">
+                      <AnimatedCounter value={musicVideos.length} />+
+                    </p>
                     <p className="text-sm text-muted-foreground">Videos</p>
                   </div>
                 </div>
-              </div>
+                </StaggerItem>
+              </Stagger>
             </div>
           </section>
         )}

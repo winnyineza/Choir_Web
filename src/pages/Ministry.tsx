@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, MapPin, Calendar, Youtube, Music, Heart, ArrowRight, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { AnimatedCounter, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
 import { useState, useEffect } from "react";
 import { getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
 import { getAllMembers } from "@/lib/dataService";
@@ -21,11 +22,17 @@ export default function Ministry() {
     })();
   }, []);
 
+  // `count` marks the one stat that is a real number, so it can tick up on scroll.
   const ministryStats = [
-    { label: "Ministry Focus", value: "Music", icon: Music },
-    { label: "Community", value: "Growing", icon: Heart },
-    { label: "Active Members", value: memberCount > 0 ? `${memberCount}` : "—", icon: Users },
-    { label: "Location", value: "Rwanda", icon: MapPin },
+    { label: "Ministry Focus", value: "Music", icon: Music, count: undefined },
+    { label: "Community", value: "Growing", icon: Heart, count: undefined },
+    {
+      label: "Active Members",
+      value: memberCount > 0 ? `${memberCount}` : "—",
+      icon: Users,
+      count: memberCount > 0 ? memberCount : undefined,
+    },
+    { label: "Location", value: "Rwanda", icon: MapPin, count: undefined },
   ];
   
   return (
@@ -36,34 +43,44 @@ export default function Ministry() {
         <section className="relative pt-32 pb-20 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                Our Ministry
-              </span>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                Serving Through <span className="gold-text">Sacred Music</span>
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                From choir trips to daily devotions, discover how we serve God's kingdom
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
+                  Our Ministry
+                </span>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+                  Serving Through <span className="gold-text">Sacred Music</span>
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-xl text-muted-foreground">
+                  From choir trips to daily devotions, discover how we serve God's kingdom
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
         {/* Ministry Stats */}
         <section className="py-12 border-b border-primary/10">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-6" stagger={0.1}>
               {ministryStats.map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-3 flex items-center justify-center">
-                    <stat.icon className="w-6 h-6 text-primary-foreground" />
+                <StaggerItem key={stat.label}>
+                  <div className="text-center group">
+                    <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-3 flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                      <stat.icon className="w-6 h-6 text-primary-foreground" />
+                    </div>
+                    <p className="text-2xl md:text-3xl font-bold gold-text">
+                      {stat.count !== undefined ? <AnimatedCounter value={stat.count} /> : stat.value}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{stat.label}</p>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold gold-text">{stat.value}</p>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                </div>
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           </div>
         </section>
 
@@ -71,48 +88,42 @@ export default function Ministry() {
         <section className="py-20">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
-              <div className="text-center mb-12">
-                <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-2 block">
-                  About Us
-                </span>
-                <h2 className="font-display text-4xl font-bold mb-6">
-                  Our <span className="gold-text">Mission</span>
-                </h2>
-                <p className="text-muted-foreground text-lg">
-                  We are dedicated to spreading the gospel through sacred music. Our choir travels across Rwanda 
-                  to share worship, fellowship, and spiritual nourishment with communities everywhere.
-                </p>
-              </div>
+              <Stagger className="text-center mb-12" stagger={0.1}>
+                <StaggerItem>
+                  <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-2 block">
+                    About Us
+                  </span>
+                </StaggerItem>
+                <StaggerItem>
+                  <h2 className="font-display text-4xl font-bold mb-6">
+                    Our <span className="gold-text">Mission</span>
+                  </h2>
+                </StaggerItem>
+                <StaggerItem>
+                  <p className="text-muted-foreground text-lg">
+                    We are dedicated to spreading the gospel through sacred music. Our choir travels across Rwanda 
+                    to share worship, fellowship, and spiritual nourishment with communities everywhere.
+                  </p>
+                </StaggerItem>
+              </Stagger>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="card-glass rounded-2xl p-6 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-primary-foreground" />
-                  </div>
-                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Worship</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Leading hearts to God through powerful worship music and hymns.
-                  </p>
-                </div>
-                <div className="card-glass rounded-2xl p-6 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center">
-                    <Heart className="w-6 h-6 text-primary-foreground" />
-                  </div>
-                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Fellowship</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Building community through shared faith and musical ministry.
-                  </p>
-                </div>
-                <div className="card-glass rounded-2xl p-6 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center">
-                    <BookOpen className="w-6 h-6 text-primary-foreground" />
-                  </div>
-                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">Devotion</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Nurturing spiritual growth through daily reflection and prayer.
-                  </p>
-                </div>
-              </div>
+              <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-6" stagger={0.12}>
+                {[
+                  { icon: Music, title: "Worship", body: "Leading hearts to God through powerful worship music and hymns." },
+                  { icon: Heart, title: "Fellowship", body: "Building community through shared faith and musical ministry." },
+                  { icon: BookOpen, title: "Devotion", body: "Nurturing spiritual growth through daily reflection and prayer." },
+                ].map((pillar) => (
+                  <StaggerItem key={pillar.title}>
+                    <TiltCard className="card-glass rounded-2xl p-6 text-center h-full group">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-[var(--shadow-gold)]">
+                        <pillar.icon className="w-6 h-6 text-primary-foreground" />
+                      </div>
+                      <h3 className="font-display text-xl font-semibold text-foreground mb-2">{pillar.title}</h3>
+                      <p className="text-muted-foreground text-sm">{pillar.body}</p>
+                    </TiltCard>
+                  </StaggerItem>
+                ))}
+              </Stagger>
             </div>
           </div>
         </section>
@@ -121,7 +132,7 @@ export default function Ministry() {
         {featuredVideo && (
           <section className="py-20 bg-charcoal section-pattern">
             <div className="container mx-auto px-4">
-              <div className="max-w-3xl mx-auto">
+              <Reveal className="max-w-3xl mx-auto">
                 <div className="card-glass rounded-3xl p-8">
                   <span className="text-primary text-sm font-semibold tracking-wider uppercase mb-4 block">
                     Featured Release
@@ -159,7 +170,7 @@ export default function Ministry() {
                     </Button>
                   </div>
                 </div>
-              </div>
+              </Reveal>
             </div>
           </section>
         )}
@@ -167,8 +178,8 @@ export default function Ministry() {
         {/* Support Section */}
         <section className="py-20">
           <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto card-glass rounded-3xl p-10 text-center">
-              <div className="w-16 h-16 rounded-full bg-gold-gradient mx-auto mb-6 flex items-center justify-center">
+            <Reveal className="max-w-4xl mx-auto card-glass rounded-3xl p-10 text-center">
+              <div className="w-16 h-16 rounded-full bg-gold-gradient mx-auto mb-6 flex items-center justify-center animate-pulse-gold">
                 <Heart className="w-8 h-8 text-primary-foreground" />
               </div>
               <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
@@ -178,10 +189,10 @@ export default function Ministry() {
                 Your generous contributions help us continue spreading the gospel through music, funding trips, equipment, and outreach programs.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button variant="gold" size="lg" asChild>
+                <Button variant="gold" size="lg" asChild className="group">
                   <Link to="/support">
                     Support Now
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1" />
                   </Link>
                 </Button>
                 <Button variant="gold-outline" size="lg" asChild>
@@ -190,7 +201,7 @@ export default function Ministry() {
                   </Link>
                 </Button>
               </div>
-            </div>
+            </Reveal>
           </div>
         </section>
       </main>

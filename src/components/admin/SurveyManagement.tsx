@@ -55,6 +55,7 @@ import {
   getResponses,
   type Survey,
   type SurveyQuestion,
+  type SurveyResponse,
   type QuestionType,
 } from "@/lib/surveyService";
 import { getAllEvents } from "@/lib/dataService";
@@ -66,6 +67,7 @@ export function SurveyManagement() {
   const { currentUser } = useAuth();
   
   const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [events, setEvents] = useState<{ id: string; title: string }[]>([]);
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,15 +106,20 @@ export function SurveyManagement() {
   }, []);
 
   const loadData = async () => {
-    const [surveysData, eventsData, membersData] = await Promise.all([
+    const [surveysData, responsesData, eventsData, membersData] = await Promise.all([
       getSurveys(),
+      getResponses(),
       getAllEvents(),
       getAllMembers(),
     ]);
     setSurveys(surveysData);
+    setResponses(responsesData);
     setEvents(eventsData.map(e => ({ id: e.id, title: e.title })));
     setMembers(membersData.map(m => ({ id: m.id, name: m.name })));
   };
+
+  // Responses are fetched once in loadData; counts and results read from that snapshot.
+  const getResponsesFor = (surveyId: string) => responses.filter(r => r.surveyId === surveyId);
 
   const filteredSurveys = surveys.filter(survey => {
     if (filterStatus !== "all" && survey.status !== filterStatus) return false;
@@ -271,11 +278,11 @@ export function SurveyManagement() {
 
   // Get responses for results
   const getSurveyResults = (survey: Survey) => {
-    const responses = getResponses(survey.id);
+    const surveyResponses = getResponsesFor(survey.id);
     return {
-      totalResponses: responses.length,
+      totalResponses: surveyResponses.length,
       responsesByQuestion: (survey.questions || []).map(q => {
-        const questionResponses = responses.map(r => r.answers[q.id]).filter(Boolean);
+        const questionResponses = surveyResponses.map(r => r.answers[q.id]).filter(Boolean);
         
         if (q.type === "rating") {
           const ratings = questionResponses.map(r => Number(r)).filter(n => !isNaN(n));
@@ -327,7 +334,7 @@ export function SurveyManagement() {
     active: surveys.filter(s => s.status === "active").length,
     draft: surveys.filter(s => s.status === "draft").length,
     closed: surveys.filter(s => s.status === "closed").length,
-    totalResponses: surveys.reduce((sum, s) => sum + getResponses(s.id).length, 0),
+    totalResponses: responses.length,
   };
 
   return (
@@ -427,7 +434,7 @@ export function SurveyManagement() {
           </div>
         ) : (
           filteredSurveys.map(survey => {
-            const responseCount = getResponses(survey.id).length;
+            const responseCount = getResponsesFor(survey.id).length;
             const linkedEvent = events.find(e => e.id === survey.eventId);
             
             return (

@@ -15,6 +15,7 @@ import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Loader2 } from "lucide-r
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { createContactSubmission } from "@/lib/contactService";
 
 export default function Contact() {
@@ -115,17 +116,23 @@ export default function Contact() {
         <section className="relative pt-32 pb-16 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                Contact
-              </span>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                Get in <span className="gold-text">Touch</span>
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                We'd love to hear from you. Reach out with any questions or inquiries.
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
+                  Contact
+                </span>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+                  Get in <span className="gold-text">Touch</span>
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-xl text-muted-foreground">
+                  We'd love to hear from you. Reach out with any questions or inquiries.
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
@@ -134,7 +141,7 @@ export default function Contact() {
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
               {/* Contact Form */}
-              <div className="card-glass rounded-3xl p-8">
+              <Reveal direction="right" className="card-glass rounded-3xl p-8">
                 <h2 className="font-display text-2xl font-bold text-foreground mb-6">
                   Send a Message
                 </h2>
@@ -282,10 +289,10 @@ export default function Contact() {
                     </Button>
                   </form>
                 )}
-              </div>
+              </Reveal>
 
               {/* Contact Info */}
-              <div className="space-y-8">
+              <Reveal direction="left" delay={0.1} className="space-y-8">
                 <div>
                   <h2 className="font-display text-2xl font-bold text-foreground mb-6">
                     Contact Information
@@ -294,9 +301,9 @@ export default function Contact() {
                     Feel free to reach out through any of these channels. We typically respond within 24-48 hours.
                   </p>
 
-                  <div className="space-y-6">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0">
+                  <Stagger className="space-y-6" stagger={0.1}>
+                    <StaggerItem className="flex items-start gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <MapPin className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -306,10 +313,10 @@ export default function Contact() {
                           Kigali, Rwanda
                         </p>
                       </div>
-                    </div>
+                    </StaggerItem>
 
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0">
+                    <StaggerItem className="flex items-start gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <Mail className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -321,10 +328,10 @@ export default function Contact() {
                           theserenadeschoir@gmail.com
                         </a>
                       </div>
-                    </div>
+                    </StaggerItem>
 
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0">
+                    <StaggerItem className="flex items-start gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <Phone className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -336,10 +343,10 @@ export default function Contact() {
                           +250 780 623 144
                         </a>
                       </div>
-                    </div>
+                    </StaggerItem>
 
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0">
+                    <StaggerItem className="flex items-start gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <Clock className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -349,8 +356,8 @@ export default function Contact() {
                           3:00 PM - 6:00 PM
                         </p>
                       </div>
-                    </div>
-                  </div>
+                    </StaggerItem>
+                  </Stagger>
                 </div>
 
                 {/* Map Placeholder */}
@@ -374,7 +381,7 @@ export default function Contact() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Reveal>
             </div>
           </div>
         </section>

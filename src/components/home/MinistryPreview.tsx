@@ -1,115 +1,83 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Youtube, Music, BookOpen, Heart, ArrowRight, Eye, TrendingUp } from "lucide-react";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
 
+const ministryFeatures = [
+  { icon: Music, text: "Ministry trips and choir bookings" },
+  { icon: BookOpen, text: "Daily biblical devotions" },
+  { icon: Heart, text: "Community outreach programs" },
+];
+
 export function MinistryPreview() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const [featuredVideo, setFeaturedVideo] = useState<MusicVideo | null>(null);
 
   useEffect(() => {
     getLatestMusicVideo().then((latest) => setFeaturedVideo(latest || null));
   }, []);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.2 }
-    );
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section ref={sectionRef} className="py-24 relative overflow-hidden">
+    <section className="py-24 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-charcoal to-background" />
-      
+
       <div className="container mx-auto px-4 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Content Side */}
           <div>
-            <span
-              className={`inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4 transition-all duration-700 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              Our Ministry
-            </span>
-            <h2
-              className={`font-display text-4xl md:text-5xl lg:text-6xl font-bold mb-6 transition-all duration-700 delay-100 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              Serving Through <span className="gold-text">Sacred Music</span>
-            </h2>
-            <p
-              className={`text-lg text-muted-foreground mb-8 leading-relaxed transition-all duration-700 delay-200 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              From choir trips to daily devotions, our ministry extends beyond the stage. We're committed to spreading joy, faith, and hope through every note we sing.
-            </p>
+            <Stagger stagger={0.1}>
+              <StaggerItem>
+                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
+                  Our Ministry
+                </span>
+              </StaggerItem>
+              <StaggerItem>
+                <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
+                  Serving Through <span className="gold-text">Sacred Music</span>
+                </h2>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                  From choir trips to daily devotions, our ministry extends beyond the stage. We're committed to spreading joy, faith, and hope through every note we sing.
+                </p>
+              </StaggerItem>
+            </Stagger>
 
             {/* Ministry Features */}
-            <div className="space-y-4 mb-8">
-              {[
-                { icon: Music, text: "Ministry trips and choir bookings" },
-                { icon: BookOpen, text: "Daily biblical devotions" },
-                { icon: Heart, text: "Community outreach programs" },
-              ].map((item, index) => (
-                <div
-                  key={item.text}
-                  className={`flex items-center gap-4 transition-all duration-700 ${
-                    isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
-                  }`}
-                  style={{ transitionDelay: `${300 + index * 100}ms` }}
-                >
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <item.icon className="w-5 h-5 text-primary" />
+            <Stagger className="space-y-4 mb-8" stagger={0.1}>
+              {ministryFeatures.map((item) => (
+                <StaggerItem key={item.text} direction="right">
+                  <div className="flex items-center gap-4 group">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">
+                      <item.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <span className="text-foreground">{item.text}</span>
                   </div>
-                  <span className="text-foreground">{item.text}</span>
-                </div>
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
 
-            <div
-              className={`flex flex-wrap gap-4 transition-all duration-700 delay-700 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              <Button variant="gold" size="lg" asChild>
+            <Reveal className="flex flex-wrap gap-4">
+              <Button variant="gold" size="lg" asChild className="group">
                 <Link to="/ministry">
                   Explore Ministry
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1" />
                 </Link>
               </Button>
-              <Button variant="gold-outline" size="lg" asChild>
+              <Button variant="gold-outline" size="lg" asChild className="group">
                 <Link to="/support">
                   Support Us
-                  <Heart className="w-4 h-4 ml-2" />
+                  <Heart className="w-4 h-4 ml-2 group-hover:scale-125" />
                 </Link>
               </Button>
-            </div>
+            </Reveal>
           </div>
 
           {/* Featured Song Card - Only show if video exists */}
           {featuredVideo && (
-            <div
-              className={`transition-all duration-700 delay-300 ${
-                isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
-              }`}
-            >
+            <Reveal direction="left" delay={0.15}>
               <div className="flex items-center justify-between mb-4">
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold">
                   <TrendingUp className="w-3 h-3" />
@@ -120,9 +88,9 @@ export function MinistryPreview() {
                   <span className="font-medium">Watch Now</span>
                 </div>
               </div>
-              
+
               {/* Embedded YouTube Video */}
-              <div className="rounded-2xl overflow-hidden mb-4 gold-glow">
+              <div className="rounded-2xl overflow-hidden mb-4 gold-glow hover-lift">
                 <iframe
                   width="100%"
                   height="220"
@@ -156,7 +124,7 @@ export function MinistryPreview() {
                   </a>
                 </Button>
               </div>
-            </div>
+            </Reveal>
           )}
         </div>
       </div>

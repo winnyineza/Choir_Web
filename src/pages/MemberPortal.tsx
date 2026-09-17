@@ -71,7 +71,8 @@ import {
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useToast } from "@/hooks/use-toast";
-import { getAllMembers, getSettings, updateMember, type Member, type EmergencyContact, type Settings } from "@/lib/dataService";
+// `Settings` is aliased because lucide-react also exports a `Settings` icon used in this file.
+import { DEFAULT_SETTINGS, getAllMembers, getSettings, updateMember, type Member, type EmergencyContact, type Settings as ChoirSettingsType } from "@/lib/dataService";
 import { BirthdayAlert } from "@/components/BirthdayAlert";
 import {
   verifyPortalPin,
@@ -79,6 +80,7 @@ import {
   generateLeaveRequestId,
   getLeaveRequestsByEmail,
   validateLeaveRequestDate,
+  deleteLeaveRequest,
   MINIMUM_NOTICE_DAYS,
   getLeaveApprovalRequirements,
   type LeaveRequest,
@@ -151,7 +153,7 @@ interface ContributionPaymentDraft {
   expectedAmount?: number;
 }
 
-function getReceiptDisplayData(receipt: Contribution, settings: Settings): ReceiptDisplayData {
+function getReceiptDisplayData(receipt: Contribution, settings: ChoirSettingsType): ReceiptDisplayData {
   const fallbackDescription = receipt.category === "monthly" ? "Monthly Dues" : receipt.category === "special" ? "Special Contribution" : "Contribution";
   return {
     choirName: settings.choirName || "Serenades of Praise Choir",
@@ -509,32 +511,12 @@ export default function MemberPortal() {
   // Data
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [myAttendance, setMyAttendance] = useState<AttendanceRecord[]>([]);
-  const [attendanceStats, setAttendanceStats] = useState<ReturnType<typeof getMemberAttendanceStatsByEmail> | null>(null);
+  const [attendanceStats, setAttendanceStats] = useState<Awaited<ReturnType<typeof getMemberAttendanceStatsByEmail>> | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [myContributions, setMyContributions] = useState<Contribution[]>([]);
   const [contributionStatus, setContributionStatus] = useState<MemberContributionStatus | null>(null);
   const [upcomingMeetings, setUpcomingMeetings] = useState<MeetingMinutes[]>([]);
-  const [choirSettings, setChoirSettings] = useState<Settings>({
-    choirName: "Serenades of Praise Choir",
-    choirDescription: "",
-    foundedYear: "2024",
-    address: "Kacyiru SDA Church, Kigali, Rwanda",
-    phone: "+250 780 623 144",
-    email: "theserenadeschoir@gmail.com",
-    facebook: "",
-    instagram: "",
-    twitter: "",
-    youtube: "",
-    tiktok: "",
-    whatsapp: "",
-    welcomeTitle: "",
-    welcomeMessage: "",
-    backgroundImage: "",
-    joinHeroImage: "",
-    choirImage1: "",
-    choirImage2: "",
-    choirImage3: "",
-  });
+  const [choirSettings, setChoirSettings] = useState<ChoirSettingsType>(DEFAULT_SETTINGS);
 
   // Profile editing
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -1122,7 +1104,7 @@ export default function MemberPortal() {
           description: leaveResult.error,
           variant: "destructive",
         });
-        setView("request");
+        setView("leave-form");
         return;
       }
 

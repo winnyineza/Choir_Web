@@ -817,6 +817,7 @@ CREATE TABLE IF NOT EXISTS music_videos (
   youtube_id VARCHAR(50),
   thumbnail TEXT,
   album_id TEXT,
+  release_date DATE,
   is_latest BOOLEAN DEFAULT false,
   is_featured BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()

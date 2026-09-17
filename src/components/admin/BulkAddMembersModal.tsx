@@ -105,7 +105,6 @@ export function BulkAddMembersModal({ isOpen, onClose, onSuccess }: BulkAddMembe
           phone: row.phone.trim(),
           voice: row.voice,
           status: "Pending",
-          joinedDate: new Date().toISOString().split("T")[0],
         });
         addedMembers.push({ id: member.id, email: member.email, name: member.name });
         added++;

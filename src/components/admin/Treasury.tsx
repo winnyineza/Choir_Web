@@ -240,7 +240,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
         type: "contribution" as const,
         description: `Contribution: ${c.typeName}`,
         amount: c.amount,
-        date: c.paidAt,
+        date: c.createdAt,
         isIncome: true,
       })),
       ...allDonations.map(d => ({

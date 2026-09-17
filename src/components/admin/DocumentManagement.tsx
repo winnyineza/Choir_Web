@@ -64,7 +64,7 @@ export function DocumentManagement() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { user } = useAuth();
+  const { currentUser: user } = useAuth();
   const { toast } = useToast();
 
   // Form states
@@ -477,9 +477,13 @@ export function DocumentManagement() {
                         {getCategoryLabel(doc.category).split(" ")[0]}
                       </span>
                       {doc.isPublic ? (
-                        <Globe className="w-3 h-3 text-green-400" title="Public" />
+                        <span title="Public">
+                          <Globe className="w-3 h-3 text-green-400" aria-label="Public" />
+                        </span>
                       ) : (
-                        <Lock className="w-3 h-3 text-orange-400" title="Private" />
+                        <span title="Private">
+                          <Lock className="w-3 h-3 text-orange-400" aria-label="Private" />
+                        </span>
                       )}
                     </div>
                   </div>

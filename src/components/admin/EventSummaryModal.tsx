@@ -50,8 +50,9 @@ export function EventSummaryModal({ isOpen, onClose, event, orders }: EventSumma
   const totalRevenue = confirmedOrders.reduce((sum, o) => sum + o.total, 0);
   const avgOrderValue = confirmedOrders.length > 0 ? totalRevenue / confirmedOrders.length : 0;
   
-  // Count scanned tickets
-  const scannedTickets = confirmedOrders.filter(o => o.scannedAt).length;
+  // Count scanned tickets. Scanning moves an order from "confirmed" to "used",
+  // so this counts across all of the event's orders rather than the confirmed ones.
+  const scannedTickets = eventOrders.filter(o => o.status === "used").length;
   const checkInRate = soldTickets > 0 ? (scannedTickets / soldTickets) * 100 : 0;
 
   // Event status
@@ -67,7 +68,7 @@ export function EventSummaryModal({ isOpen, onClose, event, orders }: EventSumma
     const tierRevenue = tierOrders.reduce((sum, o) => 
       sum + o.tickets
         .filter(t => t.tierName === tier.name)
-        .reduce((s, t) => s + t.price * t.quantity, 0),
+        .reduce((s, t) => s + t.priceEach * t.quantity, 0),
       0
     );
     const tierSold = tierOrders.reduce((sum, o) => 

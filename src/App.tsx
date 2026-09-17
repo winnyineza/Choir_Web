@@ -1,4 +1,5 @@
 import { useEffect, lazy, Suspense } from "react";
+import { AnimatePresence } from "motion/react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { PageTransition } from "@/components/motion";
 import { trackPageView, trackSession } from "@/lib/analyticsService";
 import Index from "./pages/Index";
 
@@ -48,6 +50,51 @@ function AnalyticsTracker() {
   return null;
 }
 
+// Route changes should always land at the top of the new page.
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, [pathname]);
+
+  return null;
+}
+
+function AnimatedRoutes() {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <PageTransition key={location.pathname}>
+        <Suspense fallback={null}>
+          <Routes location={location}>
+            <Route path="/" element={<Index />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/ministry" element={<Ministry />} />
+            <Route path="/releases" element={<Releases />} />
+            <Route path="/gallery" element={<Gallery />} />
+            <Route path="/join" element={<Join />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/donate" element={<Donate />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/email-previews" element={<EmailPreviews />} />
+            <Route path="/scanner" element={<Scanner />} />
+            <Route path="/member-portal" element={<MemberPortal />} />
+            <Route path="/api-docs" element={<ApiDocs />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </PageTransition>
+    </AnimatePresence>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -57,29 +104,8 @@ const App = () => (
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AnalyticsTracker />
-            <Suspense fallback={null}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/events" element={<Events />} />
-                <Route path="/ministry" element={<Ministry />} />
-                <Route path="/releases" element={<Releases />} />
-                <Route path="/gallery" element={<Gallery />} />
-                <Route path="/join" element={<Join />} />
-                <Route path="/support" element={<Support />} />
-                <Route path="/donate" element={<Donate />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route path="/admin/email-previews" element={<EmailPreviews />} />
-                <Route path="/scanner" element={<Scanner />} />
-                <Route path="/member-portal" element={<MemberPortal />} />
-                <Route path="/api-docs" element={<ApiDocs />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+            <ScrollToTop />
+            <AnimatedRoutes />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

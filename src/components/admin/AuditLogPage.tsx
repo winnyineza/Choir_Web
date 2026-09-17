@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -176,7 +176,7 @@ export function AuditLogPage() {
   
   const { toast } = useToast();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     const [logsData, adminsData] = await Promise.all([
       getAuditLog(500),
@@ -185,9 +185,9 @@ export function AuditLogPage() {
     setAllLogs(logsData);
     setAdmins(adminsData);
     setIsLoading(false);
-  };
+  }, []);
 
-  const loadPagedLogs = async () => {
+  const loadPagedLogs = useCallback(async () => {
     setIsLoading(true);
     const result = await getAuditLogPage({
       page: currentPage,
@@ -203,15 +203,15 @@ export function AuditLogPage() {
     setPagedLogs(result.logs);
     setFilteredTotal(result.total);
     setIsLoading(false);
-  };
+  }, [currentPage, searchQuery, selectedUser, selectedAction, selectedCategory, dateFrom, dateTo]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     loadPagedLogs();
-  }, [searchQuery, selectedUser, selectedAction, selectedCategory, dateFrom, dateTo, currentPage]);
+  }, [loadPagedLogs]);
 
   // Get unique action types from logs
   const actionTypes = useMemo(() => {

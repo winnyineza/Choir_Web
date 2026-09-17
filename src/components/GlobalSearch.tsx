@@ -105,7 +105,7 @@ export function GlobalSearch({ open, onOpenChange, onResultClick }: GlobalSearch
         searchResults.push({
           id: contribution.id,
           type: "contribution",
-          title: `${member.name} - ${contribution.type}`,
+          title: `${member.name} - ${contribution.typeName}`,
           subtitle: `RWF ${contribution.amount.toLocaleString()} • ${new Date(contribution.createdAt).toLocaleDateString()}`,
           icon: Wallet,
           data: contribution,

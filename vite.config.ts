@@ -76,6 +76,7 @@ export default defineConfig(({ mode }) => ({
           'vendor-icons': ['lucide-react'],
           'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
           'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-motion': ['motion', 'motion/react'],
         },
       },
     },

@@ -44,7 +44,9 @@ export const defaultPaymentSettings: PaymentSettings = {
 
 export async function getPaymentSettings(): Promise<PaymentSettings> {
   try {
-    const stored = await dbGetSettings(PAYMENT_SETTINGS_KEY);
+    // choir_settings is a flat key/value store, so the payment blob lives under one key.
+    const allSettings = await dbGetSettings<Record<string, unknown>>({});
+    const stored = allSettings?.[PAYMENT_SETTINGS_KEY];
     if (!stored) return defaultPaymentSettings;
     const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
     return { ...defaultPaymentSettings, ...parsed };
@@ -55,7 +57,7 @@ export async function getPaymentSettings(): Promise<PaymentSettings> {
 
 export async function updatePaymentSettings(settings: Partial<PaymentSettings>): Promise<void> {
   const current = await getPaymentSettings();
-  await dbSaveSettings(PAYMENT_SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
+  await dbSaveSettings({ [PAYMENT_SETTINGS_KEY]: { ...current, ...settings } });
 }
 
 export interface FlutterwaveConfig {

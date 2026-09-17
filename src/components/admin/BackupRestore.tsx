@@ -18,7 +18,7 @@ import {
 
 export function BackupRestore() {
   const [isExporting, setIsExporting] = useState(false);
-  const [stats, setStats] = useState<ReturnType<typeof getBackupStats> | null>(null);
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getBackupStats>> | null>(null);
   const { toast } = useToast();
 
   // Load stats on mount

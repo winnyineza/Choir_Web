@@ -1,4 +1,5 @@
-import { CheckCircle, Calendar, MapPin, Ticket, QrCode, Clock, AlertCircle, Image, Printer, Mail } from "lucide-react";
+// Aliased: an unqualified `Image` would shadow the DOM Image constructor used below.
+import { CheckCircle, Calendar, MapPin, Ticket, QrCode, Clock, AlertCircle, Image as ImageIcon, Printer, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/flutterwave";
 import type { TicketOrder } from "@/lib/ticketService";
@@ -649,7 +650,7 @@ export function TicketConfirmation({ order, onClose }: TicketConfirmationProps) 
               onClick={handleDownloadTicket}
               disabled={isGenerating}
             >
-              <Image className="w-4 h-4 mr-2" />
+              <ImageIcon className="w-4 h-4 mr-2" />
               {isGenerating ? "Generating..." : "Download"}
             </Button>
             <Button 

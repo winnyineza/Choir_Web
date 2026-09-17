@@ -17,6 +17,7 @@ import choirImage from "@/assets/choir-group.jpg";
 import { LivestreamModal } from "@/components/events/LivestreamModal";
 import { EventReminderButton } from "@/components/events/EventReminderButton";
 import { checkAndProcessReminders, cleanupOldReminders } from "@/lib/reminderService";
+import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
 
 // Transform EventTicket to TicketTier format for the modal
 interface DisplayEvent {
@@ -203,23 +204,30 @@ export default function Events() {
         <section className="relative pt-32 pb-16 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                Upcoming
-              </span>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                <span className="gold-text">Events</span> & Concerts
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Join us for worship, celebration, and musical excellence
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
+                  Upcoming
+                </span>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+                  <span className="gold-text">Events</span> & Concerts
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-xl text-muted-foreground">
+                  Join us for worship, celebration, and musical excellence
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
         {/* Filters */}
         <section className="py-8 border-b border-primary/10">
           <div className="container mx-auto px-4">
+            <Reveal>
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="flex gap-2 flex-wrap">
                 {categories.map((category) => (
@@ -246,6 +254,7 @@ export default function Events() {
                 />
               </div>
             </div>
+            </Reveal>
           </div>
         </section>
 
@@ -257,17 +266,17 @@ export default function Events() {
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filteredEvents.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" stagger={0.1}>
                 {filteredEvents.map((event) => {
                   const remaining = getTotalRemaining(event);
                   const isSoldOut = remaining === 0;
                   const isLowStock = remaining > 0 && remaining <= 10;
                   
                   return (
-                    <div
-                      key={event.id}
-                      id={`event-${event.id}`}
-                      className={`card-glass rounded-2xl overflow-hidden group transition-all duration-500 ${
+                    <StaggerItem key={event.id} id={`event-${event.id}`}>
+                    <TiltCard
+                      maxTilt={6}
+                      className={`card-glass rounded-2xl overflow-hidden h-full group transition-colors duration-500 ${
                         isSoldOut ? "opacity-75" : "hover:border-primary/30"
                       }`}
                     >
@@ -434,13 +443,14 @@ export default function Events() {
                           />
                         </div>
                       </div>
-                    </div>
+                    </TiltCard>
+                    </StaggerItem>
                   );
                 })}
-              </div>
+              </Stagger>
             ) : (
               /* Empty State */
-              <div className="flex flex-col items-center justify-center py-24 text-center card-glass rounded-2xl border border-primary/20">
+              <Reveal className="flex flex-col items-center justify-center py-24 text-center card-glass rounded-2xl border border-primary/20">
                 <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
                   <Calendar className="w-8 h-8 text-primary" />
                 </div>
@@ -471,7 +481,7 @@ export default function Events() {
                     Subscribe to our newsletter below to be notified of new events!
                   </div>
                 )}
-              </div>
+              </Reveal>
             )}
           </div>
         </section>
@@ -479,17 +489,23 @@ export default function Events() {
         {/* Newsletter CTA */}
         <section className="py-16 bg-charcoal">
           <div className="container mx-auto px-4">
-            <div className="max-w-2xl mx-auto text-center">
-              <h2 className="font-display text-3xl font-bold mb-4">
-                Never Miss an <span className="gold-text">Event</span>
-              </h2>
-              <p className="text-muted-foreground mb-6">
-                Subscribe to our newsletter and be the first to know about upcoming concerts, revivals, and special events.
-              </p>
-              <div className="max-w-md mx-auto">
-                <NewsletterForm variant="inline" />
-              </div>
-            </div>
+            <Stagger className="max-w-2xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <h2 className="font-display text-3xl font-bold mb-4">
+                  Never Miss an <span className="gold-text">Event</span>
+                </h2>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-muted-foreground mb-6">
+                  Subscribe to our newsletter and be the first to know about upcoming concerts, revivals, and special events.
+                </p>
+              </StaggerItem>
+              <StaggerItem>
+                <div className="max-w-md mx-auto">
+                  <NewsletterForm variant="inline" />
+                </div>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
       </main>

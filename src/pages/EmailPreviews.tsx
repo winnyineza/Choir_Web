@@ -21,6 +21,8 @@ const defaultSettings: Settings = {
   memberPortalPin: "2024",
   scannerPin: "2024",
   contributionLockDay: 5,
+  contributionCurrentMonthDueDay: 10,
+  contributionOverdueReminderIntervalDays: 7,
 };
 
 const previewMember: Partial<Member> = {

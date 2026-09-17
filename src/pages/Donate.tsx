@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
 import { useState } from "react";
 import { DonationCheckout } from "@/components/payments/DonationCheckout";
 import {
@@ -94,39 +95,47 @@ export default function Donate() {
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
 
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
-                <Heart className="w-4 h-4" />
-                Support Our Ministry
-              </div>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                Partner With <span className="gold-text">Us</span>
-              </h1>
-              <p className="text-xl text-muted-foreground mb-8">
-                Your generous donation helps us continue spreading the gospel through music.
-                Every contribution, big or small, makes a difference in our ministry.
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
+                  <Heart className="w-4 h-4" />
+                  Support Our Ministry
+                </div>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+                  Partner With <span className="gold-text">Us</span>
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-xl text-muted-foreground mb-8">
+                  Your generous donation helps us continue spreading the gospel through music.
+                  Every contribution, big or small, makes a difference in our ministry.
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
         {/* Impact Areas */}
         <section className="py-12 bg-charcoal">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" stagger={0.1}>
               {impactAreas.map((area, index) => (
-                <div
-                  key={index}
-                  className="card-glass rounded-2xl p-6 text-center hover:border-primary/30 transition-all"
-                >
-                  <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <area.icon className="w-7 h-7 text-primary" />
-                  </div>
-                  <h3 className="font-display text-lg font-semibold mb-2">{area.title}</h3>
-                  <p className="text-sm text-muted-foreground">{area.description}</p>
-                </div>
+                <StaggerItem key={index}>
+                  <TiltCard
+                    maxTilt={6}
+                    className="card-glass rounded-2xl p-6 text-center h-full group hover:border-primary/30 transition-colors"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                      <area.icon className="w-7 h-7 text-primary" />
+                    </div>
+                    <h3 className="font-display text-lg font-semibold mb-2">{area.title}</h3>
+                    <p className="text-sm text-muted-foreground">{area.description}</p>
+                  </TiltCard>
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           </div>
         </section>
 
@@ -134,23 +143,28 @@ export default function Donate() {
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
-              <h2 className="font-display text-3xl font-bold text-center mb-10">
-                Ways to <span className="gold-text">Give</span>
-              </h2>
+              <Reveal>
+                <h2 className="font-display text-3xl font-bold text-center mb-10">
+                  Ways to <span className="gold-text">Give</span>
+                </h2>
+              </Reveal>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="card-glass rounded-2xl p-6 md:col-span-2">
-                  <div className="mb-6 text-center">
-                    <h3 className="font-display text-2xl font-semibold">Give Online</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Pay directly with MTN MoMo, or use Airtel Money and cards through Flutterwave.
-                    </p>
+              <Stagger className="grid grid-cols-1 md:grid-cols-2 gap-8" stagger={0.12}>
+                <StaggerItem className="md:col-span-2">
+                  <div className="card-glass rounded-2xl p-6">
+                    <div className="mb-6 text-center">
+                      <h3 className="font-display text-2xl font-semibold">Give Online</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Pay directly with MTN MoMo, or use Airtel Money and cards through Flutterwave.
+                      </p>
+                    </div>
+                    <DonationCheckout />
                   </div>
-                  <DonationCheckout />
-                </div>
+                </StaggerItem>
 
                 {/* Bank Transfer */}
-                <div className="card-glass rounded-2xl p-6">
+                <StaggerItem direction="right">
+                <div className="card-glass rounded-2xl p-6 h-full">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
                       <CreditCard className="w-6 h-6 text-blue-500" />
@@ -208,9 +222,11 @@ export default function Donate() {
                     </div>
                   </div>
                 </div>
+                </StaggerItem>
 
                 {/* Mobile Money */}
-                <div className="card-glass rounded-2xl p-6">
+                <StaggerItem direction="left">
+                <div className="card-glass rounded-2xl p-6 h-full">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
                       <Phone className="w-6 h-6 text-yellow-500" />
@@ -295,10 +311,11 @@ export default function Donate() {
                     </div>
                   </div>
                 </div>
-              </div>
+                </StaggerItem>
+              </Stagger>
 
               {/* Notify Us Form */}
-              <div className="mt-12 card-glass rounded-2xl p-8">
+              <Reveal className="mt-12 card-glass rounded-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <Sparkles className="w-6 h-6 text-primary" />
                   <h3 className="font-display text-xl font-semibold">
@@ -350,7 +367,7 @@ export default function Donate() {
                   <Heart className="w-4 h-4 mr-2" />
                   I've Made a Donation
                 </Button>
-              </div>
+              </Reveal>
             </div>
           </div>
         </section>
@@ -358,13 +375,17 @@ export default function Donate() {
         {/* Quote Section */}
         <section className="py-16 bg-charcoal">
           <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center">
-              <blockquote className="font-display text-2xl md:text-3xl italic text-foreground mb-6">
-                "Each of you should give what you have decided in your heart to give, not
-                reluctantly or under compulsion, for God loves a cheerful giver."
-              </blockquote>
-              <cite className="text-primary font-semibold">— 2 Corinthians 9:7</cite>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.12}>
+              <StaggerItem>
+                <blockquote className="font-display text-2xl md:text-3xl italic text-foreground mb-6">
+                  "Each of you should give what you have decided in your heart to give, not
+                  reluctantly or under compulsion, for God loves a cheerful giver."
+                </blockquote>
+              </StaggerItem>
+              <StaggerItem>
+                <cite className="text-primary font-semibold">— 2 Corinthians 9:7</cite>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
       </main>

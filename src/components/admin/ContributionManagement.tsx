@@ -676,11 +676,8 @@ export function ContributionManagement() {
         recordedBy: currentUser?.name || "Admin",
       })
     ));
-      void logAuditSafely(currentUser, "RECORD_CONTRIBUTIONS", `Recorded ${newMonths.length} month(s) for ${member.name}`);
-    if (currentUser) {
-      addAuditLog(currentUser, "RECORD_CONTRIBUTIONS", `Recorded ${newMonths.length} month(s) for ${member.name}`);
-    }
-    
+    void logAuditSafely(currentUser, "RECORD_CONTRIBUTIONS", `Recorded ${newMonths.length} month(s) for ${member.name}`);
+
     toast({ 
       title: "Contributions Recorded", 
       description: `${newMonths.length} month(s) recorded for ${member.name}.` 
@@ -1598,7 +1595,7 @@ export function ContributionManagement() {
                           }
 
                           // Use historical rate tracking - compare against rate at time of payment
-                          const paymentDetails = paymentDetailsMap[`${member.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: expectedAmount, hasHistoricalRate: false };
+                          const paymentDetails = paymentDetailsMap[`${member.id}-${month}-${bulkYear}`] ?? { amountPaid: 0, expectedAmount: expectedAmount, hasHistoricalRate: false, isTolerated: false };
                           const amountPaid = paymentDetails.amountPaid;
                           // Use the stored historical rate, or fall back to current expected amount
                           const effectiveExpected = paymentDetails.hasHistoricalRate 

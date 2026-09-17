@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { getAllGalleryItems } from "@/lib/dataService";
 
 interface Photo {
@@ -166,17 +167,23 @@ export default function Gallery() {
         <section className="relative pt-32 pb-16 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                Media
-              </span>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                Our <span className="gold-text">Gallery</span>
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Capturing moments of praise, fellowship, and ministry
-              </p>
-            </div>
+            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
+              <StaggerItem>
+                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
+                  Media
+                </span>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
+                  Our <span className="gold-text">Gallery</span>
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="text-xl text-muted-foreground">
+                  Capturing moments of praise, fellowship, and ministry
+                </p>
+              </StaggerItem>
+            </Stagger>
           </div>
         </section>
 
@@ -228,7 +235,7 @@ export default function Gallery() {
 
               {/* Empty State */}
               {!isLoading && albums.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-24 text-center card-glass rounded-2xl border border-primary/20">
+                <Reveal className="flex flex-col items-center justify-center py-24 text-center card-glass rounded-2xl border border-primary/20">
                   <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
                     <Images className="w-8 h-8 text-primary" />
                   </div>
@@ -236,7 +243,7 @@ export default function Gallery() {
                   <p className="max-w-md text-muted-foreground mb-6">
                     Our gallery is being updated. Check back soon for photos from our concerts, ministry trips, and special events!
                   </p>
-                </div>
+                </Reveal>
               )}
 
               {/* Sub-navigation for photos */}
@@ -268,11 +275,11 @@ export default function Gallery() {
 
               {/* Album View */}
               {!isLoading && albums.length > 0 && !selectedAlbum && photoViewMode === "albums" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" stagger={0.08}>
                   {albums.map((album) => (
-                    <div
+                    <StaggerItem
                       key={album.name}
-                      className="group cursor-pointer"
+                      className="group cursor-pointer hover-lift"
                       onClick={() => setSelectedAlbum(album)}
                     >
                       <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-secondary">
@@ -315,18 +322,18 @@ export default function Gallery() {
                           <ChevronRight className="w-5 h-5 text-primary-foreground" />
                         </div>
                       </div>
-                    </div>
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               )}
 
               {/* All Photos Grid View */}
               {!isLoading && allPhotos.length > 0 && !selectedAlbum && photoViewMode === "all" && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <Stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" stagger={0.04}>
                   {allPhotos.map((photo, index) => (
-                    <div
+                    <StaggerItem
                       key={photo.id}
-                      className="group cursor-pointer"
+                      className="group cursor-pointer hover-lift"
                       onClick={() => setSelectedImageIndex(index)}
                     >
                       <div className="relative rounded-xl overflow-hidden aspect-square">
@@ -347,9 +354,9 @@ export default function Gallery() {
                           )}
                         </div>
                       </div>
-                    </div>
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               )}
 
               {/* Selected Album View */}
@@ -374,11 +381,11 @@ export default function Gallery() {
                   </div>
 
                   {/* Album Photos Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <Stagger className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" stagger={0.04} key={selectedAlbum.name}>
                     {(selectedAlbum.photos || []).map((photo, index) => (
-                      <div
+                      <StaggerItem
                         key={photo.id}
-                        className="group cursor-pointer"
+                        className="group cursor-pointer hover-lift"
                         onClick={() => setSelectedImageIndex(index)}
                       >
                         <div className="relative rounded-xl overflow-hidden aspect-square">
@@ -396,9 +403,9 @@ export default function Gallery() {
                             <p className="text-sm font-medium text-foreground truncate">{photo.title}</p>
                           </div>
                         </div>
-                      </div>
+                      </StaggerItem>
                     ))}
-                  </div>
+                  </Stagger>
                 </div>
               )}
             </div>
@@ -411,7 +418,7 @@ export default function Gallery() {
             <div className="container mx-auto px-4">
               {/* Empty State for Videos */}
               {videos.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-24 text-center card-glass rounded-2xl border border-primary/20">
+                <Reveal className="flex flex-col items-center justify-center py-24 text-center card-glass rounded-2xl border border-primary/20">
                   <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
                     <Video className="w-8 h-8 text-primary" />
                   </div>
@@ -419,15 +426,15 @@ export default function Gallery() {
                   <p className="max-w-md text-muted-foreground mb-6">
                     Videos from our performances and music releases will appear here. Check back soon!
                   </p>
-                </div>
+                </Reveal>
               )}
 
               {videos.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" stagger={0.08}>
                 {videos.map((video) => (
-                  <div
+                  <StaggerItem
                     key={video.id}
-                    className="group cursor-pointer"
+                    className="group cursor-pointer hover-lift"
                     onClick={() => setSelectedVideo(video)}
                   >
                     <div className="relative rounded-2xl overflow-hidden">
@@ -461,9 +468,9 @@ export default function Gallery() {
                         {video.title}
                       </h3>
                     </div>
-                  </div>
+                  </StaggerItem>
                 ))}
-              </div>
+              </Stagger>
               )}
             </div>
           </section>
