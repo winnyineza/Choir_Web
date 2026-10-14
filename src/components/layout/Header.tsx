@@ -9,6 +9,9 @@ import { getBookableEvents } from "@/lib/dataService";
 import logo from "@/assets/LogoTSC.jpg";
 import { MELODIES_OF_GRACE, isMelodiesUpcoming } from "@/lib/melodiesOfGrace";
 
+// Online giving is paused until the payment APIs are live; flip to true to bring the header button back.
+const SHOW_GIVE_BUTTON = false;
+
 const baseNavLinks = [
   { name: "About", href: "/about" },
   { name: "Ministry", href: "/ministry" },
@@ -149,9 +152,11 @@ export function Header() {
         {/* Actions */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
-          <Button variant="gold" size="sm" asChild>
-            <Link to="/donate">Give</Link>
-          </Button>
+          {SHOW_GIVE_BUTTON && (
+            <Button variant="gold" size="sm" asChild>
+              <Link to="/donate">Give</Link>
+            </Button>
+          )}
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -224,9 +229,11 @@ export function Header() {
               transition={{ delay: 0.4, duration: 0.6 }}
             >
               <ThemeToggle className="h-12 w-12 border border-foreground/15" />
-              <Button variant="gold" size="lg" asChild className="min-w-0 flex-1 sm:flex-none">
-                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Give</Link>
-              </Button>
+              {SHOW_GIVE_BUTTON && (
+                <Button variant="gold" size="lg" asChild className="min-w-0 flex-1 sm:flex-none">
+                  <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Give</Link>
+                </Button>
+              )}
             </motion.div>
           </motion.div>
         )}
