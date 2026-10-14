@@ -175,15 +175,15 @@ export default function Gallery() {
         {/* View Toggle */}
         <section className="py-8">
           <div className="container mx-auto px-4">
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => {
                   setView("photos");
                   setSelectedAlbum(null);
                 }}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-medium transition-colors duration-500 sm:px-6 sm:py-3 sm:text-base ${
                   view === "photos"
-                    ? "bg-gold-gradient text-primary-foreground"
+                    ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18)]"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -192,9 +192,9 @@ export default function Gallery() {
               </button>
               <button
                 onClick={() => setView("videos")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-medium transition-colors duration-500 sm:px-6 sm:py-3 sm:text-base ${
                   view === "videos"
-                    ? "bg-gold-gradient text-primary-foreground"
+                    ? "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18)]"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -231,11 +231,11 @@ export default function Gallery() {
 
               {/* Sub-navigation for photos */}
               {!isLoading && albums.length > 0 && !selectedAlbum && (
-                <div className="flex items-center justify-between mb-8">
+                <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                   <h2 className="font-display text-2xl font-semibold">
                     {photoViewMode === "albums" ? "Albums" : "All Photos"}
                   </h2>
-                  <div className="flex gap-2">
+                  <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
                     <Button
                       variant={photoViewMode === "albums" ? "gold" : "outline"}
                       size="sm"
@@ -284,11 +284,11 @@ export default function Gallery() {
                           />
                         </div>
 
-                        {/* Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300 rounded-xl" />
+                        {/* Overlay: text sits on photography, so it gets a dark scrim in both themes */}
+                        <div className="absolute inset-0 rounded-xl bg-[linear-gradient(0deg,hsl(36_12%_4%/0.88)_0%,hsl(36_12%_4%/0.35)_45%,transparent_75%)] transition-opacity duration-500 group-hover:opacity-90" />
 
-                        {/* Album Info */}
-                        <div className="absolute bottom-0 left-0 right-0 p-5">
+                        {/* Album Info (dark tokens so the label reads on the scrim in light mode too) */}
+                        <div className="tone-dark absolute bottom-0 left-0 right-0 p-5">
                           <div className="flex items-center gap-2 mb-2">
                             <Images className="w-5 h-5 text-primary" />
                             <span className="text-sm text-primary font-medium">

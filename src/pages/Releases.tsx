@@ -241,7 +241,7 @@ export default function Releases() {
                             href={album.listenUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-5 py-2.5 rounded-full bg-gold-gradient text-primary-foreground font-semibold flex items-center gap-2"
+                            className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold flex items-center gap-2 transition-colors duration-500 hover:bg-gold-light"
                           >
                             <Play className="w-4 h-4" />
                             Listen
@@ -251,7 +251,7 @@ export default function Releases() {
                             href={`https://www.youtube.com/results?search_query=serenades+of+praise+${encodeURIComponent(album.title)}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-5 py-2.5 rounded-full bg-gold-gradient text-primary-foreground font-semibold flex items-center gap-2"
+                            className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold flex items-center gap-2 transition-colors duration-500 hover:bg-gold-light"
                           >
                             <Play className="w-4 h-4" />
                             Find

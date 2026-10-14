@@ -425,15 +425,16 @@
 
   /*
    * Icon-only gold tiles become outlined medallions: a hairline ring with a champagne glyph.
-   * Tiles that hold text (badges, avatars, buttons) keep their solid fill.
+   * CSS cannot see text, so this only targets plain div/span tiles. Buttons and links that pair an
+   * icon with a label (tabs, "Listen on" links) must keep their solid fill or the label disappears.
    */
-  :is(.bg-gold-gradient, [class*="bg-[var(--gradient-gold)]"]):has(> svg:only-child) {
+  :is(div, span):is(.bg-gold-gradient, [class*="bg-[var(--gradient-gold)]"]):has(> svg:only-child) {
     background: transparent;
     border: 1px solid hsl(var(--gold) / 0.45);
     box-shadow: none;
   }
 
-  :is(.bg-gold-gradient, [class*="bg-[var(--gradient-gold)]"]):has(> svg:only-child) > svg {
+  :is(div, span):is(.bg-gold-gradient, [class*="bg-[var(--gradient-gold)]"]):has(> svg:only-child) > svg {
     color: hsl(var(--gold));
     stroke-width: 1.4;
   }
