@@ -109,6 +109,7 @@ export function PageHero({ eyebrow, title, lede, image, imageAlt = "", children,
 
   return (
     <section
+      data-header-tone={image ? "dark" : undefined}
       className={cn(
         "relative overflow-hidden",
         image ? "min-h-[78svh] flex items-end bg-ink text-[hsl(40_30%_91%)]" : "pt-40 md:pt-48 pb-16 md:pb-24",

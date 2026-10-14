@@ -10,8 +10,8 @@
     <link rel="canonical" href="https://serenadesofpraise.com" />
     
     <!-- Theme Color -->
-    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0a09" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f8f6f1" media="(prefers-color-scheme: light)" />
     <meta name="msapplication-TileColor" content="#d4a537" />
     <meta name="color-scheme" content="dark light" />
     
@@ -85,6 +85,18 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     
+    <!-- Apply the theme before first paint: the visitor's saved choice, otherwise their device setting. -->
+    <script>
+      (function () {
+        var theme = null;
+        try { theme = localStorage.getItem('theme'); } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.classList.add(theme);
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
 
   <body>
@@ -94,14 +106,5 @@
     <!-- Flutterwave Payment SDK -->
     <script src="https://checkout.flutterwave.com/v3.js" async></script>
     
-    <!-- Prevent FOUC for dark mode -->
-    <script>
-      (function() {
-        const theme = localStorage.getItem('theme');
-        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
   </body>
 </html>

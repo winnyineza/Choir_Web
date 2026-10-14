@@ -294,6 +294,23 @@
   }
 }
 
+/*
+ * Sections built on dark photography stay dark in both themes. Anything layered on top of them
+ * (the header, for instance) borrows the dark tokens via this class so it stays legible.
+ */
+.tone-dark {
+  --background: 36 12% 4%;
+  --foreground: 40 30% 91%;
+  --muted-foreground: 38 9% 64%;
+  --primary: 40 45% 60%;
+  --primary-foreground: 36 14% 6%;
+  --border: 38 10% 15%;
+  --ring: 40 45% 60%;
+  --gold: 40 45% 60%;
+  --gold-light: 40 52% 74%;
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     @apply border-border;

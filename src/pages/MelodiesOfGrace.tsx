@@ -120,7 +120,7 @@ export default function MelodiesOfGrace() {
       <Header />
       <main>
         {/* ---------- Invitation ---------- */}
-        <section className={`relative overflow-hidden bg-ink ${ON_DARK}`}>
+        <section data-header-tone="dark" className={`relative overflow-hidden bg-ink ${ON_DARK}`}>
           <img
             src={EVENT.poster}
             alt=""

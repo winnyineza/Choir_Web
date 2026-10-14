@@ -75,6 +75,7 @@ export function Hero() {
   return (
     <section
       ref={sectionRef}
+      data-header-tone="dark"
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden bg-ink text-[hsl(40_30%_91%)] [perspective:1200px]"

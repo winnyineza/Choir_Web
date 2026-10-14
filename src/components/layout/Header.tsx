@@ -21,6 +21,7 @@ const baseNavLinks = [
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
+  const [onDark, setOnDark] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [hasEvents, setHasEvents] = useState(false);
   const lastY = useRef(0);
@@ -33,7 +34,18 @@ export function Header() {
 
   // The bar condenses once you leave the top, steps aside while you read down, and returns when you scroll up.
   useEffect(() => {
+    // Is the bar currently over a section that stays dark in both themes (a hero photograph)?
+    const checkTone = () => {
+      const probe = 40;
+      const dark = Array.from(document.querySelectorAll<HTMLElement>('[data-header-tone="dark"]')).some((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.top <= probe && rect.bottom >= probe;
+      });
+      setOnDark(dark);
+    };
+
     const handleScroll = () => {
+      checkTone();
       const y = window.scrollY;
       setIsScrolled(y > 24);
       setIsHidden(y > 320 && y > lastY.current + 4);
@@ -42,8 +54,13 @@ export function Header() {
     };
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    // Pages load lazily and animate in, so look again once the new page has had time to render.
+    const timers = [80, 400, 1000].map((ms) => window.setTimeout(checkTone, ms));
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      timers.forEach(window.clearTimeout);
+    };
+  }, [location.pathname]);
 
   // Check if there are any bookable events
   useEffect(() => {
@@ -89,7 +106,8 @@ export function Header() {
           : "bg-gradient-to-b from-background/70 to-transparent border-transparent py-6",
         // backdrop-filter would trap the fixed full-screen menu inside the header, so drop it while open.
         isScrolled && !isMobileMenuOpen && "backdrop-blur-md",
-        isHidden && !isMobileMenuOpen && "-translate-y-full"
+        isHidden && !isMobileMenuOpen && "-translate-y-full",
+        onDark && !isMobileMenuOpen && "tone-dark"
       )}
     >
       <div className="container mx-auto px-4 lg:px-10 flex items-center justify-between gap-6">
@@ -200,14 +218,14 @@ export function Header() {
               ))}
             </motion.nav>
             <motion.div
-              className="container mx-auto px-6 pb-10 flex items-center justify-between"
+              className="container mx-auto px-6 pb-10 flex items-center justify-between gap-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.6 }}
             >
-              <ThemeToggle />
-              <Button variant="gold" size="lg" asChild>
-                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Give to the ministry</Link>
+              <ThemeToggle className="h-12 w-12 border border-foreground/15" />
+              <Button variant="gold" size="lg" asChild className="min-w-0 flex-1 sm:flex-none">
+                <Link to="/donate" onClick={() => setIsMobileMenuOpen(false)}>Give</Link>
               </Button>
             </motion.div>
           </motion.div>

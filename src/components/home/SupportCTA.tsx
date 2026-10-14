@@ -22,7 +22,7 @@ const channels = [
 
 export function SupportCTA() {
   return (
-    <section className="relative overflow-hidden bg-ink text-[hsl(40_30%_91%)]">
+    <section data-header-tone="dark" className="relative overflow-hidden bg-ink text-[hsl(40_30%_91%)]">
       <img
         src={choirImage}
         alt=""
