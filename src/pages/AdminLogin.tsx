@@ -329,15 +329,13 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 group">
-            <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-primary/40 shadow-[0_0_24px_hsl(var(--gold)/0.35)] group-hover:scale-110 transition-transform">
+            <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-primary/40 shadow-[0_0_24px_hsl(var(--gold)/0.35)] group-hover:scale-[1.03] transition-transform">
               <img src={logo} alt="Serenades of Praise Logo" className="w-full h-full object-cover" />
             </div>
           </Link>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Instagram, Facebook, Youtube, Twitter, Mail, Phone, MapPin, Eye } from "lucide-react";
+import { Instagram, Facebook, Youtube, Twitter } from "lucide-react";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { useVisitorCount } from "@/hooks/useVisitorCount";
 import { getBookableEvents } from "@/lib/dataService";
@@ -27,6 +27,27 @@ const quickLinks = [
   { name: "Contact", href: "/contact" },
 ];
 
+const involvedLinks = [
+  { name: "Join the choir", href: "/join" },
+  { name: "Support the ministry", href: "/support" },
+  { name: "Give", href: "/donate" },
+  { name: "Member portal", href: "/member-portal" },
+];
+
+const socials = [
+  { icon: Instagram, href: "https://www.instagram.com/theserenadesofpraise_group/", label: "Instagram" },
+  { icon: Facebook, href: "https://web.facebook.com/profile.php?id=61558957757084", label: "Facebook" },
+  { icon: Youtube, href: "https://www.youtube.com/@theserenadesofpraisegroup", label: "YouTube" },
+  { icon: Twitter, href: "https://x.com/SerenadesTSC", label: "X (Twitter)" },
+  { icon: SpotifyIcon, href: "https://open.spotify.com/user/31vkr3pk5yd5y2mpocfhibr4xbfm?si=R0-7_dXCRL2tlA84TP04TA", label: "Spotify" },
+];
+
+function FooterHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-6 text-[0.62rem] font-medium uppercase tracking-luxe text-primary">{children}</p>
+  );
+}
+
 export function Footer() {
   const visitorCount = useVisitorCount();
   const [hasEvents, setHasEvents] = useState(false);
@@ -34,62 +55,85 @@ export function Footer() {
   useEffect(() => {
     getBookableEvents().then(events => setHasEvents(events.length > 0));
   }, []);
-  
+
   return (
-    <footer className="bg-charcoal border-t border-primary/10">
-      {/* Newsletter Section */}
-      <div className="border-b border-primary/10">
-        <div className="container mx-auto px-4 py-10">
-          <div className="max-w-2xl mx-auto text-center">
-            <h3 className="font-display text-2xl font-bold text-foreground mb-2">
-              Stay <span className="gold-text">Connected</span>
-            </h3>
-            <p className="text-muted-foreground text-sm mb-6">
-              Subscribe to receive updates on events, new releases, and ministry news.
+    <footer className="relative bg-background border-t border-foreground/[0.07] overflow-hidden">
+      {/* Newsletter, set like a closing line in a concert programme */}
+      <div className="container mx-auto px-4 lg:px-10 pt-24 pb-20">
+        <div className="grid gap-12 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-7">
+            <p className="eyebrow mb-6">The Programme</p>
+            <h2 className="display-lg text-foreground">
+              Stay near the <span className="italic text-primary">music.</span>
+            </h2>
+          </div>
+          <div className="lg:col-span-5">
+            <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+              New releases, concert dates and ministry news. A few letters a year, never noise.
             </p>
-            <div className="max-w-md mx-auto">
-              <NewsletterForm variant="inline" />
-            </div>
+            <NewsletterForm variant="inline" />
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+      <div className="container mx-auto px-4 lg:px-10">
+        <div className="hairline" />
+      </div>
+
+      <div className="container mx-auto px-4 lg:px-10 py-16">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-12">
           {/* Brand */}
-          <div className="space-y-4">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full overflow-hidden">
-                <img
-                  src={logo}
-                  alt="Serenades of Praise Logo"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div>
-                <h2 className="font-display text-xl font-bold gold-text">Serenades of Praise</h2>
-                <p className="text-sm text-muted-foreground">Est. 2024</p>
-              </div>
+          <div className="col-span-2 md:col-span-5 space-y-6">
+            <Link to="/" className="inline-flex items-center gap-4">
+              <span className="w-12 h-12 rounded-full overflow-hidden ring-1 ring-primary/40 ring-offset-2 ring-offset-background">
+                <img src={logo} alt="Serenades of Praise Logo" className="w-full h-full object-cover" />
+              </span>
+              <span className="font-display text-2xl text-foreground leading-none">
+                Serenades <span className="italic text-primary">of</span> Praise
+              </span>
             </Link>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Lifting hearts through harmonious praise. A ministry dedicated to glorifying God through sacred music.
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+              A choir ministry of Kacyiru Seventh-day Adventist Church, lifting hearts through sacred music since 2024.
             </p>
+            <div className="flex gap-2">
+              {socials.map(({ icon: Icon, href, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="w-10 h-10 rounded-full border border-foreground/10 flex items-center justify-center text-muted-foreground transition-colors duration-500 hover:border-primary hover:text-primary"
+                >
+                  <Icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              Quick Links
-            </h3>
-            <ul className="space-y-2">
+          {/* Explore */}
+          <div className="md:col-span-2">
+            <FooterHeading>Explore</FooterHeading>
+            <ul className="space-y-3">
               {quickLinks
                 .filter(link => link.name !== "Events" || hasEvents)
                 .map((link) => (
+                  <li key={link.name}>
+                    <Link to={link.href} className="text-sm text-foreground/75 transition-colors hover:text-primary">
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+            </ul>
+          </div>
+
+          {/* Get involved */}
+          <div className="md:col-span-2">
+            <FooterHeading>Take part</FooterHeading>
+            <ul className="space-y-3">
+              {involvedLinks.map((link) => (
                 <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-muted-foreground hover:text-primary transition-colors text-sm"
-                  >
+                  <Link to={link.href} className="text-sm text-foreground/75 transition-colors hover:text-primary">
                     {link.name}
                   </Link>
                 </li>
@@ -98,89 +142,44 @@ export function Footer() {
           </div>
 
           {/* Contact */}
-          <div>
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              Contact
-            </h3>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-3 text-sm text-muted-foreground">
-                <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
-                Kacyiru SDA Church, Kigali
-              </li>
-              <li>
-                <a 
-                  href="mailto:theserenadeschoir@gmail.com"
-                  className="flex items-center gap-3 text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Mail className="w-4 h-4 text-primary flex-shrink-0" />
+          <div className="col-span-2 md:col-span-3">
+            <FooterHeading>Visit &amp; write</FooterHeading>
+            <address className="not-italic space-y-3 text-sm text-foreground/75">
+              <p>Kacyiru SDA Church<br />Kigali, Rwanda</p>
+              <p>
+                <a href="mailto:theserenadeschoir@gmail.com" className="transition-colors hover:text-primary">
                   theserenadeschoir@gmail.com
                 </a>
-              </li>
-              <li>
-                <a 
-                  href="tel:+250780623144"
-                  className="flex items-center gap-3 text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Phone className="w-4 h-4 text-primary flex-shrink-0" />
+              </p>
+              <p>
+                <a href="tel:+250780623144" className="tabular-nums transition-colors hover:text-primary">
                   +250 780 623 144
                 </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Socials */}
-          <div>
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              Follow Us
-            </h3>
-            <div className="flex gap-3">
-              {[
-                { icon: Instagram, href: "https://www.instagram.com/theserenadesofpraise_group/", label: "Instagram" },
-                { icon: Facebook, href: "https://web.facebook.com/profile.php?id=61558957757084", label: "Facebook" },
-                { icon: Youtube, href: "https://www.youtube.com/@theserenadesofpraisegroup", label: "YouTube" },
-                { icon: Twitter, href: "https://x.com/SerenadesTSC", label: "X (Twitter)" },
-                { icon: SpotifyIcon, href: "https://open.spotify.com/user/31vkr3pk5yd5y2mpocfhibr4xbfm?si=R0-7_dXCRL2tlA84TP04TA", label: "Spotify" },
-              ].map(({ icon: Icon, href, label }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="w-10 h-10 rounded-full border border-primary/30 flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300"
-                >
-                  <Icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
-            <div className="mt-6 p-4 rounded-lg bg-secondary/50 border border-primary/10">
-              <p className="text-xs text-muted-foreground">
-                Member of <span className="text-primary">Kacyiru SDA Church</span>
               </p>
-            </div>
+            </address>
           </div>
         </div>
+      </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-10 pt-8 border-t border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Serenades of Praise Choir. All rights reserved.
-            </p>
+      {/* Oversized wordmark, cropped by the page edge */}
+      <div aria-hidden className="pointer-events-none select-none px-4 lg:px-10">
+        <p className="font-display italic leading-[0.8] text-foreground/[0.04] whitespace-nowrap text-center" style={{ fontSize: "clamp(4rem, 17vw, 17rem)" }}>
+          Serenades
+        </p>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="border-t border-foreground/[0.07]">
+        <div className="container mx-auto px-4 lg:px-10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6">
+            <p>© {new Date().getFullYear()} Serenades of Praise</p>
             {visitorCount > 0 && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Eye className="w-4 h-4 text-primary" />
-                <span>{visitorCount.toLocaleString()} visitors</span>
-              </div>
+              <p className="tabular-nums">{visitorCount.toLocaleString()} visitors</p>
             )}
           </div>
-          <div className="flex gap-6 text-sm">
-            <Link to="/privacy" className="text-muted-foreground hover:text-primary transition-colors">
-              Privacy Policy
-            </Link>
-            <Link to="/terms" className="text-muted-foreground hover:text-primary transition-colors">
-              Terms of Service
-            </Link>
+          <div className="flex gap-6">
+            <Link to="/privacy" className="transition-colors hover:text-primary">Privacy</Link>
+            <Link to="/terms" className="transition-colors hover:text-primary">Terms</Link>
           </div>
         </div>
       </div>

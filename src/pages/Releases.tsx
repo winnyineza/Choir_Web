@@ -16,6 +16,7 @@ import {
 } from "@/lib/releaseService";
 import { getPlatformConfig } from "@/lib/streamingPlatforms";
 import { AnimatedCounter, Reveal, Stagger, StaggerItem } from "@/components/motion";
+import { PageHero } from "@/components/editorial";
 
 export default function Releases() {
   useDocumentTitle("Music Releases");
@@ -54,29 +55,11 @@ export default function Releases() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  Music Releases
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  <span className="gold-text">Albums</span> & Videos
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  Listen everywhere you stream
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="Recordings"
+          title={<>Albums <span className="italic text-primary">&amp;</span> films</>}
+          lede="Hymns, anthems and new songs from the choir. Listen wherever you stream."
+        />
 
         {/* Listen Everywhere Banner */}
         {platforms.length > 0 && (
@@ -111,7 +94,7 @@ export default function Releases() {
                       onClick={(e) => !platform.url && e.preventDefault()}
                     >
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-hover:scale-[1.03]"
                         style={{ backgroundColor: config.color }}
                       >
                         <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5">
@@ -172,7 +155,7 @@ export default function Releases() {
                         <img
                           src={latestAlbum.coverImage}
                           alt={latestAlbum.title}
-                          className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full aspect-square object-cover group-hover:scale-[1.02] transition-transform duration-500"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src =
                               "https://via.placeholder.com/400?text=Album";
@@ -246,7 +229,7 @@ export default function Releases() {
                       <img
                         src={album.coverImage}
                         alt={album.title}
-                        className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full aspect-square object-cover group-hover:scale-[1.02] transition-transform duration-500"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
                             "https://via.placeholder.com/300?text=Album";
@@ -351,7 +334,7 @@ export default function Releases() {
                             `https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`
                           }
                           alt={video.title}
-                          className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full aspect-video object-cover group-hover:scale-[1.02] transition-transform duration-500"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
                           }}
@@ -391,7 +374,7 @@ export default function Releases() {
                               `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`
                             }
                             alt={video.title}
-                            className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="w-full aspect-video object-cover group-hover:scale-[1.02] transition-transform duration-500"
                           />
                           <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                             <Play className="w-8 h-8 text-white" />
@@ -414,8 +397,6 @@ export default function Releases() {
         {(albums.length > 0 || musicVideos.length > 0) && (
           <section className="py-20 bg-charcoal relative overflow-hidden">
             {/* Background decorations */}
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1DB954]/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
 
             <div className="container mx-auto px-4 relative z-10">
               <Stagger className="max-w-4xl mx-auto text-center" stagger={0.1}>

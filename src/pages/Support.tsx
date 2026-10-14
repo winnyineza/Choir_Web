@@ -1,49 +1,72 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Heart, CreditCard, Phone, Send, CheckCircle, Loader2, Zap, Copy,
-  Music, Users, Globe, Mic2, Shield, Lock, Smartphone, Banknote, Wallet, QrCode
-} from "lucide-react";
+import { ArrowDown, ArrowRight, Check, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { motion } from "motion/react";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { DonationCheckout } from "@/components/payments/DonationCheckout";
+import { PageHero, SectionHead } from "@/components/editorial";
+import { cn } from "@/lib/utils";
+import supportHero from "@/assets/choir-group2.jpg";
 
 const impactAreas = [
   {
-    icon: Music,
-    title: "Music Production",
-    description: "Recording albums & spreading the gospel through music",
-    color: "text-purple-500",
-    bg: "bg-purple-500/20",
+    title: "Music production",
+    description: "Recording albums and films that carry the gospel further than our voices can reach.",
   },
   {
-    icon: Users,
-    title: "Community Outreach",
-    description: "Ministry trips & community service programs",
-    color: "text-blue-500",
-    bg: "bg-blue-500/20",
+    title: "Ministry trips",
+    description: "Travel, lodging and logistics to sing at churches and gatherings across Rwanda.",
   },
   {
-    icon: Globe,
-    title: "Digital Ministry",
-    description: "Expanding online presence to reach more souls",
-    color: "text-green-500",
-    bg: "bg-green-500/20",
+    title: "Digital ministry",
+    description: "Streaming, video and an online home that meets people where they are.",
   },
   {
-    icon: Mic2,
-    title: "Equipment & Training",
-    description: "Instruments, sound systems & vocal training",
-    color: "text-orange-500",
-    bg: "bg-orange-500/20",
+    title: "Equipment & training",
+    description: "Instruments, sound systems and vocal coaching that honour God with excellence.",
   },
 ];
+
+const fieldClass =
+  "h-12 rounded-[3px] border-foreground/12 bg-card text-base shadow-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-0";
+
+const EASE = [0.19, 1, 0.22, 1] as const;
+
+function CopyRow({
+  label,
+  value,
+  display,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  display?: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-4">
+      <span className="text-[0.62rem] uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-3">
+        <span className="font-display text-xl text-foreground tabular-nums tracking-wide select-all">{display ?? value}</span>
+        <button
+          type="button"
+          onClick={onCopy}
+          aria-label={`Copy ${label.toLowerCase()}`}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-foreground/15 text-muted-foreground transition-colors duration-500 hover:border-primary hover:text-primary"
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />}
+        </button>
+      </span>
+    </div>
+  );
+}
 
 export default function Support() {
   useDocumentTitle("Support Our Ministry");
@@ -57,7 +80,7 @@ export default function Support() {
     navigator.clipboard.writeText(text);
     setCopied(label);
     toast({
-      title: "Copied!",
+      title: "Copied",
       description: `${label} copied to clipboard.`,
     });
     setTimeout(() => setCopied(null), 2000);
@@ -73,7 +96,7 @@ export default function Support() {
     setMessageSubmitted(true);
 
     toast({
-      title: "Message Sent!",
+      title: "Message sent",
       description: "Thank you for your encouraging words. God bless you!",
     });
 
@@ -87,406 +110,262 @@ export default function Support() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero Section */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
-                  <Heart className="w-4 h-4" />
-                  Partner With Us
-                </div>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-                  Support Our <span className="gold-text">Ministry</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Your generosity enables us to spread the gospel through music, 
-                  reaching more hearts across Rwanda and beyond.
-                </p>
-              </StaggerItem>
-            </Stagger>
+        <PageHero
+          eyebrow="Partner with us"
+          title={<>Support the <span className="italic text-primary">ministry</span></>}
+          lede="Your generosity carries the gospel in song to more hearts across Rwanda and beyond."
+          image={supportHero}
+          imageAlt="The choir in the hills of Rwanda"
+        >
+          <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
+            <a
+              href="#give"
+              onClick={() => setPaymentMode("online")}
+              className="link-luxe !text-[hsl(40_30%_91%/0.9)] hover:!text-[hsl(40_45%_70%)]"
+            >
+              Give online
+              <ArrowDown className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="#give"
+              onClick={() => setPaymentMode("manual")}
+              className="link-luxe !text-[hsl(40_30%_91%/0.9)] hover:!text-[hsl(40_45%_70%)]"
+            >
+              Transfer directly
+              <span className="link-luxe-rule" />
+            </a>
           </div>
-        </section>
+        </PageHero>
 
-        {/* Impact Areas */}
-        <section className="py-12 bg-charcoal/50">
-          <div className="container mx-auto px-4">
-            <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6" stagger={0.1}>
-              {impactAreas.map((area, index) => (
-                <StaggerItem key={index}>
-                  <TiltCard
-                    maxTilt={6}
-                    className="card-glass rounded-2xl p-4 md:p-6 text-center h-full hover:border-primary/30 transition-colors group"
-                  >
-                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full ${area.bg} flex items-center justify-center mx-auto mb-3 md:mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6`}>
-                      <area.icon className={`w-6 h-6 md:w-7 md:h-7 ${area.color}`} />
-                    </div>
-                    <h3 className="font-display text-sm md:text-base font-semibold mb-1 md:mb-2">{area.title}</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">{area.description}</p>
-                  </TiltCard>
+        {/* Where the gift goes */}
+        <section className="py-24 md:py-32">
+          <div className="container mx-auto px-4 lg:px-10">
+            <SectionHead
+              align="split"
+              index="I"
+              eyebrow="Your impact"
+              title={<>Where your gift <span className="italic text-primary">goes.</span></>}
+              lede="Every gift is recorded by the choir's treasury and directed where the ministry needs it most."
+            />
+            <Stagger className="grid border-t border-foreground/10 sm:grid-cols-2 lg:grid-cols-4" stagger={0.1}>
+              {impactAreas.map((area, i) => (
+                <StaggerItem key={area.title}>
+                  <div className="group h-full border-foreground/10 py-10 sm:pr-8 lg:border-l lg:pl-8 lg:first:border-l-0 lg:first:pl-0">
+                    <p className="font-display text-5xl italic text-primary/60 transition-colors duration-700 group-hover:text-primary">
+                      {String(i + 1).padStart(2, "0")}
+                    </p>
+                    <h3 className="mt-8 font-display text-2xl text-foreground">{area.title}</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{area.description}</p>
+                  </div>
                 </StaggerItem>
               ))}
             </Stagger>
           </div>
         </section>
 
-        {/* Payment Section */}
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
+        {/* Giving */}
+        <section id="give" className="scroll-mt-24 border-y border-foreground/[0.06] bg-charcoal py-24 md:py-32">
+          <div className="container mx-auto px-4 lg:px-10">
+            <div className="mb-16 flex flex-col gap-10 md:mb-20 lg:flex-row lg:items-end lg:justify-between">
               <Reveal>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-8">
-                  Choose How to <span className="gold-text">Give</span>
+                <p className="mb-6 flex items-center gap-4 text-[0.65rem] uppercase tracking-luxe text-primary">
+                  <span className="font-display text-base normal-case tracking-normal italic">II</span>
+                  <span className="h-px w-8 bg-primary/60" />
+                  Give
+                </p>
+                <h2 className="display-lg text-foreground">
+                  {paymentMode === "online" ? (
+                    <>Three quiet <span className="italic text-primary">steps.</span></>
+                  ) : (
+                    <>Give <span className="italic text-primary">directly.</span></>
+                  )}
                 </h2>
               </Reveal>
 
-              {/* Accepted Payment Methods */}
-              <Reveal delay={0.08} className="flex flex-wrap items-center justify-center gap-4 mb-6">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
-                  <Smartphone className="w-3.5 h-3.5" />
-                  MTN MoMo
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
-                  <Smartphone className="w-3.5 h-3.5" />
-                  Airtel Money
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
-                  <CreditCard className="w-3.5 h-3.5" />
-                  Visa / Mastercard
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full text-xs font-medium text-muted-foreground">
-                  <Banknote className="w-3.5 h-3.5" />
-                  Bank Transfer
+              {/* Mode switch */}
+              <Reveal delay={0.1}>
+                <div className="relative inline-grid grid-cols-2 rounded-full border border-foreground/15 p-1" role="tablist" aria-label="How to give">
+                  {(["online", "manual"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      role="tab"
+                      aria-selected={paymentMode === mode}
+                      onClick={() => setPaymentMode(mode)}
+                      className={cn(
+                        "relative z-10 h-11 rounded-full px-4 sm:px-6 text-[0.64rem] sm:text-[0.68rem] font-medium uppercase tracking-[0.18em] transition-colors duration-500",
+                        paymentMode === mode ? "text-primary-foreground" : "text-foreground/70 hover:text-foreground"
+                      )}
+                    >
+                      {paymentMode === mode && (
+                        <motion.span
+                          layoutId="give-mode"
+                          className="absolute inset-0 -z-10 rounded-full bg-primary"
+                          transition={{ type: "spring", stiffness: 300, damping: 32 }}
+                        />
+                      )}
+                      {mode === "online" ? "Give online" : "Bank & MoMo"}
+                    </button>
+                  ))}
                 </div>
               </Reveal>
+            </div>
 
-              {/* Payment Mode Toggle */}
-              <div className="flex justify-center mb-8">
-                <div className="inline-flex bg-secondary rounded-xl p-1 w-full max-w-md">
-                  <button
-                    onClick={() => setPaymentMode("online")}
-                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm sm:text-base ${
-                      paymentMode === "online"
-                        ? "bg-primary text-primary-foreground shadow-lg"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Wallet className="w-4 h-4" />
-                    Pay Online
-                  </button>
-                  <button
-                    onClick={() => setPaymentMode("manual")}
-                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm sm:text-base ${
-                      paymentMode === "manual"
-                        ? "bg-primary text-primary-foreground shadow-lg"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Manual Transfer
-                  </button>
-                </div>
-              </div>
-
-              {/* Online Payment */}
-              {paymentMode === "online" && (
-                <div className="card-glass rounded-3xl p-6 sm:p-8 animate-fade-in-up">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600 mx-auto mb-4 flex items-center justify-center shadow-lg">
-                      <Zap className="w-8 h-8 text-black" />
+            {paymentMode === "online" ? (
+              <motion.div key="online" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: EASE }}>
+                <DonationCheckout />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="manual"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: EASE }}
+                className="grid gap-12 lg:grid-cols-12 lg:gap-16"
+              >
+                <div className="space-y-8 lg:col-span-7">
+                  {/* Bank */}
+                  <div className="border border-foreground/10 bg-card p-6 md:p-8">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <h3 className="font-display text-3xl text-foreground">Bank transfer</h3>
+                      <span className="text-[0.6rem] uppercase tracking-luxe text-muted-foreground">Equity Bank Rwanda</span>
                     </div>
-                    <h3 className="font-display text-xl font-bold text-foreground mb-2">
-                      Quick & Secure Payment
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      Pay instantly with MTN MoMo or Card
+                    <div className="mt-6 divide-y divide-foreground/10 border-y border-foreground/10">
+                      <div className="flex items-center justify-between gap-4 py-4">
+                        <span className="text-[0.62rem] uppercase tracking-[0.2em] text-muted-foreground">Account name</span>
+                        <span className="font-display text-xl text-foreground">Serenades of Praise</span>
+                      </div>
+                      <CopyRow label="Account number" value="4024212955253" copied={copied === "Account number"} onCopy={() => handleCopy("4024212955253", "Account number")} />
+                      <CopyRow label="Swift code" value="EABORWRW" copied={copied === "Swift code"} onCopy={() => handleCopy("EABORWRW", "Swift code")} />
+                    </div>
+                  </div>
+
+                  {/* Mobile money */}
+                  <div className="border border-foreground/10 bg-card p-6 md:p-8">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <h3 className="font-display text-3xl text-foreground">Mobile money</h3>
+                      <span className="text-[0.6rem] uppercase tracking-luxe text-muted-foreground">MTN Mobile Money</span>
+                    </div>
+                    <div className="mt-6 divide-y divide-foreground/10 border-y border-foreground/10">
+                      <div className="flex items-center justify-between gap-4 py-4">
+                        <span className="text-[0.62rem] uppercase tracking-[0.2em] text-muted-foreground">Account name</span>
+                        <span className="font-display text-xl text-foreground">Irakoze Alysee</span>
+                      </div>
+                      <CopyRow label="MTN MoMo" value="0798254683" display="(+250) 798 254 683" copied={copied === "MTN number"} onCopy={() => handleCopy("0798254683", "MTN number")} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notify */}
+                <aside className="lg:col-span-5">
+                  <div className="border border-primary/30 bg-card p-6 md:p-8 lg:sticky lg:top-28">
+                    <p className="text-[0.62rem] uppercase tracking-luxe text-primary">After you send</p>
+                    <h3 className="mt-3 font-display text-3xl text-foreground">Let us say thank you.</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      Transfers don't tell us who sent them. Leave your name so the choir can acknowledge your gift.
                     </p>
-                  </div>
-                  
-                  <DonationCheckout />
-                  
-                  {/* Trust Badges */}
-                  <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-primary/10">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Shield className="w-4 h-4 text-green-500" />
-                      <span>Secure</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Lock className="w-4 h-4 text-green-500" />
-                      <span>Encrypted</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>Verified</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual Payment */}
-              {paymentMode === "manual" && (
-                <div className="space-y-6 animate-fade-in-up">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Bank Transfer */}
-                    <TiltCard maxTilt={6} className="card-glass rounded-2xl p-6 h-full">
-                      <div className="flex items-center gap-3 mb-5">
-                        <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                          <CreditCard className="w-6 h-6 text-blue-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-display text-lg font-semibold">Bank Transfer</h3>
-                          <p className="text-sm text-muted-foreground">Equity Bank Rwanda</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 bg-secondary/50 rounded-xl p-4 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Account Name</span>
-                          <span className="font-medium">Serenades of Praise</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Account No.</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">4024212955253</span>
-                            <button
-                              onClick={() => handleCopy("4024212955253", "Account number")}
-                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
-                            >
-                              {copied === "Account number" ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-primary" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Swift Code</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">EABORWRW</span>
-                            <button
-                              onClick={() => handleCopy("EABORWRW", "Swift code")}
-                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
-                            >
-                              {copied === "Swift code" ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-primary" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </TiltCard>
-
-                    {/* Mobile Money */}
-                    <TiltCard maxTilt={6} className="card-glass rounded-2xl p-6 h-full">
-                      <div className="flex items-center gap-3 mb-5">
-                        <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                          <Phone className="w-6 h-6 text-yellow-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-display text-lg font-semibold">Mobile Money</h3>
-                          <p className="text-sm text-muted-foreground">MTN MoMo / Airtel</p>
-                        </div>
-                      </div>
-
-                      {/* MTN */}
-                      <div className="bg-secondary/50 rounded-xl p-4 mb-3">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center">
-                            <span className="text-white font-bold text-[10px]">MTN</span>
-                          </div>
-                          <span className="font-semibold text-sm">MTN MoMo</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">Number</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">0780 623 144</span>
-                            <button
-                              onClick={() => handleCopy("0780623144", "MTN number")}
-                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
-                            >
-                              {copied === "MTN number" ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-primary" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Airtel */}
-                      <div className="bg-secondary/50 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
-                            <span className="text-white font-bold text-[10px]">A</span>
-                          </div>
-                          <span className="font-semibold text-sm">Airtel Money</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">Number</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">0730 623 144</span>
-                            <button
-                              onClick={() => handleCopy("0730623144", "Airtel number")}
-                              className="p-1.5 hover:bg-primary/20 rounded-lg transition-colors"
-                            >
-                              {copied === "Airtel number" ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-primary" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </TiltCard>
-                  </div>
-
-                  {/* Notify Form */}
-                  <div className="card-glass rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <Heart className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <h4 className="font-display font-semibold">Notify Us</h4>
-                        <p className="text-xs text-muted-foreground">So we can acknowledge your gift</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <Input placeholder="Your Name" className="bg-secondary border-primary/20" />
-                      <Input type="email" placeholder="Email" className="bg-secondary border-primary/20" />
-                      <Button
-                        variant="gold"
-                        className="whitespace-nowrap"
+                    <div className="mt-8 space-y-4">
+                      <Input placeholder="Your name" className={fieldClass} aria-label="Your name" />
+                      <Input type="email" placeholder="Email" className={fieldClass} aria-label="Email" />
+                      <button
+                        type="button"
                         onClick={() => {
                           toast({
-                            title: "Thank You! 🙏",
-                            description: "We've received your notification. God bless you!",
+                            title: "Thank you",
+                            description: "We've received your note. God bless you!",
                           });
                         }}
+                        className="group flex h-12 w-full items-center justify-center gap-3 rounded-[2px] bg-primary text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-primary-foreground transition-colors duration-500 hover:bg-gold-light"
                       >
-                        I've Donated
-                      </Button>
+                        I've sent my gift
+                        <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover:translate-x-1" />
+                      </button>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                </aside>
+              </motion.div>
+            )}
           </div>
         </section>
 
-        {/* Bible Verse */}
-        <section className="py-12 bg-charcoal/50">
-          <div className="container mx-auto px-4">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.12}>
-              <StaggerItem>
-                <blockquote className="font-display text-xl sm:text-2xl md:text-3xl italic text-foreground mb-4">
-                  "Each of you should give what you have decided in your heart to give, 
-                  not reluctantly or under compulsion, for God loves a cheerful giver."
-                </blockquote>
-              </StaggerItem>
-              <StaggerItem>
-                <cite className="text-primary font-semibold">— 2 Corinthians 9:7</cite>
-              </StaggerItem>
-            </Stagger>
+        {/* Scripture */}
+        <section className="py-28 md:py-36">
+          <div className="container mx-auto px-4 lg:px-10">
+            <Reveal className="mx-auto max-w-4xl text-center">
+              <span aria-hidden className="block font-display text-[6rem] leading-[0.5] text-primary/40 select-none">“</span>
+              <blockquote className="font-display text-3xl md:text-5xl leading-[1.2] text-foreground text-balance">
+                Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion,
+                for God loves a <span className="italic text-primary">cheerful giver.</span>
+              </blockquote>
+              <cite className="mt-8 block text-[0.65rem] not-italic uppercase tracking-luxe text-muted-foreground">2 Corinthians 9 : 7</cite>
+            </Reveal>
           </div>
         </section>
 
         {/* Leave a Message */}
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-2xl mx-auto">
-              <Stagger className="text-center mb-8" stagger={0.1}>
-                <StaggerItem>
-                  <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3">
-                    Leave a <span className="gold-text">Message</span>
-                  </h2>
-                </StaggerItem>
-                <StaggerItem>
-                  <p className="text-muted-foreground">
-                    Share words of encouragement with our choir family
-                  </p>
-                </StaggerItem>
-              </Stagger>
+        <section className="border-t border-foreground/[0.06] py-24 md:py-32">
+          <div className="container mx-auto px-4 lg:px-10">
+            <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+              <div className="lg:col-span-5">
+                <SectionHead
+                  index="III"
+                  eyebrow="Encourage"
+                  title={<>Leave a <span className="italic text-primary">word.</span></>}
+                  lede="Not every gift is money. A prayer or a kind word reaches the whole choir family."
+                  className="!mb-0"
+                />
+              </div>
 
-              <Reveal delay={0.1} className="card-glass rounded-3xl p-6 sm:p-8">
+              <Reveal delay={0.1} className="lg:col-span-7">
                 {messageSubmitted ? (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 rounded-full bg-green-500/20 mx-auto mb-4 flex items-center justify-center">
-                      <CheckCircle className="w-8 h-8 text-green-500" />
-                    </div>
-                    <h3 className="font-display text-xl font-semibold text-foreground mb-2">
-                      Message Sent!
-                    </h3>
-                    <p className="text-muted-foreground">
-                      Thank you for your encouraging words. God bless you!
-                    </p>
+                  <div className="border border-primary/30 bg-card px-6 py-16 text-center">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-primary/50">
+                      <Check className="h-6 w-6 text-primary" strokeWidth={1.4} />
+                    </span>
+                    <h3 className="mt-6 font-display text-3xl text-foreground">Message received.</h3>
+                    <p className="mt-3 text-muted-foreground">Thank you for your encouraging words. God bless you!</p>
                   </div>
                 ) : (
-                  <form onSubmit={handleMessageSubmit} className="space-y-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <form onSubmit={handleMessageSubmit} className="space-y-6">
+                    <div className="grid gap-5 sm:grid-cols-2">
                       <div>
-                        <Label htmlFor="name">Your Name</Label>
-                        <Input
-                          id="name"
-                          placeholder="Enter your name"
-                          required
-                          className="mt-1.5 bg-secondary border-primary/20"
-                          disabled={isSubmittingMessage}
-                        />
+                        <label htmlFor="name" className="mb-2 block text-[0.62rem] font-medium uppercase tracking-[0.2em] text-muted-foreground">Your name</label>
+                        <Input id="name" placeholder="Enter your name" required className={fieldClass} disabled={isSubmittingMessage} />
                       </div>
                       <div>
-                        <Label htmlFor="email">Email (optional)</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="your@email.com"
-                          className="mt-1.5 bg-secondary border-primary/20"
-                          disabled={isSubmittingMessage}
-                        />
+                        <label htmlFor="email" className="mb-2 flex justify-between text-[0.62rem] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                          Email <span className="normal-case tracking-normal text-muted-foreground/70">Optional</span>
+                        </label>
+                        <Input id="email" type="email" placeholder="your@email.com" className={fieldClass} disabled={isSubmittingMessage} />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="message">Your Message</Label>
+                      <label htmlFor="message" className="mb-2 block text-[0.62rem] font-medium uppercase tracking-[0.2em] text-muted-foreground">Your message</label>
                       <Textarea
                         id="message"
                         placeholder="Write your message of support..."
-                        className="mt-1.5 bg-secondary border-primary/20"
-                        rows={4}
+                        className="rounded-[3px] border-foreground/12 bg-card text-base shadow-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-0"
+                        rows={5}
                         required
                         disabled={isSubmittingMessage}
                       />
                     </div>
-                    <Button
+                    <button
                       type="submit"
-                      variant="gold"
-                      className="w-full"
                       disabled={isSubmittingMessage}
+                      className="group flex h-12 items-center gap-3 rounded-[2px] border border-foreground/25 px-8 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-foreground transition-colors duration-500 hover:border-foreground hover:bg-foreground hover:text-background disabled:opacity-60"
                     >
                       {isSubmittingMessage ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Sending...
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Sending
                         </>
                       ) : (
                         <>
-                          <Send className="w-4 h-4 mr-2" />
-                          Send Message
+                          Send message
+                          <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover:translate-x-1" />
                         </>
                       )}
-                    </Button>
+                    </button>
                   </form>
                 )}
               </Reveal>

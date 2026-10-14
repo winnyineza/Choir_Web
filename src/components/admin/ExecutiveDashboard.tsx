@@ -191,19 +191,19 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
       }
     });
     setVoiceDistribution([
-      { name: "Soprano", value: voiceCounts.Soprano, color: "#F59E0B" },
-      { name: "Alto", value: voiceCounts.Alto, color: "#10B981" },
-      { name: "Tenor", value: voiceCounts.Tenor, color: "#3B82F6" },
-      { name: "Bass", value: voiceCounts.Bass, color: "#8B5CF6" },
+      { name: "Soprano", value: voiceCounts.Soprano, color: "hsl(var(--gold))" },
+      { name: "Alto", value: voiceCounts.Alto, color: "hsl(var(--sage-500))" },
+      { name: "Tenor", value: voiceCounts.Tenor, color: "hsl(var(--slate-500))" },
+      { name: "Bass", value: voiceCounts.Bass, color: "hsl(var(--plum-500))" },
     ]);
 
     // Revenue by source
     const sourceData = [
-      { name: "Contributions", value: contributionTotal, color: "#F59E0B" },
-      { name: "Donations", value: donationTotal, color: "#10B981" },
+      { name: "Contributions", value: contributionTotal, color: "hsl(var(--gold))" },
+      { name: "Donations", value: donationTotal, color: "hsl(var(--sage-500))" },
     ];
     if (ticketedEvents > 0) {
-      sourceData.splice(1, 0, { name: "Tickets", value: ticketRevenue, color: "#3B82F6" });
+      sourceData.splice(1, 0, { name: "Tickets", value: ticketRevenue, color: "hsl(var(--slate-500))" });
     }
     setRevenueBySource(sourceData);
 
@@ -248,7 +248,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
   };
 
   // Colors for page view chart
-  const PAGE_COLORS = ["#F59E0B", "#10B981", "#3B82F6", "#8B5CF6", "#EC4899", "#EF4444"];
+  const PAGE_COLORS = ["hsl(var(--gold))", "hsl(var(--sage-500))", "hsl(var(--slate-500))", "hsl(var(--plum-500))", "hsl(var(--blush-500))", "hsl(var(--oxblood-500))"];
 
   return (
     <div className="space-y-6">
@@ -447,9 +447,9 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
                   <XAxis dataKey="date" stroke="#666" fontSize={11} />
                   <YAxis stroke="#666" fontSize={11} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '4px', color: 'hsl(var(--popover-foreground))' }}
                   />
-                  <Bar dataKey="views" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="views" fill="hsl(var(--gold))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -504,21 +504,21 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
               <AreaChart data={monthlyTrend}>
                 <defs>
                   <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="hsl(var(--gold))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--gold))" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis dataKey="month" stroke="#666" fontSize={12} />
                 <YAxis stroke="#666" fontSize={12} tickFormatter={(v) => formatCompact(v)} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '4px', color: 'hsl(var(--popover-foreground))' }}
                   formatter={(value: number) => [formatCurrency(value), '']}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="income" 
-                  stroke="#F59E0B" 
+                  stroke="hsl(var(--gold))" 
                   fill="url(#incomeGradient)"
                   strokeWidth={2}
                   name="Income"
@@ -526,7 +526,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
                 <Line 
                   type="monotone" 
                   dataKey="expenses" 
-                  stroke="#EF4444" 
+                  stroke="hsl(var(--oxblood-500))" 
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}
@@ -560,7 +560,7 @@ export function ExecutiveDashboard({ onNavigate }: ExecutiveDashboardProps) {
                   ))}
                 </Pie>
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '4px', color: 'hsl(var(--popover-foreground))' }}
                   formatter={(value: number) => [formatCurrency(value), '']}
                 />
               </PieChart>

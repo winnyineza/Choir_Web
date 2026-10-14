@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -207,31 +208,32 @@ import { confirmDestructiveAction } from "@/lib/confirmDestructiveAction";
 
 type Tab = "dashboard" | "members" | "events" | "tickets" | "attendance" | "leave" | "disciplinary" | "contributions" | "expenses" | "treasury" | "announcements" | "messages" | "releases" | "promos" | "gallery" | "inventory" | "minutes" | "documents" | "voice-balance" | "surveys" | "event-staff" | "team" | "audit" | "settings";
 
+// Grouped so the long admin menu reads like a table of contents rather than one undifferentiated list.
 const sidebarItems = [
-  { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard },
-  { id: "members" as Tab, label: "Members", icon: Users },
-  { id: "events" as Tab, label: "Events", icon: Calendar },
-  { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket },
-  { id: "attendance" as Tab, label: "Attendance", icon: UserCheck },
-  { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff },
-  { id: "disciplinary" as Tab, label: "Disciplinary", icon: AlertTriangle },
-  { id: "contributions" as Tab, label: "Contributions", icon: Wallet },
-  { id: "expenses" as Tab, label: "Expenses", icon: Receipt },
-  { id: "treasury" as Tab, label: "Treasury", icon: PiggyBank },
-  { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
-  { id: "messages" as Tab, label: "Messages", icon: Mail },
-  { id: "releases" as Tab, label: "Releases", icon: Disc3 },
-  { id: "promos" as Tab, label: "Promo Codes", icon: Tag },
-  { id: "gallery" as Tab, label: "Gallery", icon: Image },
-  { id: "inventory" as Tab, label: "Inventory", icon: Package },
-  { id: "minutes" as Tab, label: "Minutes", icon: FileTextIcon },
-  { id: "documents" as Tab, label: "Documents", icon: FolderOpen },
-  { id: "voice-balance" as Tab, label: "Voice Balance", icon: Mic2 },
-  { id: "surveys" as Tab, label: "Surveys", icon: ClipboardList },
-  { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard },
-  { id: "team" as Tab, label: "Admin Team", icon: Shield },
-  { id: "audit" as Tab, label: "Audit Log", icon: History },
-  { id: "settings" as Tab, label: "Settings", icon: Settings },
+  { id: "dashboard" as Tab, label: "Dashboard", icon: LayoutDashboard, group: "Overview" },
+  { id: "members" as Tab, label: "Members", icon: Users, group: "Choir" },
+  { id: "attendance" as Tab, label: "Attendance", icon: UserCheck, group: "Choir" },
+  { id: "leave" as Tab, label: "Leave Requests", icon: CalendarOff, group: "Choir" },
+  { id: "disciplinary" as Tab, label: "Disciplinary", icon: AlertTriangle, group: "Choir" },
+  { id: "voice-balance" as Tab, label: "Voice Balance", icon: Mic2, group: "Choir" },
+  { id: "event-staff" as Tab, label: "Event Staff", icon: IdCard, group: "Choir" },
+  { id: "events" as Tab, label: "Events", icon: Calendar, group: "Events" },
+  { id: "tickets" as Tab, label: "Ticket Orders", icon: Ticket, group: "Events" },
+  { id: "promos" as Tab, label: "Promo Codes", icon: Tag, group: "Events" },
+  { id: "contributions" as Tab, label: "Contributions", icon: Wallet, group: "Finance" },
+  { id: "expenses" as Tab, label: "Expenses", icon: Receipt, group: "Finance" },
+  { id: "treasury" as Tab, label: "Treasury", icon: PiggyBank, group: "Finance" },
+  { id: "inventory" as Tab, label: "Inventory", icon: Package, group: "Finance" },
+  { id: "announcements" as Tab, label: "Announcements", icon: Megaphone, group: "Communication" },
+  { id: "messages" as Tab, label: "Messages", icon: Mail, group: "Communication" },
+  { id: "surveys" as Tab, label: "Surveys", icon: ClipboardList, group: "Communication" },
+  { id: "releases" as Tab, label: "Releases", icon: Disc3, group: "Media" },
+  { id: "gallery" as Tab, label: "Gallery", icon: Image, group: "Media" },
+  { id: "minutes" as Tab, label: "Minutes", icon: FileTextIcon, group: "Records" },
+  { id: "documents" as Tab, label: "Documents", icon: FolderOpen, group: "Records" },
+  { id: "team" as Tab, label: "Admin Team", icon: Shield, group: "System" },
+  { id: "audit" as Tab, label: "Audit Log", icon: History, group: "System" },
+  { id: "settings" as Tab, label: "Settings", icon: Settings, group: "System" },
 ];
 
 const VALID_TABS = new Set<string>(["dashboard","members","events","tickets","attendance","leave","disciplinary","contributions","expenses","treasury","announcements","messages","releases","promos","gallery","inventory","minutes","documents","voice-balance","surveys","event-staff","team","audit","settings"]);
@@ -966,7 +968,7 @@ export default function Admin() {
   const [attendanceTimePeriod, setAttendanceTimePeriod] = useState<"30" | "120" | "year" | "all">("30");
 
   // Chart colors
-  const CHART_COLORS = ["#D4AF37", "#22c55e", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#f59e0b", "#14b8a6"];
+  const CHART_COLORS = ["hsl(var(--gold))", "hsl(var(--sage-500))", "hsl(var(--slate-500))", "hsl(var(--oxblood-500))", "hsl(var(--plum-500))", "hsl(var(--blush-500))", "hsl(var(--gold))", "hsl(var(--teal-500))"];
 
   // Time period filter helper
   const getTimeCutoff = (period: string): number => {
@@ -1426,10 +1428,10 @@ export default function Admin() {
     return (
       <div className="min-h-screen bg-background font-body flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-full bg-gold-gradient mx-auto mb-4 flex items-center justify-center animate-pulse">
-            <Music2 className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="font-display text-3xl text-foreground animate-pulse">
+            Serenades <span className="italic text-primary">of</span> Praise
+          </p>
+          <p className="mt-3 text-[0.62rem] uppercase tracking-luxe text-muted-foreground">Preparing the dashboard</p>
         </div>
       </div>
     );
@@ -1444,7 +1446,7 @@ export default function Admin() {
     <div className="h-screen bg-background font-body flex overflow-hidden">
       {/* Preview Mode Banner - Fixed at top */}
       {previewRole && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-yellow-900 px-4 py-2 flex items-center justify-between shadow-lg">
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-primary text-primary-foreground px-4 py-2 flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4" />
             <span className="text-sm font-medium">
@@ -1466,63 +1468,74 @@ export default function Admin() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-charcoal border-r border-primary/10 transform transition-transform duration-300 lg:relative lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border transform transition-transform duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] lg:relative lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="h-full flex flex-col">
-          <div className="p-6 border-b border-primary/10">
+          <div className="px-6 pt-7 pb-6 border-b border-sidebar-border">
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary/30 shadow-[0_0_18px_hsl(var(--gold)/0.25)]">
+              <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-primary/40 ring-offset-2 ring-offset-sidebar">
                 <img src={logo} alt="Serenades of Praise Logo" className="w-full h-full object-cover" />
               </div>
-              <div>
-                <h1 className="font-display text-lg font-bold gold-text">Admin Panel</h1>
-                <p className="text-xs text-muted-foreground">
+              <div className="leading-none">
+                <p className="font-display text-xl text-foreground">
+                  Serenades <span className="italic text-primary">of</span> Praise
+                </p>
+                <p className="mt-1.5 text-[0.58rem] uppercase tracking-luxe text-muted-foreground">
                   {previewRole ? (
                     <span className="text-yellow-500 flex items-center gap-1">
                       <Eye className="w-3 h-3" />
                       {getRoleLabel(previewRole as any)} View
                     </span>
                   ) : (
-                    "Serenades of Praise"
+                    "Administration"
                   )}
                 </p>
               </div>
             </Link>
           </div>
 
-          <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-            {visibleSidebarItems.map((item) => {
+          <nav className="flex-1 overflow-y-auto px-3 py-5">
+            {visibleSidebarItems.map((item, index) => {
               const Icon = item.icon;
               if (!Icon) return null; // Safety check
+              const startsGroup = index === 0 || visibleSidebarItems[index - 1].group !== item.group;
+              const isActive = activeTab === item.id;
               return (
+              <div key={item.id}>
+              {startsGroup && (
+                <p className={cn("px-3 pb-2 text-[0.58rem] font-medium uppercase tracking-luxe text-muted-foreground/70", index > 0 && "pt-6")}>
+                  {item.group}
+                </p>
+              )}
               <button
-                key={item.id}
                 onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200",
-                  activeTab === item.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  "relative w-full flex items-center gap-3 px-3 py-2 rounded-[3px] text-left text-[0.84rem] transition-colors duration-300",
+                  isActive
+                    ? "bg-sidebar-accent text-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-px before:bg-primary"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-foreground"
                 )}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className={cn("w-4 h-4 stroke-[1.5]", isActive ? "text-primary" : "text-muted-foreground")} />
                 {item.label}
                 {/* Unread messages badge */}
                 {item.id === "messages" && unreadMessages > 0 && (
-                  <span className="ml-auto px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-medium">
+                  <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[0.65rem] font-semibold flex items-center justify-center tabular-nums">
                     {unreadMessages}
                   </span>
                 )}
               </button>
+              </div>
               );
             })}
           </nav>
 
-          <div className="p-4 border-t border-primary/10 space-y-2">
+          <div className="p-4 border-t border-sidebar-border space-y-2">
             {/* Current User Info */}
-            <div className="p-3 rounded-lg bg-secondary/50 mb-3">
+            <div className="px-2 pb-3">
               <p className="text-sm font-medium text-foreground truncate">
                 {currentUser?.name || "Admin"}
               </p>
@@ -1567,11 +1580,18 @@ export default function Admin() {
       {/* Main Content */}
       <div className={cn("flex-1 flex flex-col h-full overflow-hidden", previewRole && "pt-10")}>
         {/* Header */}
-        <header className="h-16 border-b border-primary/10 flex items-center justify-between px-4 lg:px-8">
-          <button className="lg:hidden p-2 text-foreground" onClick={() => setSidebarOpen(true)}>
-            <Menu className="w-6 h-6" />
+        <header className="h-[4.5rem] shrink-0 border-b border-foreground/[0.07] flex items-center justify-between gap-4 px-4 lg:px-10 bg-background/90 backdrop-blur-sm">
+          <button className="lg:hidden p-2 -ml-2 text-foreground" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+            <Menu className="w-5 h-5" />
           </button>
-          <h1 className="font-display text-xl font-semibold capitalize">{activeTab}</h1>
+          <div className="mr-auto lg:mr-0 leading-none">
+            <p className="text-[0.58rem] uppercase tracking-luxe text-primary">
+              {sidebarItems.find((i) => i.id === activeTab)?.group ?? "Admin"}
+            </p>
+            <h1 className="mt-1.5 font-display text-2xl text-foreground">
+              {sidebarItems.find((i) => i.id === activeTab)?.label ?? activeTab}
+            </h1>
+          </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
               <span className="text-sm text-foreground font-medium block">
@@ -1582,11 +1602,11 @@ export default function Admin() {
               </span>
             </div>
             <div className="relative group">
-              <button className="w-10 h-10 rounded-full bg-gold-gradient flex items-center justify-center text-primary-foreground font-semibold hover:opacity-90 transition-opacity">
+              <button className="w-10 h-10 rounded-full border border-primary/50 flex items-center justify-center font-display text-lg text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
                 {currentUser?.name?.charAt(0).toUpperCase() || "A"}
               </button>
               {/* Dropdown */}
-              <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-charcoal border border-primary/20 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-popover border border-border rounded-md shadow-[var(--shadow-dark)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                 <div className="px-4 py-2 border-b border-primary/10">
                   <p className="text-sm font-medium text-foreground truncate">
                     {currentUser?.name}
@@ -1630,18 +1650,31 @@ export default function Admin() {
           />
           
           <Suspense fallback={null}>
-          <div className="p-4 lg:p-8">
+          {/* Each tab glides in and its cards settle one after another. Keyed so it replays on every switch. */}
+          <motion.div
+            key={activeTab}
+            className="admin-stage p-4 lg:p-8"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.19, 1, 0.22, 1] }}
+          >
           {/* Dashboard */}
           {activeTab === "dashboard" && (
             <div className="space-y-6">
               {/* Role Welcome Banner with Preview Switcher */}
-              <div className="card-glass rounded-2xl p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="pb-8 border-b border-foreground/[0.07]">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div>
-                    <h1 className="text-xl font-bold text-foreground">
-                      Welcome back, {currentUser?.name?.split(" ")[0]}!
+                    <p className="text-[0.62rem] uppercase tracking-luxe text-muted-foreground">
+                      {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                    </p>
+                    <h1 className="mt-3 font-display text-4xl md:text-5xl text-foreground">
+                      {(() => {
+                        const h = new Date().getHours();
+                        return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+                      })()}, <span className="italic text-primary">{currentUser?.name?.split(" ")[0]}</span>.
                     </h1>
-                    <p className="text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-4">
                       <span className="inline-flex items-center gap-2 px-2 py-0.5 bg-primary/20 rounded-full text-xs font-medium text-primary">
                         {effectiveUser && getRoleLabel(effectiveUser.role)}
                       </span>
@@ -2058,7 +2091,7 @@ export default function Admin() {
                             <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
                             <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
                             <Tooltip formatter={(value: number) => [formatCurrency(value), "Revenue"]} />
-                            <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--gold))" fill="hsl(var(--gold))" fillOpacity={0.2} />
                           </AreaChart>
                         </ResponsiveContainer>
                       ) : (
@@ -2095,7 +2128,7 @@ export default function Admin() {
                           <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
                           <YAxis domain={[0, 100]} tick={{ fill: "#9CA3AF", fontSize: 11 }} />
                           <Tooltip formatter={(value: number) => [`${value}%`, "Attendance"]} />
-                          <Line type="monotone" dataKey="rate" stroke="#22c55e" strokeWidth={3} dot={{ r: 3 }} />
+                          <Line type="monotone" dataKey="rate" stroke="hsl(var(--sage-500))" strokeWidth={3} dot={{ r: 3 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
@@ -2112,7 +2145,7 @@ export default function Admin() {
                           <XAxis dataKey="date" tick={{ fill: "#9CA3AF", fontSize: 11 }} />
                           <YAxis tick={{ fill: "#9CA3AF", fontSize: 11 }} />
                           <Tooltip formatter={(value: number) => [value, "Views"]} />
-                          <Area type="monotone" dataKey="views" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+                          <Area type="monotone" dataKey="views" stroke="hsl(var(--slate-500))" fill="hsl(var(--slate-500))" fillOpacity={0.2} />
                         </AreaChart>
                       </ResponsiveContainer>
                     ) : (
@@ -2695,7 +2728,7 @@ export default function Admin() {
                               }}
                               formatter={(value: number) => [formatCurrency(value), "Revenue"]}
                             />
-                            <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
+                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--gold))" fill="hsl(var(--gold))" fillOpacity={0.2} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
@@ -2747,7 +2780,7 @@ export default function Admin() {
                                 }}
                                 formatter={(value: number) => [formatCurrency(value), "Revenue"]}
                               />
-                              <Bar dataKey="value" fill="#D4AF37" radius={[0, 4, 4, 0]} />
+                              <Bar dataKey="value" fill="hsl(var(--gold))" radius={[0, 4, 4, 0]} />
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
@@ -2765,7 +2798,7 @@ export default function Admin() {
                               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
                               <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={9} width={100} />
                               <Tooltip />
-                              <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                              <Bar dataKey="value" fill="hsl(var(--sage-500))" radius={[0, 4, 4, 0]} />
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
@@ -3009,7 +3042,7 @@ export default function Admin() {
                           }}
                         />
                         <Legend />
-                        <Line type="monotone" dataKey="rate" stroke="#D4AF37" strokeWidth={2} dot={{ fill: "#D4AF37", r: 3 }} name="Rate %" />
+                        <Line type="monotone" dataKey="rate" stroke="hsl(var(--gold))" strokeWidth={2} dot={{ fill: "hsl(var(--gold))", r: 3 }} name="Rate %" />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -4473,7 +4506,7 @@ export default function Admin() {
 
             </div>
           )}
-          </div>
+          </motion.div>
           </Suspense>
         </main>
       </div>

@@ -1,13 +1,13 @@
 import type { Transition, Variants } from "motion/react";
 
 /** Shared easing curve so every animation in the app feels like it came from the same place. */
-export const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+export const EASE_OUT = [0.19, 1, 0.22, 1] as const;
 export const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const;
 
 export const DURATION = {
-  fast: 0.25,
-  base: 0.5,
-  slow: 0.8,
+  fast: 0.3,
+  base: 0.7,
+  slow: 1.1,
 } as const;
 
 export const springSoft: Transition = { type: "spring", stiffness: 260, damping: 26, mass: 0.9 };
@@ -16,10 +16,10 @@ export const springSnappy: Transition = { type: "spring", stiffness: 420, dampin
 export type RevealDirection = "up" | "down" | "left" | "right" | "none";
 
 const OFFSET: Record<RevealDirection, { x: number; y: number }> = {
-  up: { x: 0, y: 32 },
-  down: { x: 0, y: -32 },
-  left: { x: 40, y: 0 },
-  right: { x: -40, y: 0 },
+  up: { x: 0, y: 24 },
+  down: { x: 0, y: -24 },
+  left: { x: 28, y: 0 },
+  right: { x: -28, y: 0 },
   none: { x: 0, y: 0 },
 };
 
@@ -34,7 +34,7 @@ export function revealVariants(
       opacity: 0,
       x: x * distance,
       y: y * distance,
-      filter: blur ? "blur(6px)" : "blur(0px)",
+      filter: blur ? "blur(4px)" : "blur(0px)",
     },
     visible: {
       opacity: 1,
@@ -63,7 +63,8 @@ export const staticVariants: Variants = {
 
 /** Whole-page enter/exit used by route transitions. */
 export const pageVariants: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
+  // No filter or perspective here: either would trap the fixed header inside the page wrapper.
+  hidden: { opacity: 0, y: 28, scale: 0.99 },
+  visible: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -12, scale: 0.995 },
 };

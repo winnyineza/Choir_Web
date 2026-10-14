@@ -1,176 +1,164 @@
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Play, Calendar } from "lucide-react";
-import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
-import { AnimatedCounter, FloatingNotes, PointerParallax } from "@/components/motion";
-import { DURATION, EASE_OUT, revealVariants, staggerVariants, staticVariants } from "@/lib/motionPresets";
+import { ArrowRight } from "lucide-react";
+import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
+import { EASE_OUT } from "@/lib/motionPresets";
 import choirImage from "@/assets/choir-group.jpg";
+
+/** One headline line that rises out of a mask, the way type is revealed in film titles. */
+function MaskLine({ children, delay, reduced }: { children: React.ReactNode; delay: number; reduced: boolean | null }) {
+  return (
+    <span className="block overflow-hidden pb-[0.08em]">
+      <motion.span
+        className="block"
+        initial={reduced ? { opacity: 0 } : { y: "110%" }}
+        animate={reduced ? { opacity: 1 } : { y: "0%" }}
+        transition={{ duration: reduced ? 0.3 : 1.4, delay, ease: EASE_OUT }}
+      >
+        {children}
+      </motion.span>
+    </span>
+  );
+}
+
+function FadeIn({ children, delay, className }: { children: React.ReactNode; delay: number; className?: string }) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.2, delay, ease: EASE_OUT }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 export function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
   const reduced = useReducedMotion();
 
-  // Background drifts slower than the content, so the hero gains depth as you scroll away.
+  // The photograph drifts slower than the type, so the hero gains depth as you scroll away.
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] });
   const smooth = useSpring(scrollYProgress, { stiffness: 90, damping: 26, mass: 0.4 });
-  const bgY = useTransform(smooth, [0, 1], ["0%", "18%"]);
-  const bgScale = useTransform(smooth, [0, 1], [1, 1.12]);
-  const contentY = useTransform(smooth, [0, 1], ["0%", "-12%"]);
-  const contentOpacity = useTransform(smooth, [0, 0.8], [1, 0]);
+  const bgY = useTransform(smooth, [0, 1], ["0%", "16%"]);
+  const contentOpacity = useTransform(smooth, [0, 0.7], [1, 0]);
+  // As you scroll away the type tips back into the scene, like a title card receding.
+  const contentRotateX = useTransform(smooth, [0, 1], [0, 18]);
+  const contentScale = useTransform(smooth, [0, 1], [1, 0.9]);
+  const contentY = useTransform(smooth, [0, 1], ["0%", "-8%"]);
 
-  const item = reduced ? staticVariants : revealVariants("up");
-  const itemTransition = { duration: reduced ? DURATION.fast : DURATION.slow, ease: EASE_OUT };
+  // Pointer depth: the photograph and the type sit on separate planes and drift against each other.
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const pointerSpring = { stiffness: 60, damping: 20, mass: 0.8 };
+  const imgX = useSpring(useTransform(px, (v) => v * -18), pointerSpring);
+  const imgY = useSpring(useTransform(py, (v) => v * -12), pointerSpring);
+  const imgRotY = useSpring(useTransform(px, (v) => v * 2.2), pointerSpring);
+  const imgRotX = useSpring(useTransform(py, (v) => v * -1.6), pointerSpring);
+  const typeX = useSpring(useTransform(px, (v) => v * 14), pointerSpring);
+  const typeY = useSpring(useTransform(py, (v) => v * 8), pointerSpring);
+
+  function handlePointerMove(event: React.PointerEvent<HTMLElement>) {
+    if (reduced || event.pointerType !== "mouse") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    px.set((event.clientX - rect.left) / rect.width - 0.5);
+    py.set((event.clientY - rect.top) / rect.height - 0.5);
+  }
+
+  function handlePointerLeave() {
+    px.set(0);
+    py.set(0);
+  }
 
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden bg-ink text-[hsl(40_30%_91%)] [perspective:1200px]"
     >
-      {/* Background Image with Dark Overlay */}
-      <div className="absolute inset-0">
+      {/* Photograph settles in slowly on arrival, then floats on its own plane */}
+      <motion.div className="absolute -inset-6" style={reduced ? undefined : { y: bgY }}>
+        <motion.div
+          className="h-full w-full"
+          style={reduced ? undefined : { x: imgX, y: imgY, rotateX: imgRotX, rotateY: imgRotY }}
+        >
         <motion.img
           src={choirImage}
-          alt="Serenades of Praise Choir"
-          className="w-full h-full object-cover will-change-transform"
-          style={reduced ? undefined : { y: bgY, scale: bgScale }}
+          alt="Serenades of Praise Choir gathered outdoors in the hills of Rwanda"
+          className="w-full h-full object-cover object-[50%_30%]"
+          initial={reduced ? false : { scale: 1.12, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 2.6, ease: EASE_OUT }}
         />
-        <div className="absolute inset-0 bg-background/60" />
-      </div>
-
-      <FloatingNotes count={12} />
-
-      {/* Content */}
-      <motion.div
-        className="relative z-10 container mx-auto px-4 pt-24 pb-16"
-        style={reduced ? undefined : { y: contentY, opacity: contentOpacity }}
-      >
-        <motion.div
-          className="max-w-4xl mx-auto text-center"
-          initial="hidden"
-          animate="visible"
-          variants={staggerVariants(reduced ? 0.03 : 0.12)}
-        >
-          {/* Badge */}
-          <motion.div
-            variants={item}
-            transition={itemTransition}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-background/40 backdrop-blur-sm border border-foreground/10 mb-8"
-          >
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-sm font-medium tracking-widest uppercase text-foreground/80">Psalm 147:1</span>
-          </motion.div>
-
-          {/* Title */}
-          <PointerParallax strength={10}>
-            <motion.h1
-              variants={item}
-              transition={itemTransition}
-              className="font-display text-5xl md:text-7xl lg:text-8xl font-semibold mb-6 leading-[0.95]"
-            >
-              <span className="text-foreground">Sing songs of</span>
-              <br />
-              <span className="text-primary italic">praise to God</span>
-            </motion.h1>
-          </PointerParallax>
-
-          {/* Decorative Line */}
-          <motion.div
-            variants={item}
-            transition={itemTransition}
-            className="flex items-center justify-center gap-2 mb-8"
-          >
-            <motion.div
-              className="h-0.5 bg-primary"
-              initial={{ width: 0 }}
-              animate={{ width: 64 }}
-              transition={{ duration: reduced ? 0.15 : 0.7, delay: 0.5, ease: EASE_OUT }}
-            />
-            <div className="w-2 h-2 rounded-full bg-primary" />
-            <motion.div
-              className="h-0.5 bg-primary"
-              initial={{ width: 0 }}
-              animate={{ width: 64 }}
-              transition={{ duration: reduced ? 0.15 : 0.7, delay: 0.5, ease: EASE_OUT }}
-            />
-          </motion.div>
-
-          {/* Subtitle */}
-          <motion.p
-            variants={item}
-            transition={itemTransition}
-            className="text-lg md:text-xl text-foreground/70 max-w-xl mx-auto mb-12 leading-relaxed"
-          >
-            Experience divine connection through <span className="text-primary font-medium">powerful worship</span> and musical excellence that praises God.
-          </motion.p>
-
-          {/* Stats */}
-          <motion.div
-            variants={item}
-            transition={itemTransition}
-            className="flex items-center justify-center gap-12 md:gap-20 mb-12"
-          >
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-foreground">
-                <AnimatedCounter value={2} duration={1.2} />
-                <span className="text-primary">+</span>
-              </div>
-              <div className="text-xs tracking-widest uppercase text-foreground/80 mt-1">Years in MISSION</div>
-            </div>
-            <div className="w-px h-12 bg-foreground/20" />
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-foreground">
-                <AnimatedCounter value={2024} from={2000} duration={1.8} />
-              </div>
-              <div className="text-xs tracking-widest uppercase text-foreground/80 mt-1 font-normal">Founded</div>
-            </div>
-          </motion.div>
-
-          {/* CTA Buttons */}
-          <motion.div
-            variants={item}
-            transition={itemTransition}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            <Button variant="gold" size="lg" asChild className="min-w-[180px]">
-              <Link to="/events">
-                <Calendar className="w-4 h-4 mr-2" />
-                Upcoming Events
-              </Link>
-            </Button>
-            <Link
-              to="/about"
-              className="text-foreground/70 hover:text-foreground transition-colors flex items-center gap-2 group"
-            >
-              Discover More
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-            </Link>
-            <Link
-              to="/releases"
-              className="text-foreground/70 hover:text-foreground transition-colors flex items-center gap-2 group"
-            >
-              <Play className="w-4 h-4 transition-transform group-hover:scale-125" />
-              Listen Now
-            </Link>
-          </motion.div>
         </motion.div>
       </motion.div>
+      {/* Tonal grade: dark at the foot for type, a veil at the top for the nav */}
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(36_12%_4%/0.55)_0%,hsl(36_12%_4%/0.15)_30%,hsl(36_12%_4%/0.45)_62%,hsl(36_12%_4%/0.96)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,hsl(36_12%_4%/0.7)_0%,hsl(36_12%_4%/0.25)_45%,transparent_70%)]" />
 
-      {/* Scroll Indicator */}
       <motion.div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.4, duration: 0.6 }}
+        className="relative z-10 container mx-auto px-4 lg:px-10 pt-40 pb-14 md:pb-20 origin-bottom"
+        style={
+          reduced
+            ? undefined
+            : { opacity: contentOpacity, rotateX: contentRotateX, scale: contentScale, y: contentY }
+        }
       >
-        <div className="flex flex-col items-center gap-2 text-foreground/40">
-          <motion.div
-            className="w-px h-8 bg-gradient-to-b from-transparent via-foreground/30 to-foreground/50"
-            animate={reduced ? undefined : { scaleY: [0.4, 1, 0.4], opacity: [0.3, 1, 0.3] }}
-            style={{ originY: 0 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          />
+        <FadeIn delay={0.5} className="mb-8 md:mb-10">
+          <p className="eyebrow !text-[hsl(40_45%_70%)]">Psalm 147 : 1</p>
+        </FadeIn>
+
+        <motion.h1 className="display-xl max-w-[14ch]" style={reduced ? undefined : { x: typeX, y: typeY }}>
+          <MaskLine delay={0.6} reduced={reduced}>Sing songs</MaskLine>
+          <MaskLine delay={0.75} reduced={reduced}>
+            of <span className="italic text-[hsl(40_45%_68%)]">praise</span> to God.
+          </MaskLine>
+        </motion.h1>
+
+        <div className="mt-12 md:mt-16 grid gap-10 md:grid-cols-12 md:items-end">
+          <FadeIn delay={1.2} className="md:col-span-5">
+            <p className="text-base md:text-lg font-light leading-relaxed text-[hsl(40_30%_91%/0.78)] max-w-md">
+              A choir of Kacyiru Seventh-day Adventist Church, offering sacred music with reverence, discipline and joy.
+            </p>
+          </FadeIn>
+
+          <FadeIn delay={1.35} className="md:col-span-7 flex flex-wrap items-center gap-x-10 gap-y-6 md:justify-end">
+            <Button variant="hero" size="xl" asChild>
+              <Link to="/releases">
+                Listen to the choir
+                <ArrowRight />
+              </Link>
+            </Button>
+            <Link to="/events" className="link-luxe !text-[hsl(40_30%_91%/0.85)] hover:!text-[hsl(40_45%_70%)]">
+              Upcoming concerts
+              <span className="link-luxe-rule" />
+            </Link>
+          </FadeIn>
         </div>
+
+        {/* Colophon strip */}
+        <FadeIn delay={1.6} className="mt-16 md:mt-20 pt-6 border-t border-[hsl(40_30%_91%/0.14)]">
+          <div className="flex flex-wrap items-center justify-between gap-4 text-[0.62rem] uppercase tracking-luxe text-[hsl(40_30%_91%/0.55)]">
+            <span>Est. 2024</span>
+            <span className="hidden sm:inline">Kacyiru SDA Church</span>
+            <span className="hidden md:inline">Kigali, Rwanda</span>
+            <span className="flex items-center gap-3">
+              Scroll
+              <span className="relative block h-8 w-px overflow-hidden bg-[hsl(40_30%_91%/0.15)]">
+                {!reduced && (
+                  <motion.span
+                    className="absolute inset-x-0 top-0 h-1/2 bg-[hsl(40_45%_70%)]"
+                    animate={{ y: ["-100%", "200%"] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
+              </span>
+            </span>
+          </div>
+        </FadeIn>
       </motion.div>
     </section>
   );

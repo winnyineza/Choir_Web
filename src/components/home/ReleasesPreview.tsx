@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Play, Music, ArrowRight } from "lucide-react";
+import { Play } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Reveal, Stagger, StaggerItem } from "@/components/motion";
+import { Depth, Stagger, StaggerItem } from "@/components/motion";
+import { SectionHead } from "@/components/editorial";
 import { getAllMusicVideos, getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
 
 export const ReleasesPreview = () => {
@@ -17,7 +17,7 @@ export const ReleasesPreview = () => {
     })();
   }, []);
 
-  const otherVideos = musicVideos.filter((v) => !v.isLatest).slice(0, 3);
+  const otherVideos = musicVideos.filter((v) => !v.isLatest).slice(0, 4);
 
   // Don't render section if no videos exist
   if (musicVideos.length === 0) {
@@ -25,40 +25,27 @@ export const ReleasesPreview = () => {
   }
 
   return (
-    <section className="py-20 md:py-28 bg-charcoal relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+    <section className="relative py-28 md:py-40">
+      <div className="container mx-auto px-4 lg:px-10">
+        <SectionHead
+          align="split"
+          index="III"
+          eyebrow="Recordings"
+          title={<>Songs for the <span className="italic text-primary">soul.</span></>}
+          lede="Hymns, anthems and new compositions, recorded by the choir and shared freely."
+          action={
+            <Link to="/releases" className="link-luxe">
+              The full collection
+              <span className="link-luxe-rule" />
+            </Link>
+          }
+        />
 
-      <div className="container mx-auto px-4 relative z-10">
-        {/* Section Header */}
-        <Stagger className="text-center mb-12" stagger={0.1}>
-          <StaggerItem>
-            <span className="inline-flex items-center gap-2 text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-              <Music className="w-4 h-4" />
-              Our Music
-            </span>
-          </StaggerItem>
-          <StaggerItem>
-            <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-              Recent <span className="gold-text">Releases</span>
-            </h2>
-          </StaggerItem>
-          <StaggerItem>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Experience the power of worship through our latest musical releases
-            </p>
-          </StaggerItem>
-        </Stagger>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="grid gap-14 lg:grid-cols-12">
           {/* Featured Latest Release */}
           {latestVideo && (
-            <Reveal direction="right" delay={0.1}>
-              <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold mb-4">
-                Latest Release
-              </span>
-              <div className="rounded-2xl overflow-hidden gold-glow-lg hover-lift">
+            <Depth className="lg:col-span-7">
+              <div className="bg-black ring-1 ring-foreground/10 shadow-[var(--shadow-dark)]">
                 <iframe
                   width="100%"
                   height="315"
@@ -70,60 +57,50 @@ export const ReleasesPreview = () => {
                   className="w-full aspect-video"
                 />
               </div>
-            </Reveal>
+              <div className="mt-6 flex items-baseline justify-between gap-6">
+                <h3 className="font-display text-3xl text-foreground">{latestVideo.title}</h3>
+                <span className="shrink-0 text-[0.62rem] uppercase tracking-luxe text-primary">Latest</span>
+              </div>
+            </Depth>
           )}
 
-          {/* Other Videos */}
-          <Stagger className="space-y-4" stagger={0.1} delay={0.15}>
-            {otherVideos.length > 0 && (
-              <StaggerItem>
-                <h3 className="font-semibold text-lg text-foreground mb-4">
-                  More from our collection
-                </h3>
-              </StaggerItem>
-            )}
-            {otherVideos.map((video) => (
-              <StaggerItem key={video.id} direction="left">
-                <a
-                  href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex gap-4 p-3 rounded-xl card-glass hover:bg-secondary/50 hover:translate-x-1 transition-all duration-300"
-                >
-                  <div className="relative w-40 flex-shrink-0 rounded-lg overflow-hidden">
-                    <img
-                      src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
-                      alt={video.title}
-                      className="w-full aspect-video object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-background/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="w-10 h-10 rounded-full bg-destructive flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                        <Play className="w-5 h-5 text-white ml-0.5" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex flex-col justify-center">
-                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {video.title}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Watch on YouTube</p>
-                  </div>
-                </a>
-              </StaggerItem>
-            ))}
-
-            {/* CTA Button */}
-            <StaggerItem>
-              <div className="pt-4">
-                <Link to="/releases">
-                  <Button variant="gold-outline" className="w-full group">
-                    View All Releases
-                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </Link>
-              </div>
-            </StaggerItem>
-          </Stagger>
+          {/* Track listing */}
+          {otherVideos.length > 0 && (
+            <div className={latestVideo ? "lg:col-span-5" : "lg:col-span-12"}>
+              <p className="mb-2 text-[0.62rem] uppercase tracking-luxe text-muted-foreground">From the collection</p>
+              <Stagger className="border-t border-foreground/10" stagger={0.08}>
+                {otherVideos.map((video, i) => (
+                  <StaggerItem key={video.id}>
+                    <a
+                      href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group grid grid-cols-[2rem_6.5rem_1fr_auto] items-center gap-5 py-5 border-b border-foreground/10"
+                    >
+                      <span className="font-display italic text-lg text-muted-foreground tabular-nums">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="img-frame aspect-video">
+                        <img
+                          src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
+                          alt=""
+                          className="h-full w-full object-cover grayscale-[35%] group-hover:grayscale-0"
+                          loading="lazy"
+                        />
+                      </span>
+                      <span className="font-display text-xl leading-snug text-foreground transition-colors duration-500 group-hover:text-primary">
+                        {video.title}
+                      </span>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/15 text-foreground/70 transition-colors duration-500 group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground">
+                        <Play className="h-3.5 w-3.5 translate-x-px" />
+                        <span className="sr-only">Watch {video.title} on YouTube</span>
+                      </span>
+                    </a>
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            </div>
+          )}
         </div>
       </div>
     </section>

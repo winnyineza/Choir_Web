@@ -20,8 +20,8 @@ export interface TiltCardProps {
 export function TiltCard({
   children,
   className,
-  maxTilt = 8,
-  lift = 12,
+  maxTilt = 5,
+  lift = 10,
   glare = true,
 }: TiltCardProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -32,13 +32,13 @@ export function TiltCard({
   const py = useMotionValue(50);
   const hovered = useMotionValue(0);
 
-  const spring = { stiffness: 220, damping: 22, mass: 0.6 };
+  const spring = { stiffness: 150, damping: 20, mass: 0.7 };
   const rotateX = useSpring(useMotionValue(0), spring);
   const rotateY = useSpring(useMotionValue(0), spring);
   const translateZ = useSpring(useMotionValue(0), spring);
   const glareOpacity = useSpring(hovered, { stiffness: 160, damping: 24 });
 
-  const glareBackground = useMotionTemplate`radial-gradient(circle at ${px}% ${py}%, hsl(45 90% 70% / 0.45), transparent 55%)`;
+  const glareBackground = useMotionTemplate`radial-gradient(circle at ${px}% ${py}%, hsl(40 50% 80% / 0.22), transparent 55%)`;
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (reduced || !ref.current) return;
@@ -47,14 +47,15 @@ export function TiltCard({
     const relY = (event.clientY - rect.top) / rect.height - 0.5;
     px.set(Math.round((relX + 0.5) * 100));
     py.set(Math.round((relY + 0.5) * 100));
-    rotateY.set(relX * maxTilt * 2);
-    rotateX.set(-relY * maxTilt * 2);
+    const tilt = Math.min(maxTilt, 6);
+    rotateY.set(relX * tilt * 2);
+    rotateX.set(-relY * tilt * 2);
   }
 
   function handlePointerEnter() {
     if (reduced) return;
     hovered.set(1);
-    translateZ.set(lift);
+    translateZ.set(Math.min(lift, 14));
   }
 
   function handlePointerLeave() {

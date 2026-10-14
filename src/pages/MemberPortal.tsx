@@ -197,7 +197,7 @@ function buildReceiptPrintHtml(receipt: ReceiptDisplayData): string {
         --ink: #101828;
         --muted: #667085;
         --line: #e4e7ec;
-        --gold: #d4af37;
+        --gold: #C8A96A;
         --green: #16a34a;
         --green-soft: #dcfce7;
         --surface: #ffffff;

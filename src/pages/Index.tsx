@@ -7,6 +7,15 @@ import { MinistryPreview } from "@/components/home/MinistryPreview";
 import { ReleasesPreview } from "@/components/home/ReleasesPreview";
 import { SupportCTA } from "@/components/home/SupportCTA";
 import { Testimonials } from "@/components/home/Testimonials";
+import { ConcertFeature } from "@/components/home/ConcertFeature";
+import { ScriptureMarquee } from "@/components/editorial";
+
+const verses = [
+  "Sing to the Lord a new song",
+  "Let everything that has breath praise the Lord",
+  "Make a joyful noise",
+  "It is good to sing praises to our God",
+];
 
 const Index = () => {
   return (
@@ -14,6 +23,8 @@ const Index = () => {
       <Header />
       <main>
         <Hero />
+        <ScriptureMarquee items={verses} />
+        <ConcertFeature />
         <AboutPreview />
         <MinistryPreview />
         <ReleasesPreview />

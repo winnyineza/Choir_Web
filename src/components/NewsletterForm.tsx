@@ -58,29 +58,39 @@ export function NewsletterForm({ variant = "default", className = "" }: Newslett
 
   if (variant === "inline") {
     return (
-      <form onSubmit={handleSubmit} className={`flex flex-col sm:flex-row gap-3 ${className}`}>
-        <div className="relative flex-1">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <form
+        onSubmit={handleSubmit}
+        className={`group flex items-end gap-4 border-b border-foreground/20 transition-colors focus-within:border-primary ${className}`}
+      >
+        <label className="flex-1">
+          <span className="sr-only">Email address</span>
           <Input
             type="email"
-            placeholder="Enter your email"
+            placeholder="Your email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="pl-10 bg-secondary border-primary/20"
+            className="h-12 rounded-none border-0 bg-transparent px-0 text-base shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
             disabled={isSubmitting}
             required
           />
-        </div>
-        <Button type="submit" variant="gold" disabled={isSubmitting}>
+        </label>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="link-luxe h-12 shrink-0 disabled:opacity-50"
+        >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Subscribing...
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Subscribing
             </>
           ) : (
-            "Subscribe"
+            <>
+              Subscribe
+              <span className="link-luxe-rule" />
+            </>
           )}
-        </Button>
+        </button>
       </form>
     );
   }

@@ -5,3 +5,5 @@ export { Parallax, PointerParallax, type ParallaxProps } from "./Parallax";
 export { FloatingNotes, type FloatingNotesProps } from "./FloatingNotes";
 export { AnimatedCounter, type AnimatedCounterProps } from "./AnimatedCounter";
 export { PageTransition, type PageTransitionProps } from "./PageTransition";
+export { SmoothScroll } from "./SmoothScroll";
+export { Depth, type DepthProps } from "./Depth";

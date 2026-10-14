@@ -1,79 +1,86 @@
-import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Target, Eye, Heart, ArrowRight } from "lucide-react";
-import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
+import { Depth, Reveal, Stagger, StaggerItem, Parallax } from "@/components/motion";
+import choirPortrait from "@/assets/Choir01.jpg";
+import choirDetail from "@/assets/ChoirLadies.jpg";
 
-const features = [
+const pillars = [
   {
-    icon: Target,
-    title: "Our Mission",
-    description: "To spread the gospel through the ministry of sacred music, touching hearts and souls across Rwanda and beyond.",
+    title: "Mission",
+    description: "To carry the gospel through sacred music, touching hearts across Rwanda and beyond.",
   },
   {
-    icon: Eye,
-    title: "Our Vision",
-    description: "To become a beacon of praise, inspiring communities through harmonious worship and spiritual devotion.",
+    title: "Vision",
+    description: "To be a beacon of praise, inspiring communities through harmonious worship and devotion.",
   },
   {
-    icon: Heart,
-    title: "Our Values",
-    description: "Unity, excellence, spirituality, and service guide everything we do in our musical ministry.",
+    title: "Values",
+    description: "Unity, excellence, spirituality and service shape every rehearsal and every song.",
   },
 ];
 
 export function AboutPreview() {
   return (
-    <section className="py-24 section-pattern relative overflow-hidden">
-      {/* Decorative gradient orbs */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-0 left-0 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
-
-      <div className="container mx-auto px-4 relative z-10">
-        <Stagger className="text-center mb-16" stagger={0.1}>
-          <StaggerItem>
-            <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-              Who We Are
-            </span>
-          </StaggerItem>
-          <StaggerItem>
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              About <span className="gold-text">The Serenades</span>
-            </h2>
-          </StaggerItem>
-          <StaggerItem>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Founded on January 1st, 2024, we are a choir ministry dedicated to praising God through the beautiful gift of music at Kacyiru SDA Church.
+    <section className="relative py-28 md:py-40 overflow-hidden">
+      <div className="container mx-auto px-4 lg:px-10">
+        <div className="grid gap-16 lg:grid-cols-12 lg:gap-20 items-start">
+          {/* Photographs, layered like a printed spread */}
+          <div className="relative lg:col-span-6">
+            <Depth tilt={16}>
+              <figure className="img-frame aspect-[4/5] shadow-[var(--shadow-dark)]">
+                <img src={choirPortrait} alt="Members of Serenades of Praise" className="h-full w-full object-cover" loading="lazy" />
+              </figure>
+            </Depth>
+            <Parallax distance={50} className="absolute -bottom-12 -right-4 md:-right-10 w-[44%] hidden sm:block">
+              <figure className="img-frame aspect-[3/4] ring-[10px] ring-background">
+                <img src={choirDetail} alt="Choir members singing" className="h-full w-full object-cover" loading="lazy" />
+              </figure>
+            </Parallax>
+            <p className="mt-5 text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="text-primary">Fig. 1</span> · Serenades of Praise, Kigali
             </p>
-          </StaggerItem>
-        </Stagger>
+          </div>
 
-        {/* Feature Cards */}
-        <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12" stagger={0.12}>
-          {features.map((feature) => (
-            <StaggerItem key={feature.title}>
-              <TiltCard className="card-glass rounded-2xl p-8 h-full group hover:border-primary/30 transition-colors duration-500">
-                <div className="w-14 h-14 rounded-xl bg-[var(--gradient-gold)] flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-[var(--shadow-gold)] transition-all duration-300">
-                  <feature.icon className="w-7 h-7 text-primary-foreground" />
-                </div>
-                <h3 className="font-display text-xl font-semibold text-foreground mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-              </TiltCard>
-            </StaggerItem>
-          ))}
-        </Stagger>
+          {/* Text */}
+          <div className="lg:col-span-6 lg:pt-16">
+            <Reveal>
+              <p className="mb-6 flex items-center gap-4 text-[0.65rem] uppercase tracking-luxe text-primary">
+                <span className="font-display text-base normal-case tracking-normal italic">I</span>
+                <span className="h-px w-8 bg-primary/60" />
+                Who we are
+              </p>
+              <h2 className="display-lg text-foreground">
+                Voices gathered in <span className="italic text-primary">one</span> devotion.
+              </h2>
+              <p className="lede mt-8">
+                Founded on the first day of 2024, Serenades of Praise is the choir ministry of Kacyiru SDA Church.
+                We sing to glorify God and to bring listeners a little closer to Him.
+              </p>
+            </Reveal>
 
-        <Reveal className="text-center" delay={0.1}>
-          <Button variant="gold-outline" size="lg" asChild className="group">
-            <Link to="/about">
-              Learn More About Us
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1" />
-            </Link>
-          </Button>
-        </Reveal>
+            <Stagger className="mt-14 border-t border-foreground/10" stagger={0.1}>
+              {pillars.map((pillar, i) => (
+                <StaggerItem key={pillar.title}>
+                  <div className="group grid grid-cols-[3rem_1fr] md:grid-cols-[3rem_9rem_1fr] gap-x-6 gap-y-2 py-7 border-b border-foreground/10">
+                    <span className="font-display italic text-primary text-lg tabular-nums">0{i + 1}</span>
+                    <h3 className="font-display text-2xl text-foreground transition-colors duration-500 group-hover:text-primary">
+                      {pillar.title}
+                    </h3>
+                    <p className="col-start-2 md:col-start-3 text-sm leading-relaxed text-muted-foreground">
+                      {pillar.description}
+                    </p>
+                  </div>
+                </StaggerItem>
+              ))}
+            </Stagger>
+
+            <Reveal className="mt-12" delay={0.1}>
+              <Link to="/about" className="link-luxe">
+                Our story
+                <span className="link-luxe-rule" />
+              </Link>
+            </Reveal>
+          </div>
+        </div>
       </div>
     </section>
   );

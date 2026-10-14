@@ -29,3 +29,6 @@ coverage
 
 # E2E test screenshots
 test-screenshots
+
+# Local Netlify folder
+.netlify

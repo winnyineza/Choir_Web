@@ -21,6 +21,7 @@ import {
   Globe,
   Sparkles,
 } from "lucide-react";
+import { PageHero } from "@/components/editorial";
 
 export default function Donate() {
   useDocumentTitle("Support Our Ministry - Donate");
@@ -88,34 +89,11 @@ export default function Donate() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6">
-                  <Heart className="w-4 h-4" />
-                  Support Our Ministry
-                </div>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  Partner With <span className="gold-text">Us</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground mb-8">
-                  Your generous donation helps us continue spreading the gospel through music.
-                  Every contribution, big or small, makes a difference in our ministry.
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="Give"
+          title={<>Every gift <span className="italic text-primary">sings</span></>}
+          lede="Your donation keeps the ministry singing. Every contribution, large or small, makes a difference."
+        />
 
         {/* Impact Areas */}
         <section className="py-12 bg-charcoal">
@@ -127,7 +105,7 @@ export default function Donate() {
                     maxTilt={6}
                     className="card-glass rounded-2xl p-6 text-center h-full group hover:border-primary/30 transition-colors"
                   >
-                    <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                    <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 transition-transform duration-300 group-hover:scale-[1.03]">
                       <area.icon className="w-7 h-7 text-primary" />
                     </div>
                     <h3 className="font-display text-lg font-semibold mb-2">{area.title}</h3>
@@ -155,10 +133,10 @@ export default function Donate() {
                     <div className="mb-6 text-center">
                       <h3 className="font-display text-2xl font-semibold">Give Online</h3>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        Pay directly with MTN MoMo, or use Airtel Money and cards through Flutterwave.
+                        Pay directly with MTN MoMo, or by card through Flutterwave.
                       </p>
                     </div>
-                    <DonationCheckout />
+                    <DonationCheckout layout="compact" />
                   </div>
                 </StaggerItem>
 
@@ -233,7 +211,7 @@ export default function Donate() {
                     </div>
                     <div>
                       <h3 className="font-display text-xl font-semibold">Mobile Money</h3>
-                      <p className="text-sm text-muted-foreground">MTN MoMo / Airtel Money</p>
+                      <p className="text-sm text-muted-foreground">MTN MoMo</p>
                     </div>
                   </div>
 
@@ -254,9 +232,9 @@ export default function Donate() {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Send to</span>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">0780623144</span>
+                            <span className="font-mono font-medium">(+250) 798 254 683</span>
                             <button
-                              onClick={() => handleCopy("0780623144", "MTN number")}
+                              onClick={() => handleCopy("0798254683", "MTN number")}
                               className="p-1 hover:bg-primary/20 rounded transition-colors"
                             >
                               {copied === "MTN number" ? (
@@ -269,43 +247,7 @@ export default function Donate() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Name</span>
-                          <span className="font-medium">Serenades of Praise</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Airtel Money */}
-                    <div className="bg-secondary/50 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-                          <span className="text-white font-bold text-xs">A</span>
-                        </div>
-                        <span className="font-semibold">Airtel Money</span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Dial</span>
-                          <span className="font-mono font-medium">*182*8*1#</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Send to</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">0730623144</span>
-                            <button
-                              onClick={() => handleCopy("0730623144", "Airtel number")}
-                              className="p-1 hover:bg-primary/20 rounded transition-colors"
-                            >
-                              {copied === "Airtel number" ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-primary" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Name</span>
-                          <span className="font-medium">Serenades of Praise</span>
+                          <span className="font-medium">Irakoze Alysee</span>
                         </div>
                       </div>
                     </div>

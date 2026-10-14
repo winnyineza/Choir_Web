@@ -8,6 +8,8 @@ import { AnimatedCounter, Reveal, Stagger, StaggerItem, TiltCard } from "@/compo
 import { useState, useEffect } from "react";
 import { getLatestMusicVideo, type MusicVideo } from "@/lib/releaseService";
 import { getAllMembers } from "@/lib/dataService";
+import { PageHero } from "@/components/editorial";
+import ministryHero from "@/assets/Choir01.jpg";
 
 export default function Ministry() {
   useDocumentTitle("Our Ministry");
@@ -39,29 +41,13 @@ export default function Ministry() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-20 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  Our Ministry
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  Serving Through <span className="gold-text">Sacred Music</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  From choir trips to daily devotions, discover how we serve God's kingdom
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="The ministry"
+          title={<>Serving through <span className="italic text-primary">sacred</span> music</>}
+          lede="From ministry trips to daily devotions, discover how we serve God's kingdom."
+          image={ministryHero}
+          imageAlt="Members of Serenades of Praise"
+        />
 
         {/* Ministry Stats */}
         <section className="py-12 border-b border-primary/10">
@@ -70,7 +56,7 @@ export default function Ministry() {
               {ministryStats.map((stat) => (
                 <StaggerItem key={stat.label}>
                   <div className="text-center group">
-                    <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-3 flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                    <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-3 flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.03]">
                       <stat.icon className="w-6 h-6 text-primary-foreground" />
                     </div>
                     <p className="text-2xl md:text-3xl font-bold gold-text">
@@ -115,7 +101,7 @@ export default function Ministry() {
                 ].map((pillar) => (
                   <StaggerItem key={pillar.title}>
                     <TiltCard className="card-glass rounded-2xl p-6 text-center h-full group">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-[var(--shadow-gold)]">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient mx-auto mb-4 flex items-center justify-center transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-[var(--shadow-gold)]">
                         <pillar.icon className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <h3 className="font-display text-xl font-semibold text-foreground mb-2">{pillar.title}</h3>
@@ -179,7 +165,7 @@ export default function Ministry() {
         <section className="py-20">
           <div className="container mx-auto px-4">
             <Reveal className="max-w-4xl mx-auto card-glass rounded-3xl p-10 text-center">
-              <div className="w-16 h-16 rounded-full bg-gold-gradient mx-auto mb-6 flex items-center justify-center animate-pulse-gold">
+              <div className="w-16 h-16 rounded-full bg-gold-gradient mx-auto mb-6 flex items-center justify-center">
                 <Heart className="w-8 h-8 text-primary-foreground" />
               </div>
               <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">

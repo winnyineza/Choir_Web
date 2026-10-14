@@ -1,11 +1,12 @@
 import { createRoot } from "react-dom/client";
 import { Component, ErrorInfo, ReactNode } from "react";
-import "@fontsource/montserrat/300.css";
-import "@fontsource/montserrat/400.css";
-import "@fontsource/montserrat/500.css";
-import "@fontsource/montserrat/600.css";
-import "@fontsource/montserrat/700.css";
-import "@fontsource/montserrat/800.css";
+import "@fontsource/cormorant-garamond/400.css";
+import "@fontsource/cormorant-garamond/400-italic.css";
+import "@fontsource/cormorant-garamond/500.css";
+import "@fontsource/cormorant-garamond/500-italic.css";
+import "@fontsource/cormorant-garamond/600.css";
+import "@fontsource/cormorant-garamond/600-italic.css";
+import "@fontsource-variable/inter";
 import App from "./App.tsx";
 import "./index.css";
 import { registerSW } from "virtual:pwa-register";
@@ -73,12 +74,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0a0a0a",
+          background: "#0c0b09",
           color: "#fff",
           padding: "20px",
           textAlign: "center"
         }}>
-          <h1 style={{ color: "#D4AF37", marginBottom: "16px" }}>Something went wrong</h1>
+          <h1 style={{ color: "#C8A96A", marginBottom: "16px" }}>Something went wrong</h1>
           <p style={{ color: "#888", marginBottom: "16px", maxWidth: "500px" }}>
             An error occurred while rendering this page.
           </p>
@@ -97,7 +98,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
           <button
             onClick={() => window.location.reload()}
             style={{
-              background: "#D4AF37",
+              background: "#C8A96A",
               color: "#000",
               padding: "10px 20px",
               border: "none",

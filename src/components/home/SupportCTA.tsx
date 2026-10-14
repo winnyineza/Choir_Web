@@ -1,99 +1,76 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Heart, ArrowRight } from "lucide-react";
-import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
+import { ArrowRight } from "lucide-react";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion";
+import choirImage from "@/assets/choir-group2.jpg";
+
+const channels = [
+  {
+    label: "Equity Bank",
+    method: "Bank transfer",
+    detailLabel: "Account number",
+    detail: "4024212955253",
+  },
+  {
+    label: "MTN Mobile Money",
+    method: "MoMo",
+    detailLabel: "MoMo number",
+    detail: "(+250) 798 254 683",
+    note: "Account name: Irakoze Alysee",
+  },
+];
 
 export function SupportCTA() {
   return (
-    <section className="py-24 relative overflow-hidden">
-      {/* Background with pattern */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gold-gradient opacity-10" />
-        <div className="absolute inset-0 bg-background/90" />
-      </div>
+    <section className="relative overflow-hidden bg-ink text-[hsl(40_30%_91%)]">
+      <img
+        src={choirImage}
+        alt=""
+        aria-hidden
+        className="absolute inset-0 h-full w-full object-cover opacity-30"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,hsl(36_12%_4%)_0%,hsl(36_12%_4%/0.92)_45%,hsl(36_12%_4%/0.6)_100%)]" />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Icon */}
-          <Reveal direction="none" duration={0.6}>
-            <div className="w-20 h-20 rounded-full bg-gold-gradient mx-auto mb-8 flex items-center justify-center animate-pulse-gold">
-              <Heart className="w-10 h-10 text-primary-foreground" />
+      <div className="relative container mx-auto px-4 lg:px-10 py-28 md:py-40">
+        <div className="grid gap-16 lg:grid-cols-12 lg:items-end">
+          <Reveal className="lg:col-span-6">
+            <p className="mb-6 flex items-center gap-4 text-[0.65rem] uppercase tracking-luxe text-[hsl(40_45%_70%)]">
+              <span className="font-display text-base normal-case tracking-normal italic">VI</span>
+              <span className="h-px w-8 bg-[hsl(40_45%_70%/0.6)]" />
+              Give
+            </p>
+            <h2 className="display-lg">
+              Help the song <span className="italic text-[hsl(40_45%_70%)]">carry further.</span>
+            </h2>
+            <p className="mt-8 max-w-md text-base md:text-lg font-light leading-relaxed text-[hsl(40_30%_91%/0.75)]">
+              Your gift funds ministry trips, recordings and outreach, so more hearts across Rwanda can hear the gospel in song.
+            </p>
+            <div className="mt-12">
+              <Button variant="hero" size="xl" asChild>
+                <Link to="/support">
+                  Support the ministry
+                  <ArrowRight />
+                </Link>
+              </Button>
             </div>
           </Reveal>
 
-          <Stagger stagger={0.12}>
-            <StaggerItem>
-              <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-                Support Our <span className="gold-text">Ministry</span>
-              </h2>
-            </StaggerItem>
-            <StaggerItem>
-              <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-                Your generous support helps us continue spreading the gospel through music, reaching more hearts, and expanding our ministry across Rwanda.
-              </p>
-            </StaggerItem>
+          <Stagger className="lg:col-span-5 lg:col-start-8 border-t border-[hsl(40_30%_91%/0.15)]" stagger={0.12}>
+            {channels.map((c) => (
+              <StaggerItem key={c.label}>
+                <div className="py-8 border-b border-[hsl(40_30%_91%/0.15)]">
+                  <div className="flex items-baseline justify-between gap-6">
+                    <h3 className="font-display text-2xl">{c.label}</h3>
+                    <span className="text-[0.6rem] uppercase tracking-luxe text-[hsl(40_30%_91%/0.5)]">{c.method}</span>
+                  </div>
+                  <p className="mt-5 text-[0.6rem] uppercase tracking-[0.2em] text-[hsl(40_45%_70%)]">{c.detailLabel}</p>
+                  <p className="mt-1 font-display text-3xl tabular-nums tracking-wide select-all">{c.detail}</p>
+                  {c.note && <p className="mt-2 text-sm text-[hsl(40_30%_91%/0.6)]">{c.note}</p>}
+                </div>
+              </StaggerItem>
+            ))}
           </Stagger>
-
-          {/* Support Options */}
-          <Stagger className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-8xl mx-auto mb-10" stagger={0.14}>
-            <StaggerItem direction="right">
-              <TiltCard maxTilt={6} className="card-glass rounded-2xl p-6 text-left h-full hover:border-primary/30 transition-colors duration-300">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#8B0000] flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">EQ</span>
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[#8B0000] font-bold text-xs">EQUITY</span>
-                    <span className="block text-muted-foreground text-xs">BANK</span>
-                  </div>
-                </div>
-                <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                  Equity Bank Transfer
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Easy direct way to support, through bank transfer for any contribution.
-                </p>
-                <div className="bg-secondary/50 rounded-lg p-2">
-                  <p className="text-base text-muted-foreground">Account Number</p>
-                  <p className="text-foreground font-mono font-semibold text-lg">4024212955253</p>
-                </div>
-              </TiltCard>
-            </StaggerItem>
-
-            <StaggerItem direction="left">
-              <TiltCard maxTilt={6} className="card-glass rounded-2xl p-6 text-left h-full hover:border-primary/30 transition-colors duration-300">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#FFCC00] flex items-center justify-center">
-                    <span className="text-black font-bold text-sm">MTN</span>
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[#FFCC00] font-bold text-xs">MTN</span>
-                    <span className="block text-muted-foreground text-xs">Mobile Money</span>
-                  </div>
-                </div>
-                <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                  MTN Mobile Money
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Quick and easy supporting way, through MTN mobile money support.
-                </p>
-                <div className="bg-secondary/50 rounded-lg p-2">
-                  <p className="text-base text-muted-foreground">MoMo Number</p>
-                  <p className="text-foreground font-mono font-semibold text-lg">(+250)798 254 683</p>
-                  <p className="text-[#FFCC00] text-foreground font-mono font-semibold text-base">Acc.Name: Irakoze Alysee</p>
-                </div>
-              </TiltCard>
-            </StaggerItem>
-          </Stagger>
-
-          <Reveal delay={0.1}>
-            <Button variant="hero" size="xl" asChild className="group">
-              <Link to="/support">
-                Support Now
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1" />
-              </Link>
-            </Button>
-          </Reveal>
         </div>
       </div>
     </section>

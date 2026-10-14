@@ -6,6 +6,8 @@ import { Target, Eye, Heart, Users, Calendar, Award, Music } from "lucide-react"
 import choirImage from "@/assets/choir-group.jpg";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AnimatedCounter, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
+import { PageHero } from "@/components/editorial";
+import aboutHero from "@/assets/Choir_2.jpg";
 
 const milestones = [
   { year: "2024", title: "Founded", description: "Serenades of Praise was born at Kacyiru SDA Church" },
@@ -27,29 +29,13 @@ export default function About() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero Section */}
-        <section className="relative pt-32 pb-20 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  About Us
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold mb-6">
-                  The <span className="gold-text">Serenades</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  A journey of faith, harmony, and praise
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="About the choir"
+          title={<>The <span className="italic text-primary">Serenades</span></>}
+          lede="A journey of faith, harmony and praise, begun at Kacyiru SDA Church in 2024."
+          image={aboutHero}
+          imageAlt="The choir performing at Kacyiru SDA Church"
+        />
 
         {/* Image & History */}
         <section className="py-20">
@@ -125,7 +111,7 @@ export default function About() {
               ].map((pillar) => (
                 <StaggerItem key={pillar.title}>
                   <TiltCard className="card-glass rounded-3xl p-10 h-full group">
-                    <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-[var(--shadow-gold)]">
+                    <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-[var(--shadow-gold)]">
                       <pillar.icon className="w-8 h-8 text-primary-foreground" />
                     </div>
                     <h3 className="font-display text-2xl font-bold text-foreground mb-4">{pillar.title}</h3>
@@ -154,7 +140,7 @@ export default function About() {
             <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8" stagger={0.1}>
               {values.map((value) => (
                 <StaggerItem key={value.title} className="text-center group">
-                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 group-hover:bg-gold-gradient group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 group-hover:bg-gold-gradient group-hover:scale-[1.03] transition-all duration-300">
                     <value.icon className="w-10 h-10 text-primary group-hover:text-primary-foreground transition-colors" />
                   </div>
                   <h3 className="font-display text-xl font-semibold text-foreground mb-2">{value.title}</h3>

@@ -53,10 +53,10 @@ const IDEAL_RATIOS: Record<VoicePart, number> = {
 };
 
 const VOICE_COLORS: Record<VoicePart, string> = {
-  Soprano: "#F59E0B", // Amber
-  Alto: "#10B981",    // Emerald
-  Tenor: "#3B82F6",   // Blue
-  Bass: "#8B5CF6",    // Purple
+  Soprano: "hsl(var(--gold))", // Amber
+  Alto: "hsl(var(--sage-500))",    // Emerald
+  Tenor: "hsl(var(--slate-500))",   // Blue
+  Bass: "hsl(var(--plum-500))",    // Purple
 };
 
 export function VoiceBalanceTracker() {
@@ -348,13 +348,13 @@ export function VoiceBalanceTracker() {
                 <Bar
                   dataKey="current"
                   name="Current"
-                  fill="#3B82F6"
+                  fill="hsl(var(--slate-500))"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="ideal"
                   name="Ideal"
-                  fill="#94A3B8"
+                  fill="hsl(var(--muted-foreground))"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>

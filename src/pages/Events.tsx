@@ -18,6 +18,7 @@ import { LivestreamModal } from "@/components/events/LivestreamModal";
 import { EventReminderButton } from "@/components/events/EventReminderButton";
 import { checkAndProcessReminders, cleanupOldReminders } from "@/lib/reminderService";
 import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion";
+import { PageHero } from "@/components/editorial";
 
 // Transform EventTicket to TicketTier format for the modal
 interface DisplayEvent {
@@ -200,29 +201,11 @@ export default function Events() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero Section */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  Upcoming
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  <span className="gold-text">Events</span> & Concerts
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  Join us for worship, celebration, and musical excellence
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="The calendar"
+          title={<>Concerts <span className="italic text-primary">&amp;</span> gatherings</>}
+          lede="Join us for worship, celebration and evenings of sacred music."
+        />
 
         {/* Filters */}
         <section className="py-8 border-b border-primary/10">
@@ -285,7 +268,7 @@ export default function Events() {
                           src={event.image}
                           alt={event.title}
                           className={`w-full h-full object-cover transition-transform duration-700 ${
-                            isSoldOut ? "grayscale" : "group-hover:scale-110"
+                            isSoldOut ? "grayscale" : "group-hover:scale-[1.03]"
                           }`}
                           loading="lazy"
                         />

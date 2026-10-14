@@ -2,6 +2,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Shield } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { PageHero } from "@/components/editorial";
 
 export default function Privacy() {
   useDocumentTitle("Privacy Policy");
@@ -10,23 +11,10 @@ export default function Privacy() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-3xl mx-auto text-center">
-              <div className="w-16 h-16 rounded-full bg-gold-gradient mx-auto mb-6 flex items-center justify-center">
-                <Shield className="w-8 h-8 text-primary-foreground" />
-              </div>
-              <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                Privacy <span className="gold-text">Policy</span>
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Last updated: January 2025
-              </p>
-            </div>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="Legal · Last updated January 2025"
+          title={<>Privacy <span className="italic text-primary">policy</span></>}
+        />
 
         {/* Content */}
         <section className="py-16">

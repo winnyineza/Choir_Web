@@ -3,6 +3,8 @@ import { Footer } from "@/components/layout/Footer";
 import { Heart, Music, ArrowRight } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Stagger, StaggerItem, TiltCard } from "@/components/motion";
+import { PageHero } from "@/components/editorial";
+import joinHero from "@/assets/ChoirGrad1.jpg";
 
 export default function Join() {
   useDocumentTitle("Join the Choir");
@@ -11,29 +13,13 @@ export default function Join() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  Join Us
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  Be Part of <span className="gold-text">The Serenades</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  Use your gifts to glorify God and touch hearts through music
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="Auditions"
+          title={<>Lend us your <span className="italic text-primary">voice</span></>}
+          lede="Use your gifts to glorify God and touch hearts through music."
+          image={joinHero}
+          imageAlt="Choir members gathered together in the evening"
+        />
 
         {/* Selection Cards */}
         <section className="py-16">
@@ -61,7 +47,7 @@ export default function Join() {
                       onClick={() => window.open(option.href, "_blank")}
                       className="card-glass rounded-3xl p-10 text-left hover:border-primary/50 transition-all duration-300 group w-full h-full"
                     >
-                      <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-[var(--shadow-gold)]">
+                      <div className="w-16 h-16 rounded-2xl bg-gold-gradient flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-[var(--shadow-gold)]">
                         <option.icon className="w-8 h-8 text-primary-foreground" />
                       </div>
                       <h3 className="font-display text-2xl font-bold text-foreground mb-3">

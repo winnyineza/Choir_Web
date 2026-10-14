@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { PageTransition } from "@/components/motion";
+import { PageTransition, SmoothScroll } from "@/components/motion";
 import { trackPageView, trackSession } from "@/lib/analyticsService";
 import Index from "./pages/Index";
 
@@ -29,6 +29,7 @@ const Scanner = lazy(() => import("./pages/Scanner"));
 const MemberPortal = lazy(() => import("./pages/MemberPortal"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const EmailPreviews = lazy(() => import("./pages/EmailPreviews"));
+const MelodiesOfGrace = lazy(() => import("./pages/MelodiesOfGrace"));
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ function ScrollToTop() {
   const { pathname } = useLocation();
 
   useEffect(() => {
+    window.__lenis?.scrollTo(0, { immediate: true });
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 
@@ -72,6 +74,7 @@ function AnimatedRoutes() {
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/melodies-of-grace" element={<MelodiesOfGrace />} />
             <Route path="/ministry" element={<Ministry />} />
             <Route path="/releases" element={<Releases />} />
             <Route path="/gallery" element={<Gallery />} />
@@ -105,6 +108,7 @@ const App = () => (
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AnalyticsTracker />
             <ScrollToTop />
+            <SmoothScroll />
             <AnimatedRoutes />
           </BrowserRouter>
         </TooltipProvider>

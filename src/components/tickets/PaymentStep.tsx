@@ -52,13 +52,6 @@ export function PaymentStep({
       available: directMomoEnabled,
     },
     {
-      id: "airtel" as PaymentMethod,
-      name: "Airtel Money",
-      icon: Smartphone,
-      description: "Handled through Flutterwave",
-      available: flutterwaveReady,
-    },
-    {
       id: "card" as PaymentMethod,
       name: "Card Payment",
       icon: CreditCard,

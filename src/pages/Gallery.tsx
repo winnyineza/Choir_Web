@@ -17,6 +17,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { getAllGalleryItems } from "@/lib/dataService";
+import { PageHero } from "@/components/editorial";
 
 interface Photo {
   id: string;
@@ -163,29 +164,11 @@ export default function Gallery() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  Media
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  Our <span className="gold-text">Gallery</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  Capturing moments of praise, fellowship, and ministry
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="The archive"
+          title={<>Moments of <span className="italic text-primary">praise</span></>}
+          lede="Fellowship, ministry and worship, captured along the way."
+        />
 
         {/* Restriction Notice */}
 
@@ -293,7 +276,7 @@ export default function Gallery() {
                           <img
                             src={album.coverImage}
                             alt={album.name}
-                            className="absolute inset-0 w-full h-full object-cover rounded-xl transition-transform duration-500 group-hover:scale-105"
+                            className="absolute inset-0 w-full h-full object-cover rounded-xl transition-transform duration-500 group-hover:scale-[1.02]"
                             loading="lazy"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=Album";
@@ -340,7 +323,7 @@ export default function Gallery() {
                         <img
                           src={photo.src}
                           alt={photo.title}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                           loading="lazy"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = "https://via.placeholder.com/300?text=Photo";
@@ -392,7 +375,7 @@ export default function Gallery() {
                           <img
                             src={photo.src}
                             alt={photo.title}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                             loading="lazy"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = "https://via.placeholder.com/300?text=Photo";
@@ -441,7 +424,7 @@ export default function Gallery() {
                       <img
                         src={video.thumbnail}
                         alt={video.title}
-                        className="w-full aspect-video object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full aspect-video object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                         loading="lazy"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "https://via.placeholder.com/640x360?text=Video";

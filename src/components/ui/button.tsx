@@ -5,26 +5,27 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold ring-offset-background transition-all duration-300 will-change-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform font-body",
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-[2px] text-[0.8rem] font-medium tracking-[0.04em] ring-offset-background transition-[background-color,border-color,color,box-shadow,opacity] duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40 motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-500 font-body",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[var(--shadow-gold)]",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border-2 border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:border-primary",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-primary/10 hover:text-primary",
-        link: "text-primary underline-offset-4 hover:underline",
-        gold: "btn-shine bg-gradient-to-br from-yellow-500 to-yellow-600 text-black font-semibold shadow-lg shadow-yellow-500/25 hover:shadow-xl hover:shadow-yellow-500/40 hover:-translate-y-0.5 hover:scale-105 transition-all duration-300",
-        "gold-outline": "border-2 border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground hover:-translate-y-0.5 transition-all duration-300",
-        hero: "btn-shine bg-gradient-to-br from-yellow-500 to-yellow-600 text-black font-bold text-lg px-8 py-4 shadow-lg shadow-yellow-500/25 hover:shadow-xl hover:shadow-yellow-500/40 hover:-translate-y-0.5 hover:scale-105 transition-all duration-300",
-        "hero-outline": "border-2 border-primary/70 bg-transparent text-foreground font-semibold text-lg px-8 py-4 hover:bg-primary/10 hover:border-primary transition-all duration-300",
+        outline: "border border-foreground/15 bg-transparent text-foreground hover:border-primary/60 hover:text-primary",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/70",
+        ghost: "hover:bg-foreground/[0.04] hover:text-primary",
+        link: "text-primary underline-offset-[6px] decoration-primary/40 hover:underline",
+        // Signature call to action: solid champagne, small caps, no bounce.
+        gold: "bg-primary text-primary-foreground uppercase tracking-[0.18em] text-[0.7rem] font-semibold hover:bg-gold-light shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18)] [&:hover_svg]:translate-x-0.5",
+        "gold-outline": "border border-primary/50 bg-transparent text-primary uppercase tracking-[0.18em] text-[0.7rem] font-semibold hover:bg-primary hover:text-primary-foreground",
+        hero: "bg-primary text-primary-foreground uppercase tracking-[0.2em] text-[0.72rem] font-semibold px-9 hover:bg-gold-light shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18)] [&:hover_svg]:translate-x-0.5",
+        "hero-outline": "border border-foreground/25 bg-transparent text-foreground uppercase tracking-[0.2em] text-[0.72rem] font-semibold px-9 hover:border-foreground hover:bg-foreground hover:text-background",
       },
       size: {
         default: "h-10 px-5 py-2",
-        sm: "h-9 rounded-md px-4",
-        lg: "h-12 rounded-lg px-8 text-base",
-        xl: "h-14 rounded-xl px-10 text-lg",
+        sm: "h-9 px-4 text-xs",
+        lg: "h-12 px-8",
+        xl: "h-14 px-10",
         icon: "h-10 w-10",
       },
     },

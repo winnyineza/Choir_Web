@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { createContactSubmission } from "@/lib/contactService";
+import { PageHero } from "@/components/editorial";
 
 export default function Contact() {
   useDocumentTitle("Contact Us");
@@ -112,29 +113,11 @@ export default function Contact() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        {/* Hero */}
-        <section className="relative pt-32 pb-16 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-charcoal to-background" />
-          <div className="container mx-auto px-4 relative z-10">
-            <Stagger className="max-w-3xl mx-auto text-center" stagger={0.1}>
-              <StaggerItem>
-                <span className="inline-block text-primary text-sm font-semibold tracking-wider uppercase mb-4">
-                  Contact
-                </span>
-              </StaggerItem>
-              <StaggerItem>
-                <h1 className="font-display text-5xl md:text-6xl font-bold mb-6">
-                  Get in <span className="gold-text">Touch</span>
-                </h1>
-              </StaggerItem>
-              <StaggerItem>
-                <p className="text-xl text-muted-foreground">
-                  We'd love to hear from you. Reach out with any questions or inquiries.
-                </p>
-              </StaggerItem>
-            </Stagger>
-          </div>
-        </section>
+        <PageHero
+          eyebrow="Contact"
+          title={<>Get in <span className="italic text-primary">touch</span></>}
+          lede="We would love to hear from you, whether it's a question, an invitation or a prayer request."
+        />
 
         {/* Contact Section */}
         <section className="py-16">
@@ -303,7 +286,7 @@ export default function Contact() {
 
                   <Stagger className="space-y-6" stagger={0.1}>
                     <StaggerItem className="flex items-start gap-4 group">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-[1.03]">
                         <MapPin className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -316,7 +299,7 @@ export default function Contact() {
                     </StaggerItem>
 
                     <StaggerItem className="flex items-start gap-4 group">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-[1.03]">
                         <Mail className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -331,7 +314,7 @@ export default function Contact() {
                     </StaggerItem>
 
                     <StaggerItem className="flex items-start gap-4 group">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-[1.03]">
                         <Phone className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>
@@ -346,7 +329,7 @@ export default function Contact() {
                     </StaggerItem>
 
                     <StaggerItem className="flex items-start gap-4 group">
-                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                      <div className="w-12 h-12 rounded-xl bg-gold-gradient flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-[1.03]">
                         <Clock className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <div>

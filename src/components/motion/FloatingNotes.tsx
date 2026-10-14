@@ -24,10 +24,11 @@ function seeded(seed: number) {
 export interface FloatingNotesProps {
   count?: number;
   className?: string;
+  enabled?: boolean;
 }
 
 /** Ambient musical notes drifting upward behind hero content. Purely decorative. */
-export function FloatingNotes({ count = 14, className }: FloatingNotesProps) {
+export function FloatingNotes({ count = 14, className, enabled = false }: FloatingNotesProps) {
   const reduced = useReducedMotion();
 
   const notes = useMemo<Note[]>(
@@ -40,12 +41,13 @@ export function FloatingNotes({ count = 14, className }: FloatingNotesProps) {
         duration: 14 + seeded(i + 4) * 12,
         drift: (seeded(i + 5) - 0.5) * 120,
         rotate: (seeded(i + 6) - 0.5) * 60,
-        opacity: 0.12 + seeded(i + 7) * 0.22,
+        opacity: 0.06 + seeded(i + 7) * 0.1,
       })),
     [count]
   );
 
-  if (reduced) return null;
+  // The redesign keeps heroes still and quiet, so the notes now only appear when asked for explicitly.
+  if (reduced || !enabled) return null;
 
   return (
     <div

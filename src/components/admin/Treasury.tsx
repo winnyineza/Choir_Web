@@ -102,13 +102,13 @@ const formatDate = (dateStr: string) => {
 };
 
 const INCOME_COLORS = {
-  tickets: "#3b82f6",
-  contributions: "#8b5cf6",
-  donations: "#ec4899",
-  fines: "#f97316",
+  tickets: "hsl(var(--slate-500))",
+  contributions: "hsl(var(--plum-500))",
+  donations: "hsl(var(--blush-500))",
+  fines: "hsl(var(--sienna-500))",
 };
 
-const EXPENSE_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7"];
+const EXPENSE_COLORS = ["hsl(var(--oxblood-500))", "hsl(var(--sienna-500))", "hsl(var(--gold-light))", "hsl(var(--sage-500))", "hsl(var(--teal-500))", "hsl(var(--slate-600))", "hsl(var(--plum-400))"];
 
 interface TreasuryProps {
   onRefresh?: () => void;
@@ -525,8 +525,6 @@ export function Treasury({ onRefresh }: TreasuryProps) {
 
       {/* Main Balance Card - Hero Style */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-charcoal via-charcoal to-primary/20 border border-primary/20 p-6 md:p-8">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-green-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
         
         <div className="relative z-10">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -807,12 +805,12 @@ export function Treasury({ onRefresh }: TreasuryProps) {
                 <AreaChart data={monthlyTrendData}>
                   <defs>
                     <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--sage-500))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--sage-500))" stopOpacity={0}/>
                     </linearGradient>
                     <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--oxblood-500))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--oxblood-500))" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--primary) / 0.1)" />
@@ -820,8 +818,8 @@ export function Treasury({ onRefresh }: TreasuryProps) {
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCompactCurrency} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Area type="monotone" dataKey="income" name="Income" stroke="#22c55e" fill="url(#incomeGradient)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" fill="url(#expenseGradient)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="income" name="Income" stroke="hsl(var(--sage-500))" fill="url(#incomeGradient)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="expenses" name="Expenses" stroke="hsl(var(--oxblood-500))" fill="url(#expenseGradient)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -864,7 +862,7 @@ export function Treasury({ onRefresh }: TreasuryProps) {
                     radius={[4, 4, 0, 0]}
                   >
                     {monthlyTrendData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.balance >= 0 ? "#22c55e" : "#ef4444"} />
+                      <Cell key={`cell-${index}`} fill={entry.balance >= 0 ? "hsl(var(--sage-500))" : "hsl(var(--oxblood-500))"} />
                     ))}
                   </Bar>
                 </BarChart>
