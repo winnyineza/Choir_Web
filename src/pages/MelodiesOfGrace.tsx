@@ -11,9 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { EASE_OUT } from "@/lib/motionPresets";
 import { MELODIES_OF_GRACE as EVENT, buildMelodiesIcs } from "@/lib/melodiesOfGrace";
 
-const ON_DARK = "text-[hsl(40_30%_91%)]";
-const ON_DARK_MUTED = "text-[hsl(40_30%_91%/0.7)]";
-const GOLD_ON_DARK = "text-[hsl(40_45%_70%)]";
 
 function useCountdown(target: Date) {
   const [now, setNow] = useState(() => Date.now());
@@ -120,19 +117,20 @@ export default function MelodiesOfGrace() {
       <Header />
       <main>
         {/* ---------- Invitation ---------- */}
-        <section data-header-tone="dark" className={`relative overflow-hidden bg-ink ${ON_DARK}`}>
+        {/* Follows the site theme: ivory paper in light mode, warm ink in dark mode. */}
+        <section className="relative overflow-hidden bg-background text-foreground">
           <img
             src={EVENT.poster}
             alt=""
             aria-hidden
-            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl"
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-[0.12] blur-3xl dark:opacity-25"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(36_12%_4%/0.7),hsl(36_12%_4%/0.92)_70%,hsl(36_12%_4%))]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/90 to-background" />
 
           <div className="relative container mx-auto grid min-h-[100svh] items-center gap-14 px-4 pb-20 pt-36 lg:grid-cols-12 lg:gap-20 lg:px-10">
             <div className="lg:col-span-7">
               <motion.p
-                className="eyebrow mb-8 !text-[hsl(40_45%_70%)]"
+                className="eyebrow mb-8"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 1, delay: 0.2 }}
@@ -157,7 +155,7 @@ export default function MelodiesOfGrace() {
                     animate={reduced ? { opacity: 1 } : { y: "0%" }}
                     transition={{ duration: 1.3, delay: 0.45, ease: EASE_OUT }}
                   >
-                    of <span className={`italic ${GOLD_ON_DARK}`}>Grace.</span>
+                    of <span className="italic text-primary">Grace.</span>
                   </motion.span>
                 </span>
               </h1>
@@ -167,27 +165,27 @@ export default function MelodiesOfGrace() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 1.1, delay: 0.8, ease: EASE_OUT }}
               >
-                <p className={`mt-6 flex items-center gap-4 text-[0.65rem] uppercase tracking-luxe ${GOLD_ON_DARK}`}>
+                <p className="mt-6 flex items-center gap-4 text-[0.65rem] uppercase tracking-luxe text-primary">
                   <span className="h-px w-10 bg-current opacity-60" />
                   {EVENT.edition} · The Serenades of Praise
                 </p>
-                <p className={`mt-10 max-w-md text-lg font-light leading-relaxed ${ON_DARK_MUTED}`}>
+                <p className="mt-10 max-w-md text-lg font-light leading-relaxed text-muted-foreground">
                   {EVENT.tagline} Join us for a celebration of faith, music and togetherness.
                 </p>
 
-                <dl className="mt-10 grid max-w-lg grid-cols-2 border-y border-[hsl(40_30%_91%/0.14)]">
+                <dl className="mt-10 grid max-w-lg grid-cols-2 border-y border-foreground/10">
                   <div className="py-5 pr-6">
-                    <dt className={`text-[0.6rem] uppercase tracking-[0.2em] ${ON_DARK_MUTED}`}>When</dt>
+                    <dt className="text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">When</dt>
                     <dd className="mt-2 font-display text-xl leading-snug">
                       {EVENT.dateLabel}
-                      <span className={`block text-base ${ON_DARK_MUTED}`}>{EVENT.timeLabel}</span>
+                      <span className="block text-base text-muted-foreground">{EVENT.timeLabel}</span>
                     </dd>
                   </div>
-                  <div className="border-l border-[hsl(40_30%_91%/0.14)] py-5 pl-6">
-                    <dt className={`text-[0.6rem] uppercase tracking-[0.2em] ${ON_DARK_MUTED}`}>Where</dt>
+                  <div className="border-l border-foreground/10 py-5 pl-6">
+                    <dt className="text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">Where</dt>
                     <dd className="mt-2 font-display text-xl leading-snug">
                       {EVENT.venue}
-                      <span className={`block text-base ${ON_DARK_MUTED}`}>KG 19 Ave, Kigali</span>
+                      <span className="block text-base text-muted-foreground">KG 19 Ave, Kigali</span>
                     </dd>
                   </div>
                 </dl>
@@ -201,7 +199,7 @@ export default function MelodiesOfGrace() {
                     <CalendarPlus className="h-4 w-4" />
                     Save the date
                   </button>
-                  <button type="button" onClick={share} className="link-luxe !text-[hsl(40_30%_91%/0.85)] hover:!text-[hsl(40_45%_70%)]">
+                  <button type="button" onClick={share} className="link-luxe">
                     <Share2 className="h-3.5 w-3.5" />
                     Share invitation
                   </button>
@@ -217,7 +215,7 @@ export default function MelodiesOfGrace() {
               transition={{ duration: 1.6, delay: 0.4, ease: EASE_OUT }}
             >
               <TiltCard maxTilt={5} lift={12} className="mx-auto max-w-sm lg:max-w-none">
-                <figure className="bg-[hsl(40_33%_95%)] p-3 shadow-[0_40px_80px_-30px_hsl(0_0%_0%/0.8)]">
+                <figure className="bg-card p-3 ring-1 ring-foreground/10 shadow-[0_40px_80px_-30px_hsl(30_30%_15%/0.45)] dark:shadow-[0_40px_80px_-30px_hsl(0_0%_0%/0.8)]">
                   <img
                     src={EVENT.poster}
                     alt="The Serenades of Praise choir on the Melodies of Grace concert poster"
